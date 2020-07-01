@@ -1,0 +1,41 @@
+{
+  # for more info about the config, check out the documentation
+  # https://dev.lemmy.ml/docs/administration_configuration.html
+
+  # the domain name of your instance (eg "dev.lemmy.ml")
+  hostname: "dev.chapo.chat"
+
+  # address where lemmy should listen for incoming requests
+  bind: "0.0.0.0"
+
+  # port where lemmy should listen for incoming requests
+  port: 8536
+
+  # json web token for authorization between server and client
+  jwt_secret: "B7u6la3GwAd"
+
+  # settings related to the postgresql database
+  database: {
+    # name of the postgres database for lemmy
+    database: "lemmy"
+    # username to connect to postgres
+    user: "lemmy"
+    # password to connect to postgres
+    password: "1PcQ08!Majy"
+    # host where postgres is running
+    host: "postgres"
+  }
+
+  # The location of the frontend
+  front_end_dir: "/app/dist"
+
+  # optional: email sending configuration
+  email: {
+    # hostname of the smtp server
+    smtp_server: "postfix:25"
+    # address to send emails from, eg "noreply@your-instance.com"
+    smtp_from_address: "noreply@dev.chapo.chat"
+    use_tls: false
+  }
+}
+
