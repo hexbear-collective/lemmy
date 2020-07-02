@@ -1,5 +1,6 @@
 stages:
   - build
+  - deploy
 
 before_script:
   - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -13,5 +14,30 @@ build:
   tags:
     - docker
     - shell
+  only:
+    - chapo-dev
+
+deploy_dev:
+  stage: deploy
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-dev
+    - docker push $CI_REGISTRY_IMAGE:latest-dev
+  tags:
+    - docker
+    - shell
+  only:
+    - chapo-dev
+
+deploy_prod:
+  stage: deploy
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-prod
+    - docker push $CI_REGISTRY_IMAGE:latest-prod
+  tags:
+    - docker
+    - shell
+  when: manual
   only:
     - chapo-dev
