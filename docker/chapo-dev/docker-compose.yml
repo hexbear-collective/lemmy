@@ -19,7 +19,11 @@ services:
     image: postgres:12-alpine
     environment:
       - POSTGRES_USER=lemmy
+<<<<<<< HEAD
       - POSTGRES_PASSWORD=changeme
+=======
+      - POSTGRES_PASSWORD=1PcQ08!Majy
+>>>>>>> d9c97b22... fix merge conflicts... again
       - POSTGRES_DB=lemmy
     volumes:
       - ./volumes/postgres:/var/lib/postgresql/data
@@ -37,7 +41,11 @@ services:
     restart: always
 
   iframely:
+<<<<<<< HEAD
     image: dogbin/iframely:latest
+=======
+    image: jolt/iframely:v1.4.3
+>>>>>>> d9c97b22... fix merge conflicts... again
     ports:
       - "127.0.0.1:8061:80"
     volumes:
