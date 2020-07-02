@@ -1,0 +1,51 @@
+version: '3.3'
+
+services:
+  lemmy:
+    image: dessalines/lemmy:v0.7.5
+    ports:
+      - "127.0.0.1:8536:8536"
+    restart: always
+    environment:
+      - RUST_LOG=error
+    volumes:
+      - ./lemmy.hjson:/config/config.hjson:ro
+    depends_on:
+      - postgres
+      - pictrs
+      - iframely
+
+  postgres:
+    image: postgres:12-alpine
+    environment:
+      - POSTGRES_USER=lemmy
+      - POSTGRES_PASSWORD=changeme
+      - POSTGRES_DB=lemmy
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    restart: always
+
+  pictrs:
+    image: asonix/pictrs:amd64-v0.1.0-r9
+    user: 991:991
+    environment:
+      - PICTRS_FORMAT=jpg
+    ports:
+      - "127.0.0.1:8537:8080"
+    volumes:
+      - ./volumes/pictrs:/mnt
+    restart: always
+
+  iframely:
+    image: dogbin/iframely:latest
+    ports:
+      - "127.0.0.1:8061:80"
+    volumes:
+      - ./iframely.config.local.js:/iframely/config.local.js:ro
+    restart: always
+
+  postfix:
+    image: mwader/postfix-relay
+    environment:
+      - POSTFIX_myhostname=dev.chapo.chat
+    restart: "always"
