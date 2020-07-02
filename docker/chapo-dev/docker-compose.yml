@@ -33,6 +33,7 @@ services:
     user: 991:991
     environment:
       - PICTRS_FORMAT=jpg
+      - PICTRS_FILTER_WHITELIST=thumbnail
     ports:
       - "127.0.0.1:8537:8080"
     volumes:
