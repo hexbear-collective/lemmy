@@ -12,8 +12,8 @@
   port: 8536
 
   # json web token for authorization between server and client
-  jwt_secret: "B7u6la3GwAd"
-
+  jwt_secret: "changeme"
+  
   # settings related to the postgresql database
   database: {
     # name of the postgres database for lemmy
@@ -21,7 +21,7 @@
     # username to connect to postgres
     user: "lemmy"
     # password to connect to postgres
-    password: "1PcQ08!Majy"
+    password: "changeme"
     # host where postgres is running
     host: "postgres"
   }
