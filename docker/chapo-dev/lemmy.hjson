@@ -13,7 +13,7 @@
 
   # json web token for authorization between server and client
   jwt_secret: "changeme"
-  
+
   # settings related to the postgresql database
   database: {
     # name of the postgres database for lemmy
