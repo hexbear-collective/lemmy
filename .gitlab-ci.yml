@@ -25,6 +25,25 @@ build:
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:latest
 
+# test skeletons for whenever someone gets a chance to write the scripts
+# test_backend:
+#   stage: test
+#   script:
+#   rules:
+#     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "chapo-dev"'
+#       changes: server/*
+#       when: on_success
+#     - when: manual
+
+# test_frontend:
+#   stage: test
+#   script:
+#   rules:
+#     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "chapo-dev"'
+#       changes: ui/*
+#       when: on_success
+#     - when: manual
+
 deploy_dev:
   <<: *default_template
   stage: deploy
