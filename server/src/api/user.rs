@@ -267,13 +267,13 @@ impl Perform for Oper<Login> {
     // Fetch that username / email
     let user: User_ = match User_::find_by_email_or_username(&conn, &data.username_or_email) {
       Ok(user) => user,
-      Err(_e) => return Err(APIError::err("couldnt_find_that_username_or_email").into()),
+      Err(_e) => return Err(APIError::err("invalid_login_credentials").into()),
     };
 
     // Verify the password
     let valid: bool = verify(&data.password, &user.password_encrypted).unwrap_or(false);
     if !valid {
-      return Err(APIError::err("password_incorrect").into());
+      return Err(APIError::err("invalid_login_credentials").into());
     }
 
     // Return the jwt
