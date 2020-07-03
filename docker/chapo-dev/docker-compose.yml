@@ -2,7 +2,8 @@ version: '3.3'
 
 services:
   lemmy:
-    image: dessalines/lemmy:v0.7.5
+    image: registry.gitlab.com/chapo-sandbox/lemmy:latest-dev
+    container_name: lemmy-dev
     ports:
       - "127.0.0.1:8536:8536"
     restart: always
@@ -17,6 +18,7 @@ services:
 
   postgres:
     image: postgres:12-alpine
+    container_name: postgres-dev
     environment:
       - POSTGRES_USER=lemmy
       - POSTGRES_PASSWORD=changeme
@@ -27,9 +29,11 @@ services:
 
   pictrs:
     image: asonix/pictrs:amd64-v0.1.0-r9
+    container_name: pictrs-dev
     user: 991:991
     environment:
       - PICTRS_FORMAT=jpg
+      - PICTRS_FILTER_WHITELIST=thumbnail
     ports:
       - "127.0.0.1:8537:8080"
     volumes:
@@ -38,6 +42,7 @@ services:
 
   iframely:
     image: dogbin/iframely:latest
+    container_name: iframely-dev
     ports:
       - "127.0.0.1:8061:80"
     volumes:
@@ -46,6 +51,7 @@ services:
 
   postfix:
     image: mwader/postfix-relay
+    container_name: postfix-dev
     environment:
       - POSTFIX_myhostname=dev.chapo.chat
     restart: "always"
