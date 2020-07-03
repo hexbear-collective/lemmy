@@ -1,43 +1,62 @@
 stages:
   - build
+  - test # do not remove, dep scan errors the config without
   - deploy
 
-before_script:
-  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+include:
+  - template: Dependency-Scanning.gitlab-ci.yml
+
+default:
+  tags:
+    - docker
+    - shell
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+.default_template: &default_template
+  only:
+    - chapo-dev
 
 build:
+  <<: *default_template
   stage: build
   script:
     - docker build --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA --tag $CI_REGISTRY_IMAGE:latest --file docker/prod/Dockerfile .
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:latest
-  tags:
-    - docker
-    - shell
-  only:
-    - chapo-dev
+
+# test skeletons for whenever someone gets a chance to write the scripts
+# test_backend:
+#   stage: test
+#   script:
+#   rules:
+#     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "chapo-dev"'
+#       changes: server/*
+#       when: on_success
+#     - when: manual
+
+# test_frontend:
+#   stage: test
+#   script:
+#   rules:
+#     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "chapo-dev"'
+#       changes: ui/*
+#       when: on_success
+#     - when: manual
 
 deploy_dev:
+  <<: *default_template
   stage: deploy
   script:
     - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-dev
     - docker push $CI_REGISTRY_IMAGE:latest-dev
-  tags:
-    - docker
-    - shell
-  only:
-    - chapo-dev
 
 deploy_prod:
+  <<: *default_template
   stage: deploy
   script:
     - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-prod
     - docker push $CI_REGISTRY_IMAGE:latest-prod
-  tags:
-    - docker
-    - shell
   when: manual
-  only:
-    - chapo-dev
