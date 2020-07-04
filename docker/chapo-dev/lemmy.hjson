@@ -12,7 +12,7 @@
   port: 8536
 
   # json web token for authorization between server and client
-  jwt_secret: "changeme"
+  jwt_secret: "alsochangeme"
 
   # settings related to the postgresql database
   database: {
@@ -23,7 +23,7 @@
     # password to connect to postgres
     password: "changeme"
     # host where postgres is running
-    host: "postgres"
+    host: "postgres-dev"
   }
 
   # The location of the frontend
@@ -32,7 +32,7 @@
   # optional: email sending configuration
   email: {
     # hostname of the smtp server
-    smtp_server: "postfix:25"
+    smtp_server: "postfix-dev:25"
     # address to send emails from, eg "noreply@your-instance.com"
     smtp_from_address: "noreply@dev.chapo.chat"
     use_tls: false
