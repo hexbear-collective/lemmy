@@ -2,30 +2,14 @@ use crate::{
   api::{APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
   db::{
-    comment::*,
-    comment_view::*,
-    community_view::*,
-    moderator::*,
-    post::*,
-    site_view::*,
-    user::*,
-    user_mention::*,
-    user_view::*,
-    Crud,
-    Likeable,
-    ListingType,
-    Saveable,
-    SortType,
+    comment::*, comment_view::*, community_view::*, moderator::*, post::*, site_view::*, user::*,
+    user_mention::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
   },
-  naive_now,
-  remove_slurs,
-  scrape_text_for_mentions,
-  send_email,
+  naive_now, remove_pii, remove_slurs, scrape_text_for_mentions, send_email,
   settings::Settings,
   websocket::{
     server::{JoinCommunityRoom, SendComment},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
   MentionData,
 };
@@ -129,9 +113,10 @@ impl Perform for Oper<CreateComment> {
     }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
+    let content_pii_removed = remove_pii(&content_slurs_removed);
 
     let comment_form = CommentForm {
-      content: content_slurs_removed,
+      content: content_pii_removed,
       parent_id: data.parent_id.to_owned(),
       post_id: data.post_id,
       creator_id: user_id,
@@ -249,11 +234,12 @@ impl Perform for Oper<EditComment> {
     }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
+    let content_pii_removed = remove_pii(&content_slurs_removed);
 
     let read_comment = Comment::read(&conn, data.edit_id)?;
 
     let comment_form = CommentForm {
-      content: content_slurs_removed,
+      content: content_pii_removed,
       parent_id: data.parent_id,
       post_id: data.post_id,
       creator_id: data.creator_id,
