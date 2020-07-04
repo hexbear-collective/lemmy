@@ -47,9 +47,7 @@ use lettre::{
     extension::ClientId,
     ConnectionReuseParameters,
   },
-  ClientSecurity,
-  SmtpClient,
-  Transport,
+  ClientSecurity, SmtpClient, Transport,
 };
 use lettre_email::Email;
 use log::error;
@@ -103,6 +101,11 @@ pub fn remove_slurs(test: &str) -> String {
   SLUR_REGEX.replace_all(test, "*removed*").to_string()
 }
 
+pub fn remove_pii(test: &str) -> String {
+  PII_REGEX.replace_all(test, "*removed*").to_string()
+  //TODO: add other pii filters.
+}
+
 pub fn slur_check(test: &str) -> Result<(), Vec<&str>> {
   let mut matches: Vec<&str> = SLUR_REGEX.find_iter(test).map(|mat| mat.as_str()).collect();
 
@@ -117,9 +120,28 @@ pub fn slur_check(test: &str) -> Result<(), Vec<&str>> {
   }
 }
 
+pub fn pii_check(test: &str) -> Result<(), Vec<&str>> {
+  let mut matches: Vec<&str> = PII_REGEX.find_iter(test).map(|mat| mat.as_str()).collect();
+
+  matches.sort_unstable();
+  matches.dedup();
+
+  if matches.is_empty() {
+    Ok(())
+  } else {
+    Err(matches)
+  }
+}
+
 pub fn slurs_vec_to_str(slurs: Vec<&str>) -> String {
   let start = "No slurs - ";
   let combined = &slurs.join(", ");
+  [start, combined].concat()
+}
+
+pub fn pii_vec_to_str(pii: Vec<&str>) -> String {
+  let start = "No personally identifiable information - ";
+  let combined = &pii.join(", ");
   [start, combined].concat()
 }
 
@@ -315,14 +337,8 @@ pub fn is_valid_community_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
   use crate::{
-    is_email_regex,
-    is_image_content_type,
-    is_valid_community_name,
-    is_valid_username,
-    remove_slurs,
-    scrape_text_for_mentions,
-    slur_check,
-    slurs_vec_to_str,
+    is_email_regex, is_image_content_type, is_valid_community_name, is_valid_username,
+    remove_slurs, scrape_text_for_mentions, slur_check, slurs_vec_to_str,
   };
 
   #[test]
@@ -420,6 +436,7 @@ mod tests {
 
 lazy_static! {
   static ref EMAIL_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$").unwrap();
+  static ref PII_REGEX: Regex = Regex::new(r"(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}").unwrap();
   static ref SLUR_REGEX: Regex = RegexBuilder::new(r"(fag(g|got|tard)?|maricos?|cock\s?sucker(s|ing)?|n(i|1)g(\b|g?(a|er)?(s|z)?)\b|dindu(s?)|mudslime?s?|kikes?|mongoloids?|towel\s*heads?|\bspi(c|k)s?\b|\bchinks?|niglets?|beaners?|\bnips?\b|\bcoons?\b|jungle\s*bunn(y|ies?)|jigg?aboo?s?|\bpakis?\b|rag\s*heads?|gooks?|cunts?|bitch(es|ing|y)?|puss(y|ies?)|twats?|feminazis?|whor(es?|ing)|\bslut(s|t?y)?|\btr(a|@)nn?(y|ies?)|ladyboy(s?)|\b(b|re|r)tard(ed)?s?)").case_insensitive(true).build().unwrap();
   static ref USERNAME_MATCHES_REGEX: Regex = Regex::new(r"/u/[a-zA-Z][0-9a-zA-Z_]*").unwrap();
   // TODO keep this old one, it didn't work with port well tho
