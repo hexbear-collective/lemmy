@@ -2,20 +2,8 @@ use crate::{
   api::{APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
   db::{
-    comment_view::*,
-    community_view::*,
-    moderator::*,
-    post::*,
-    post_view::*,
-    site::*,
-    site_view::*,
-    user::*,
-    user_view::*,
-    Crud,
-    Likeable,
-    ListingType,
-    Saveable,
-    SortType,
+    comment_view::*, community_view::*, moderator::*, post::*, post_view::*, site::*, site_view::*,
+    user::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
   },
   fetch_iframely_and_pictrs_data,
   naive_now,
@@ -23,8 +11,7 @@ use crate::{
   slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
 };
 use diesel::{
@@ -131,9 +118,19 @@ impl Perform for Oper<CreatePost> {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
 
+    if let Err(pii) = pii_check(&data.name) {
+      return Err(APIError::err(&pii_vec_to_str(pii)).into());
+    }
+
     if let Some(body) = &data.body {
       if let Err(slurs) = slur_check(body) {
         return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
+      }
+    }
+
+    if let Some(body) = &data.body {
+      if let Err(pii) = pii_check(body) {
+        return Err(APIError::err(&pii_vec_to_str(pii)).into());
       }
     }
 
@@ -468,9 +465,19 @@ impl Perform for Oper<EditPost> {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
 
+    if let Err(pii) = pii_check(&data.name) {
+      return Err(APIError::err(&pii_vec_to_str(pii)).into());
+    }
+
     if let Some(body) = &data.body {
       if let Err(slurs) = slur_check(body) {
         return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
+      }
+    }
+
+    if let Some(body) = &data.body {
+      if let Err(pii) = pii_check(body) {
+        return Err(APIError::err(&pii_vec_to_str(pii)).into());
       }
     }
 
