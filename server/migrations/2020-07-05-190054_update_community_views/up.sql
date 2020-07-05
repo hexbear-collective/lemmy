@@ -65,7 +65,15 @@ CROSS JOIN LATERAL (
 		COALESCE(cf.community_id, 0) AS is_subbed
 	FROM user_ u
 	LEFT JOIN community_follower cf ON u.id = cf.user_id AND cf.community_id = cv.id
-) AS us;
+) AS us
+
+UNION ALL
+
+SELECT 
+    cv.*,
+    null AS user_id,
+    null AS subscribed
+FROM community_aggregates_view cv;
 
 CREATE VIEW community_mview AS SELECT * FROM community_view;
 
