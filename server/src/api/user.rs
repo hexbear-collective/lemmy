@@ -1,47 +1,21 @@
 use crate::{
   api::{APIError, Oper, Perform},
   apub::{
-    extensions::signatures::generate_actor_keypair,
-    make_apub_endpoint,
-    ApubObjectType,
+    extensions::signatures::generate_actor_keypair, make_apub_endpoint, ApubObjectType,
     EndpointType,
   },
   db::{
-    comment::*,
-    comment_view::*,
-    community::*,
-    community_view::*,
-    moderator::*,
-    password_reset_request::*,
-    post::*,
-    post_view::*,
-    private_message::*,
-    private_message_view::*,
-    site::*,
-    site_view::*,
-    user::*,
-    user_mention::*,
-    user_mention_view::*,
-    user_view::*,
-    Crud,
-    Followable,
-    Joinable,
-    ListingType,
-    SortType,
+    comment::*, comment_view::*, community::*, community_view::*, moderator::*,
+    password_reset_request::*, post::*, post_view::*, private_message::*, private_message_view::*,
+    site::*, site_view::*, user::*, user_mention::*, user_mention_view::*, user_view::*, Crud,
+    Followable, Joinable, ListingType, SortType,
   },
-  generate_random_string,
-  is_valid_username,
-  naive_from_unix,
-  naive_now,
-  remove_slurs,
-  send_email,
+  generate_random_string, is_valid_username, naive_from_unix, naive_now, remove_slurs, send_email,
   settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
 };
 use bcrypt::verify;
@@ -53,11 +27,11 @@ use failure::Error;
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
   username_or_email: String,
   password: String,
+  captcha_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -260,6 +234,8 @@ impl Perform for Oper<Login> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
+    const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
+
     let data: &Login = &self.data;
 
     let conn = pool.get()?;
@@ -267,9 +243,8 @@ impl Perform for Oper<Login> {
     // Fetch that username / email
     let user: User_ = match User_::find_by_email_or_username(&conn, &data.username_or_email) {
       Ok(user) => user,
-      Err(_e) => return Err(APIError::err("invalid_login_credentials").into()),
+      Err(_e) => return Err(APIError::err("invalid_login_crcargo add depeedentials").into()),
     };
-
     // Verify the password
     let valid: bool = verify(&data.password, &user.password_encrypted).unwrap_or(false);
     if !valid {
@@ -293,7 +268,7 @@ impl Perform for Oper<Register> {
 
     let conn = pool.get()?;
 
-    // Make sure site has open registration
+    // Make smuture site has open registration
     if let Ok(site) = SiteView::read(&conn) {
       if !site.open_registration {
         return Err(APIError::err("registration_closed").into());
