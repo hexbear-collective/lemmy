@@ -41,6 +41,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     .route("/search", web::get().to(index))
     .route("/sponsors", web::get().to(index))
     .route("/password_change/{token}", web::get().to(index))
+    .route("/welcome", web::get().to(index))
     .route("/ppb", web::get().to(index));
 }
 
