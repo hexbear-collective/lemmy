@@ -9,12 +9,12 @@ services:
     restart: always
     environment:
       - RUST_LOG=error
-      - LEMMY_DATABASE_PASSWORD=${LEMMYDEV_POSTGRES_PW}
-      - LEMMY_DATABASE_HOST=postgres-dev
+      - LEMMY_DATABASE__PASSWORD=${LEMMYDEV_POSTGRES_PW}
+      - LEMMY_DATABASE__HOST=postgres-dev
       - LEMMY_HOSTNAME=dev.chapo.chat
       - LEMMY_PORT=8536
-      - LEMMY_EMAIL_SMTP_SERVER=postfix-dev:25
-      - LEMMY_EMAIL_SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
+      - LEMMY_EMAIL__SMTP_SERVER=postfix-dev:25
+      - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
       - LEMMY_JWT_SECRET=${LEMMYDEV_JWT_SECRET}
     volumes:
       - ./lemmy.hjson:/config/config.hjson:ro
