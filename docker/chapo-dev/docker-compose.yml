@@ -13,7 +13,7 @@ services:
       - LEMMY_DATABASE__HOST=postgres-dev
       - LEMMY_HOSTNAME=dev.chapo.chat
       - LEMMY_PORT=8536
-      - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat:25
+      - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
       - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
       - LEMMY_EMAIL__SMTP_LOGIN=noreply@chapo.chat
       - LEMMY_EMAIL__SMTP_PASSWORD=${LEMMYDEV_SMTP_PASSWORD}
