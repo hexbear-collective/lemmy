@@ -234,7 +234,7 @@ impl Perform for Oper<Login> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
-    const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
+    //const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
 
     let data: &Login = &self.data;
 
@@ -243,7 +243,7 @@ impl Perform for Oper<Login> {
     // Fetch that username / email
     let user: User_ = match User_::find_by_email_or_username(&conn, &data.username_or_email) {
       Ok(user) => user,
-      Err(_e) => return Err(APIError::err("invalid_login_crcargo add depeedentials").into()),
+      Err(_e) => return Err(APIError::err("invalid_login_credentials").into()),
     };
     // Verify the password
     let valid: bool = verify(&data.password, &user.password_encrypted).unwrap_or(false);
@@ -268,7 +268,7 @@ impl Perform for Oper<Register> {
 
     let conn = pool.get()?;
 
-    // Make smuture site has open registration
+    // Make sure site has open registration
     if let Ok(site) = SiteView::read(&conn) {
       if !site.open_registration {
         return Err(APIError::err("registration_closed").into());
