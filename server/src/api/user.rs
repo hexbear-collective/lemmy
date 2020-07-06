@@ -27,6 +27,7 @@ use failure::Error;
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
   username_or_email: String,
@@ -226,6 +227,11 @@ pub struct UserJoinResponse {
   pub user_id: i32,
 }
 
+#[derive(Deserialize)]
+struct CaptchaResponse {
+  success: bool,
+}
+
 impl Perform for Oper<Login> {
   type Response = LoginResponse;
 
@@ -238,12 +244,24 @@ impl Perform for Oper<Login> {
 
     let data: &Login = &self.data;
 
+    let client = reqwest::blocking::Client::new();
+    let body = [("secret", SECRET_KEY), ("response", &data.captcha_id)];
+    let res = client
+      .post("https://hcaptcha.com/siteverify")
+      .form(&body)
+      .send()?;
+    //println!("received {:?}", &res.text());
+    let parsed_response: CaptchaResponse = res.json()?;
+    if !parsed_response.success {
+      return Err(APIError::err("invalid-captcha").into());
+    }
+
     let conn = pool.get()?;
 
     // Fetch that username / email
     let user: User_ = match User_::find_by_email_or_username(&conn, &data.username_or_email) {
       Ok(user) => user,
-      Err(_e) => return Err(APIError::err("invalid_login_crcargo add depeedentials").into()),
+      Err(_e) => return Err(APIError::err("invalid_login_credentials").into()),
     };
     // Verify the password
     let valid: bool = verify(&data.password, &user.password_encrypted).unwrap_or(false);

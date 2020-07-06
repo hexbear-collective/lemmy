@@ -50,3 +50,4 @@ tokio = "0.2.21"
 futures = "0.3.5"
 itertools = "0.9.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
+reqwest = { version = "0.10.6", features = ["blocking", "json"] }
