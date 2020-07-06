@@ -43,6 +43,7 @@ pub struct Register {
   pub password_verify: String,
   pub admin: bool,
   pub show_nsfw: bool,
+  pub captcha_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -282,9 +283,31 @@ impl Perform for Oper<Register> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
+    const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
     let data: &Register = &self.data;
 
     let conn = pool.get()?;
+
+    // Make sure there are no admins
+    //We put this first because there is no captcha when setting up the site.
+    //We bypass captcha check if an admin is legitimately being created
+    if data.admin && !UserView::admins(&conn)?.is_empty() {
+      return Err(APIError::err("admin_already_created").into());
+    }
+
+    if !data.admin {
+      let client = reqwest::blocking::Client::new();
+      let body = [("secret", SECRET_KEY), ("response", &data.captcha_id)];
+      let res = client
+        .post("https://hcaptcha.com/siteverify")
+        .form(&body)
+        .send()?;
+      //println!("received {:?}", &res.text());
+      let parsed_response: CaptchaResponse = res.json()?;
+      if !parsed_response.success {
+        return Err(APIError::err("invalid-captcha").into());
+      }
+    }
 
     // Make smuture site has open registration
     if let Ok(site) = SiteView::read(&conn) {
@@ -300,11 +323,6 @@ impl Perform for Oper<Register> {
 
     if let Err(slurs) = slur_check(&data.username) {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
-    }
-
-    // Make sure there are no admins
-    if data.admin && !UserView::admins(&conn)?.is_empty() {
-      return Err(APIError::err("admin_already_created").into());
     }
 
     let user_keypair = generate_actor_keypair()?;

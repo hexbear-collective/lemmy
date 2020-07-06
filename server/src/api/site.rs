@@ -3,24 +3,12 @@ use crate::{
   api::{APIError, Oper, Perform},
   apub::fetcher::search_by_apub_id,
   db::{
-    category::*,
-    comment_view::*,
-    community_view::*,
-    moderator::*,
-    moderator_views::*,
-    post_view::*,
-    site::*,
-    site_view::*,
-    user::*,
-    user_view::*,
-    Crud,
-    SearchType,
-    SortType,
+    category::*, comment_view::*, community_view::*, moderator::*, moderator_views::*,
+    post_view::*, site::*, site_view::*, user::*, user_view::*, Crud, SearchType, SortType,
   },
   naive_now,
   settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  slur_check, slurs_vec_to_str,
   websocket::{server::SendAllMessage, UserOperation, WebsocketInfo},
 };
 use diesel::{
@@ -383,6 +371,7 @@ impl Perform for Oper<GetSite> {
         password_verify: setup.admin_password.to_owned(),
         admin: true,
         show_nsfw: true,
+        captcha_id: "".to_string(),
       };
       let login_response = Oper::new(register).perform(pool.clone(), websocket_info.clone())?;
       info!("Admin {} created", setup.admin_username);
