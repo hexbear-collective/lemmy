@@ -57,11 +57,12 @@ CREATE UNIQUE INDEX idx_community_aggregates_mview_id ON community_aggregates_mv
 CREATE VIEW community_view AS
 SELECT
     cv.*,
+    us.user AS user_id,
     us.is_subbed::bool AS subscribed
 FROM community_aggregates_view cv
 CROSS JOIN LATERAL (
 	SELECT
-		u.id,
+		u.id AS user,
 		COALESCE(cf.community_id, 0) AS is_subbed
 	FROM user_ u
 	LEFT JOIN community_follower cf ON u.id = cf.user_id AND cf.community_id = cv.id
