@@ -9,6 +9,16 @@ services:
     restart: always
     environment:
       - RUST_LOG=error
+      - LEMMY_DATABASE__PASSWORD=${LEMMYDEV_POSTGRES_PW}
+      - LEMMY_DATABASE__HOST=postgres-dev
+      - LEMMY_HOSTNAME=dev.chapo.chat
+      - LEMMY_PORT=8536
+      - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat:25
+      - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
+      - LEMMY_EMAIL__SMTP_LOGIN=noreply@chapo.chat
+      - LEMMY_EMAIL__SMTP_PASSWORD=${LEMMYDEV_SMTP_PASSWORD}
+      - LEMMY_EMAIL__USE_TLS=true
+      - LEMMY_JWT_SECRET=${LEMMYDEV_JWT_SECRET}
     volumes:
       - ./lemmy.hjson:/config/config.hjson:ro
     depends_on:
@@ -21,7 +31,7 @@ services:
     container_name: postgres-dev
     environment:
       - POSTGRES_USER=lemmy
-      - POSTGRES_PASSWORD=changeme
+      - POSTGRES_PASSWORD="${LEMMYDEV_POSTGRES_PW}"
       - POSTGRES_DB=lemmy
     volumes:
       - ./volumes/postgres:/var/lib/postgresql/data
@@ -49,9 +59,26 @@ services:
       - ./iframely.config.local.js:/iframely/config.local.js:ro
     restart: always
 
-  postfix:
-    image: mwader/postfix-relay
-    container_name: postfix-dev
+  purgebot:
+    image: registry.gitlab.com/chapo-sandbox/purgebot:latest-dev
+    container_name: purgebot-dev
+    restart: always
     environment:
-      - POSTFIX_myhostname=dev.chapo.chat
-    restart: "always"
+      - POSTGRES_PASSWORD=${LEMMYDEV_POSTGRES_PW}
+      - POSTGRES_HOST=postgres-dev
+      - POSTGRES_PORT=5432
+      - LEMMY_HOST=dev.chapo.chat
+      - LEMMY_PORT=8536
+      - PUID=991
+      - PGID=991
+    volumes:
+      - /opt/app/lemmy-dev/volumes/pictrs:/pictrs
+    secrets:
+      - discord_token
+      - cloudflare_token
+
+secrets:
+  discord_token:
+    file: /opt/app/lemmy-dev/secrets/discord_token.txt
+  cloudflare_token:
+    file: /opt/app/lemmy-dev/secrets/cloudflare_token.txt
