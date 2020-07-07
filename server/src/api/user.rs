@@ -359,10 +359,7 @@ impl Perform for Oper<Register> {
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
-      email: data
-        .email
-        .to_owned()
-        .and_then(|email| Some(email.to_lowercase())),
+      email: data.email.to_owned().map(|email| email.to_lowercase()),
       matrix_user_id: None,
       avatar: None,
       password_encrypted: data.password.to_owned(),
