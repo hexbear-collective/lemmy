@@ -24,7 +24,7 @@ use diesel::{
   PgConnection,
 };
 use failure::Error;
-use log::error;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 #[derive(Serialize, Deserialize, Debug)]
@@ -989,7 +989,11 @@ impl Perform for Oper<PasswordReset> {
     // Fetch that email
     let user: User_ = match User_::find_by_email(&conn, &data.email) {
       Ok(user) => user,
-      Err(_e) => return Err(APIError::err("couldnt_find_that_username_or_email").into()),
+      // We want to avoid tipping anyone off about what usernames and emails are on the server, so we should always return the same message.
+      Err(_e) => {
+        info!("Failed to find user via email for password reset: {}", _e);
+        return Ok(PasswordResetResponse {});
+      }
     };
 
     // Generate a random token
@@ -1006,7 +1010,11 @@ impl Perform for Oper<PasswordReset> {
     let html = &format!("<h1>Password Reset Request for {}</h1><br><a href={}/password_change/{}>Click here to reset your password</a>", user.name, hostname, &token);
     match send_email(subject, user_email, &user.name, html) {
       Ok(_o) => _o,
-      Err(_e) => return Err(APIError::err(&_e).into()),
+      // We want to avoid tipping anyone off about what usernames and emails are on the server, so we should always return the same message.
+      Err(_e) => {
+        info!("Failed to send email: {}", _e);
+        return Ok(PasswordResetResponse {});
+      }
     };
 
     Ok(PasswordResetResponse {})
