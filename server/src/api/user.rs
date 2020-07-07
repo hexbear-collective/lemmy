@@ -241,7 +241,7 @@ impl Perform for Oper<Login> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
-    const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
+    //const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
 
     let data: &Login = &self.data;
 
