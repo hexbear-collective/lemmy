@@ -50,14 +50,14 @@ use diesel::{
   PgConnection,
 };
 use failure::Error;
-use log::error;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
   username_or_email: String,
   password: String,
+  captcha_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -260,6 +260,8 @@ impl Perform for Oper<Login> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
+    //const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
+
     let data: &Login = &self.data;
 
     let conn = pool.get()?;
@@ -269,7 +271,6 @@ impl Perform for Oper<Login> {
       Ok(user) => user,
       Err(_e) => return Err(APIError::err("invalid_login_credentials").into()),
     };
-
     // Verify the password
     let valid: bool = verify(&data.password, &user.password_encrypted).unwrap_or(false);
     if !valid {
@@ -322,7 +323,10 @@ impl Perform for Oper<Register> {
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
-      email: data.email.to_owned(),
+      email: data
+        .email
+        .to_owned()
+        .and_then(|email| Some(email.to_lowercase())),
       matrix_user_id: None,
       avatar: None,
       password_encrypted: data.password.to_owned(),
@@ -1014,7 +1018,11 @@ impl Perform for Oper<PasswordReset> {
     // Fetch that email
     let user: User_ = match User_::find_by_email(&conn, &data.email) {
       Ok(user) => user,
-      Err(_e) => return Err(APIError::err("couldnt_find_that_username_or_email").into()),
+      // We want to avoid tipping anyone off about what usernames and emails are on the server, so we should always return the same message.
+      Err(_e) => {
+        info!("Failed to find user via email for password reset: {}", _e);
+        return Ok(PasswordResetResponse {});
+      }
     };
 
     // Generate a random token
@@ -1031,7 +1039,11 @@ impl Perform for Oper<PasswordReset> {
     let html = &format!("<h1>Password Reset Request for {}</h1><br><a href={}/password_change/{}>Click here to reset your password</a>", user.name, hostname, &token);
     match send_email(subject, user_email, &user.name, html) {
       Ok(_o) => _o,
-      Err(_e) => return Err(APIError::err(&_e).into()),
+      // We want to avoid tipping anyone off about what usernames and emails are on the server, so we should always return the same message.
+      Err(_e) => {
+        info!("Failed to send email: {}", _e);
+        return Ok(PasswordResetResponse {});
+      }
     };
 
     Ok(PasswordResetResponse {})
