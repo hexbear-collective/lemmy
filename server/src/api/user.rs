@@ -52,7 +52,7 @@ use diesel::{
 use failure::Error;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{env, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
@@ -267,12 +267,18 @@ impl Perform for Oper<Login> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
-    //const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
+    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
+      Ok(key) => key,
+      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
+    };
 
     let data: &Login = &self.data;
 
     let client = reqwest::blocking::Client::new();
-    let body = [("secret", SECRET_KEY), ("response", &data.captcha_id)];
+    let body = [
+      ("secret", secret_key),
+      ("response", data.captcha_id.clone()),
+    ];
     let res = client
       .post("https://hcaptcha.com/siteverify")
       .form(&body)
@@ -280,7 +286,7 @@ impl Perform for Oper<Login> {
     //println!("received {:?}", &res.text());
     let parsed_response: CaptchaResponse = res.json()?;
     if !parsed_response.success {
-      return Err(APIError::err("invalid-captcha").into());
+      return Err(APIError::err("invalid_captcha").into());
     }
 
     let conn = pool.get()?;
@@ -309,7 +315,11 @@ impl Perform for Oper<Register> {
     pool: Pool<ConnectionManager<PgConnection>>,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, Error> {
-    const SECRET_KEY: &str = "0x0000000000000000000000000000000000000000";
+    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
+      Ok(key) => key,
+      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
+    };
+
     let data: &Register = &self.data;
 
     let conn = pool.get()?;
@@ -323,7 +333,10 @@ impl Perform for Oper<Register> {
 
     if !data.admin {
       let client = reqwest::blocking::Client::new();
-      let body = [("secret", SECRET_KEY), ("response", &data.captcha_id)];
+      let body = [
+        ("secret", secret_key),
+        ("response", data.captcha_id.clone()),
+      ];
       let res = client
         .post("https://hcaptcha.com/siteverify")
         .form(&body)
@@ -331,7 +344,7 @@ impl Perform for Oper<Register> {
       //println!("received {:?}", &res.text());
       let parsed_response: CaptchaResponse = res.json()?;
       if !parsed_response.success {
-        return Err(APIError::err("invalid-captcha").into());
+        return Err(APIError::err("invalid_captcha").into());
       }
     }
 
