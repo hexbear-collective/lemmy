@@ -231,6 +231,8 @@ pub struct UserJoinResponse {
 #[derive(Deserialize)]
 struct CaptchaResponse {
   success: bool,
+  #[serde(rename = "error-codes")]
+  error_codes: Vec<String>,
 }
 
 impl Perform for Oper<Login> {
@@ -260,7 +262,11 @@ impl Perform for Oper<Login> {
     //println!("received {:?}", &res.text());
     let parsed_response: CaptchaResponse = res.json()?;
     if !parsed_response.success {
-      return Err(APIError::err("invalid_captcha").into());
+      let err_string: String = format!(
+        "invalid_captcha;{}",
+        &parsed_response.error_codes.join(";").replace("-", "_")
+      );
+      return Err(APIError::err(&err_string).into());
     }
 
     let conn = pool.get()?;
@@ -318,7 +324,9 @@ impl Perform for Oper<Register> {
       //println!("received {:?}", &res.text());
       let parsed_response: CaptchaResponse = res.json()?;
       if !parsed_response.success {
-        return Err(APIError::err("invalid_captcha").into());
+        let err_string: String =
+          format!("invalid_captcha;{}", &parsed_response.error_codes.join(";"));
+        return Err(APIError::err(&err_string).into());
       }
     }
 
