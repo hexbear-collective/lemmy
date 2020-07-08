@@ -232,7 +232,7 @@ pub struct UserJoinResponse {
 struct CaptchaResponse {
   success: bool,
   #[serde(rename = "error-codes")]
-  error_codes: Vec<String>,
+  error_codes: Option<Vec<String>>,
 }
 
 impl Perform for Oper<Login> {
@@ -264,7 +264,11 @@ impl Perform for Oper<Login> {
     if !parsed_response.success {
       let err_string: String = format!(
         "invalid_captcha;{}",
-        &parsed_response.error_codes.join(";").replace("-", "_")
+        &parsed_response
+          .error_codes
+          .unwrap()
+          .join(";")
+          .replace("-", "_")
       );
       return Err(APIError::err(&err_string).into());
     }
@@ -324,8 +328,14 @@ impl Perform for Oper<Register> {
       //println!("received {:?}", &res.text());
       let parsed_response: CaptchaResponse = res.json()?;
       if !parsed_response.success {
-        let err_string: String =
-          format!("invalid_captcha;{}", &parsed_response.error_codes.join(";"));
+        let err_string: String = format!(
+          "invalid_captcha;{}",
+          &parsed_response
+            .error_codes
+            .unwrap()
+            .join(";")
+            .replace("-", "_")
+        );
         return Err(APIError::err(&err_string).into());
       }
     }
