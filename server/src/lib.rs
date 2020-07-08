@@ -405,12 +405,6 @@ pub fn is_within_comment_char_limit(content: &str) -> bool {
   content.len() <= 10000
 }
 
-pub fn word_count<T: ToString>(string: &Option<T>) -> i32 {
-  if let Some(s) = string {
-    s.to_string().split_whitespace().count() as i32
-  } else { 0 }
-}
-
 #[cfg(test)]
 mod tests {
   use crate::{
