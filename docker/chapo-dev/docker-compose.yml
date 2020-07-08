@@ -38,7 +38,7 @@ services:
     restart: always
 
   pictrs:
-    image: asonix/pictrs:amd64-v0.1.0-r9
+    image: asonix/pictrs:v0.1.13-r0
     container_name: pictrs-dev
     user: 991:991
     environment:

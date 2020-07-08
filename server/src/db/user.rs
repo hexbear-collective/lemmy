@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 // if/when it is eventuly removed form diesel this needs to be changed
 sql_function!(fn lower<TT: TextOrNullableText>(x: TT) -> sql_types::Text);
 
-#[derive(Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Clone, Queryable, Identifiable, PartialEq, Debug)]
 #[table_name = "user_"]
 pub struct User_ {
   pub id: i32,
