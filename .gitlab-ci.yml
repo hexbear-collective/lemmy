@@ -21,7 +21,7 @@ build_dev:
   <<: *default_template
   stage: build
   script:
-    - sed -i 's/10000000-ffff-ffff-ffff-000000000001/$LEMMY_HCAPTCHA_SITEKEY/g' ui/src/env.ts
+    - sed -i "s/10000000-ffff-ffff-ffff-000000000001/$LEMMY_HCAPTCHA_SITEKEY/g" ui/src/env.ts
     - docker build --tag $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA --tag $CI_REGISTRY_IMAGE:latest --file docker/prod/Dockerfile .
     - docker push $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:latest
