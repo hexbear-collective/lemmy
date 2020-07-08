@@ -3,7 +3,7 @@
   # https://dev.lemmy.ml/docs/administration_configuration.html
 
   # the domain name of your instance (eg "dev.lemmy.ml")
-  hostname: "chapo.chat"
+  hostname: "www.chapo.chat"
 
   # address where lemmy should listen for incoming requests
   bind: "0.0.0.0"

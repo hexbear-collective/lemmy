@@ -11,6 +11,7 @@
 ## Running
 
 ```bash
+sudo apt install git docker-compose
 git clone https://github.com/LemmyNet/lemmy
 cd lemmy/docker/dev
 sudo docker-compose up --no-deps --build
@@ -18,7 +19,7 @@ sudo docker-compose up --no-deps --build
 
 Upon running this, it will take a while to build, especially on slower systems. Later builds will be faster, based on how Docker creates images (using point in time snapshots).
 
-Also, trying to upload images will be broken until you set the permissions on your /volumes/pictrs folder - you need to run `chmod -R 991:991 /volumes/pictrs` from the root of the project, and will likely need to restart the docker-compose after that.
+Also, trying to upload images will be broken until you set the permissions on your /volumes/pictrs folder - you need to run `chown -R 991:991 /volumes/pictrs` from the root of the project, and will likely need to restart the docker-compose after that.
 
 Once everything is up and running, you can go to http://localhost:8536 to visit your local instance.
 
