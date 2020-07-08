@@ -392,6 +392,25 @@ pub fn is_valid_community_name(name: &str) -> bool {
   VALID_COMMUNITY_NAME_REGEX.is_match(name)
 }
 
+pub fn is_within_post_title_char_limit(title: &str) -> bool {
+  title.len() <= 140
+}
+
+// This should possibly be raised to accomodate essays or creative writing
+pub fn is_within_post_body_char_limit(body: &str) -> bool {
+  body.len() <= 10000
+}
+
+pub fn is_within_comment_char_limit(content: &str) -> bool {
+  content.len() <= 10000
+}
+
+pub fn word_count<T: ToString>(string: &Option<T>) -> i32 {
+  if let Some(s) = string {
+    s.to_string().split_whitespace().count() as i32
+  } else { 0 }
+}
+
 #[cfg(test)]
 mod tests {
   use crate::{

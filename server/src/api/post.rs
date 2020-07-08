@@ -19,6 +19,8 @@ use crate::{
     SortType,
   },
   fetch_iframely_and_pictrs_data,
+  is_within_post_title_char_limit,
+  is_within_post_body_char_limit,
   naive_now,
   pii_check,
   pii_vec_to_str,
@@ -146,6 +148,16 @@ impl Perform for Oper<CreatePost> {
       if let Err(pii) = pii_check(body) {
         return Err(APIError::err(&pii_vec_to_str(pii)).into());
       }
+    }
+
+    if !is_within_post_title_char_limit(&data.name) {
+        return Err(APIError::err("post_title_too_long").into());
+    }
+
+    if let Some(body) = &data.body {
+        if !is_within_post_body_char_limit(body) {
+            return Err(APIError::err("post_body_too_long").into());
+        }
     }
 
     let user_id = claims.id;
@@ -538,6 +550,12 @@ impl Perform for Oper<EditPost> {
       Ok(claims) => claims.claims,
       Err(_e) => return Err(APIError::err("not_logged_in").into()),
     };
+
+    if let Some(body) = &data.body {
+        if !is_within_post_body_char_limit(body) {
+            return Err(APIError::err("post_body_too_long").into());
+        }
+    }
 
     let user_id = claims.id;
 

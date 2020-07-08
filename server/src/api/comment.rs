@@ -18,6 +18,7 @@ use crate::{
     Saveable,
     SortType,
   },
+  is_within_comment_char_limit,
   naive_now,
   remove_pii,
   remove_slurs,
@@ -116,6 +117,10 @@ impl Perform for Oper<CreateComment> {
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
     let content_pii_removed = remove_pii(&content_slurs_removed);
+
+    if !is_within_comment_char_limit(&data.content) {
+        return Err(APIError::err("comment_too_long").into());
+    }
 
     let comment_form = CommentForm {
       content: content_pii_removed,
@@ -282,6 +287,10 @@ impl Perform for Oper<EditComment> {
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
     let content_pii_removed = remove_pii(&content_slurs_removed);
+
+    if !is_within_comment_char_limit(&data.content) {
+        return Err(APIError::err("comment_too_long").into());
+    }
 
     let edit_id = data.edit_id;
     let read_comment = blocking(pool, move |conn| Comment::read(conn, edit_id)).await??;
