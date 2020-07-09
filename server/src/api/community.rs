@@ -266,6 +266,17 @@ impl Perform for Oper<CreateCommunity> {
       return Err(APIError::err("site_ban").into());
     }
 
+    let comunity_name = data.name.to_owned();
+
+    match blocking(pool, move |conn| {
+      Community::read_from_name_local(conn, &comunity_name)
+    })
+    .await?
+    {
+      Ok(_) => return Err(APIError::err("community_already_exists").into()),
+      Err(_e) => (),
+    }
+
     // When you create a community, make sure the user becomes a moderator and a follower
     let keypair = generate_actor_keypair()?;
 

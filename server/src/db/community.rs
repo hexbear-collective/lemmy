@@ -85,6 +85,14 @@ impl Community {
       .first::<Self>(conn)
   }
 
+  pub fn read_from_name_local(conn: &PgConnection, community_name: &str) -> Result<Self, Error> {
+    use crate::schema::community::dsl::*;
+    community
+      .filter(name.eq(community_name))
+      .filter(local.eq(true))
+      .first::<Self>(conn)
+  }
+
   pub fn read_from_actor_id(conn: &PgConnection, community_id: &str) -> Result<Self, Error> {
     use crate::schema::community::dsl::*;
     community
