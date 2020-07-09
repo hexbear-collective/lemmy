@@ -10,7 +10,11 @@ use diesel::{dsl::*, result::Error, *};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Identifiable, PartialEq, Debug)]
+// TextOrNullableText is a marker trait for Text or Nullable<Text>
+// if/when it is eventuly removed form diesel this needs to be changed
+sql_function!(fn lower<TT: TextOrNullableText>(x: TT) -> sql_types::Text);
+
+#[derive(Clone, Queryable, Identifiable, PartialEq, Debug)]
 #[table_name = "user_"]
 pub struct User_ {
   pub id: i32,
@@ -110,7 +114,9 @@ impl User_ {
   }
 
   pub fn read_from_name(conn: &PgConnection, from_user_name: &str) -> Result<Self, Error> {
-    user_.filter(name.eq(from_user_name)).first::<Self>(conn)
+    user_
+      .filter(lower(name).eq(from_user_name.to_lowercase()))
+      .first::<Self>(conn)
   }
 
   pub fn add_admin(conn: &PgConnection, user_id: i32, added: bool) -> Result<Self, Error> {
@@ -183,11 +189,15 @@ impl User_ {
   }
 
   pub fn find_by_username(conn: &PgConnection, username: &str) -> Result<Self, Error> {
-    user_.filter(name.eq(username)).first::<User_>(conn)
+    user_
+      .filter(lower(name).eq(username.to_lowercase()))
+      .first::<User_>(conn)
   }
 
   pub fn find_by_email(conn: &PgConnection, from_email: &str) -> Result<Self, Error> {
-    user_.filter(email.eq(from_email)).first::<User_>(conn)
+    user_
+      .filter(lower(email).eq(from_email.to_lowercase()))
+      .first::<User_>(conn)
   }
 
   pub fn find_by_email_or_username(

@@ -1,0 +1,89 @@
+version: '3.3'
+
+services:
+  lemmy:
+    image: registry.gitlab.com/chapo-sandbox/lemmy:latest-prod
+    container_name: lemmy-prod
+    ports:
+      - "127.0.0.1:8546:8546"
+    restart: always
+    environment:
+      - RUST_LOG=error
+      - LEMMY_DATABASE__PASSWORD=${LEMMYPROD_POSTGRES_PW}
+      - LEMMY_DATABASE__HOST=postgres-prod
+      - LEMMY_HOSTNAME=www.chapo.chat
+      - LEMMY_PORT=8546
+      - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
+      - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@chapo.chat
+      - LEMMY_EMAIL__SMTP_LOGIN=noreply@chapo.chat
+      - LEMMY_EMAIL__SMTP_PASSWORD=${LEMMYPROD_SMTP_PASSWORD}
+      - LEMMY_EMAIL__USE_TLS=true
+      - LEMMY_JWT_SECRET=${LEMMYPROD_JWT_SECRET}
+    volumes:
+      - ./lemmy.hjson:/config/config.hjson:ro
+    depends_on:
+      - postgres
+      - pictrs
+      - iframely
+
+  postgres:
+    image: postgres:12-alpine
+    container_name: postgres-prod
+    environment:
+      - POSTGRES_USER=lemmy
+      - POSTGRES_PASSWORD="${LEMMYPROD_POSTGRES_PW}"
+      - POSTGRES_DB=lemmy
+    ports:
+      - "127.0.0.1:5433:5433"
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    command: -p 5433
+    restart: always
+
+  pictrs:
+    image: asonix/pictrs:v0.1.13-r0
+    container_name: pictrs-prod
+    user: 991:991
+    environment:
+      - PICTRS_FORMAT=jpg
+      - PICTRS_FILTER_WHITELIST=thumbnail
+    ports:
+      - "127.0.0.1:8547:8080"
+    volumes:
+      - ./volumes/pictrs:/mnt
+    restart: always
+
+  iframely:
+    image: dogbin/iframely:latest
+    container_name: iframely-prod
+    ports:
+      - "127.0.0.1:8062:80"
+    volumes:
+      - ./iframely.config.local.js:/iframely/config.local.js:ro
+    restart: always
+
+### Uncomment once purgebot is stable ###
+#
+#   purgebot:
+#     image: registry.gitlab.com/chapo-sandbox/purgebot:latest-prod
+#     container_name: purgebot-prod
+#     restart: always
+#     environment:
+#       - POSTGRES_PASSWORD=${LEMMYDEV_POSTGRES_PW}
+#       - POSTGRES_HOST=postgres-prod
+#       - POSTGRES_PORT=5433
+#       - LEMMY_HOST=www.chapo.chat
+#       - LEMMY_PORT=8536
+#       - PUID=991
+#       - PGID=991
+#     volumes:
+#       - /opt/app/lemmy-prod/volumes/pictrs:/pictrs
+#     secrets:
+#       - discord_token
+#       - cloudflare_token
+#
+# secrets:
+#   discord_token:
+#     file: /opt/app/lemmy-prod/secrets/discord_token.txt
+#   cloudflare_token:
+#     file: /opt/app/lemmy-prod/secrets/cloudflare_token.txt
