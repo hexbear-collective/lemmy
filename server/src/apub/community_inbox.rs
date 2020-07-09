@@ -1,3 +1,5 @@
+#![allow(clippy::large_enum_variant)]
+
 use crate::{
   apub::{
     extensions::signatures::verify,

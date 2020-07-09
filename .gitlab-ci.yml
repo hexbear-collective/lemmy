@@ -17,12 +17,13 @@ default:
   only:
     - chapo-dev
 
-build:
+build_dev:
   <<: *default_template
   stage: build
   script:
-    - docker build --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA --tag $CI_REGISTRY_IMAGE:latest --file docker/prod/Dockerfile .
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - sed -i "s/10000000-ffff-ffff-ffff-000000000001/$LEMMY_HCAPTCHA_SITEKEY/g" ui/src/env.ts
+    - docker build --tag $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA --tag $CI_REGISTRY_IMAGE:latest --file docker/prod/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:latest
 
 # test skeletons for whenever someone gets a chance to write the scripts
@@ -48,15 +49,15 @@ deploy_dev:
   <<: *default_template
   stage: deploy
   script:
-    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-dev
+    - docker pull $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-dev
     - docker push $CI_REGISTRY_IMAGE:latest-dev
 
 deploy_prod:
   <<: *default_template
   stage: deploy
   script:
-    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-prod
+    - docker pull $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-prod
     - docker push $CI_REGISTRY_IMAGE:latest-prod
   when: manual
