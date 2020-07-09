@@ -1,51 +1,24 @@
 use crate::{
   api::{APIError, Oper, Perform},
   apub::{
-    extensions::signatures::generate_actor_keypair,
-    make_apub_endpoint,
-    ApubObjectType,
+    extensions::signatures::generate_actor_keypair, make_apub_endpoint, ApubObjectType,
     EndpointType,
   },
   blocking,
   db::{
-    comment::*,
-    comment_view::*,
-    community::*,
-    community_view::*,
-    moderator::*,
-    password_reset_request::*,
-    post::*,
-    post_view::*,
-    private_message::*,
-    private_message_view::*,
-    site::*,
-    site_view::*,
-    user::*,
-    user_mention::*,
-    user_mention_view::*,
-    user_view::*,
-    Crud,
-    Followable,
-    Joinable,
-    ListingType,
-    SortType,
+    comment::*, comment_view::*, community::*, community_view::*, moderator::*,
+    password_reset_request::*, post::*, post_view::*, private_message::*, private_message_view::*,
+    site::*, site_view::*, user::*, user_mention::*, user_mention_view::*, user_view::*, Crud,
+    Followable, Joinable, ListingType, SortType,
   },
-  generate_random_string,
-  is_valid_username,
-  naive_from_unix,
-  naive_now,
-  remove_slurs,
-  send_email,
+  generate_random_string, is_valid_username, naive_from_unix, naive_now, remove_slurs, send_email,
   settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use log::{error, info};
@@ -275,7 +248,7 @@ impl Perform for Oper<Login> {
 
     let data: &Login = &self.data;
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let body = [
       ("secret", secret_key),
       ("response", data.captcha_id.clone()),
@@ -283,9 +256,10 @@ impl Perform for Oper<Login> {
     let res = client
       .post("https://hcaptcha.com/siteverify")
       .form(&body)
-      .send()?;
+      .send()
+      .await?;
     //println!("received {:?}", &res.text());
-    let parsed_response: CaptchaResponse = res.json()?;
+    let parsed_response: CaptchaResponse = res.json().await?;
     if !parsed_response.success {
       let err_string: String = format!(
         "invalid_captcha;{}",
@@ -347,7 +321,7 @@ impl Perform for Oper<Register> {
     }
 
     if !data.admin {
-      let client = reqwest::blocking::Client::new();
+      let client = reqwest::Client::new();
       let body = [
         ("secret", secret_key),
         ("response", data.captcha_id.clone()),
@@ -355,9 +329,10 @@ impl Perform for Oper<Register> {
       let res = client
         .post("https://hcaptcha.com/siteverify")
         .form(&body)
-        .send()?;
+        .send()
+        .await?;
       //println!("received {:?}", &res.text());
-      let parsed_response: CaptchaResponse = res.json()?;
+      let parsed_response: CaptchaResponse = res.json().await?;
       if !parsed_response.success {
         let err_string: String = format!(
           "invalid_captcha;{}",
