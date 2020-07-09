@@ -65,21 +65,21 @@ services:
     container_name: purgebot-dev
     restart: always
     environment:
-      - POSTGRES_PASSWORD=${LEMMYDEV_POSTGRES_PW}
       - POSTGRES_HOST=postgres-dev
       - POSTGRES_PORT=5432
-      - LEMMY_HOST=dev.chapo.chat
-      - LEMMY_PORT=8536
-      - PUID=991
-      - PGID=991
     volumes:
       - /opt/app/lemmy-dev/volumes/pictrs:/pictrs
     secrets:
       - discord_token
       - cloudflare_token
+      - postgres_pw
+    depends_on:
+      - postgres
 
 secrets:
   discord_token:
     file: /opt/app/lemmy-dev/secrets/discord_token.txt
   cloudflare_token:
     file: /opt/app/lemmy-dev/secrets/cloudflare_token.txt
+  postgres_pw:
+    file: /opt/app/lemmy-dev/secrets/postgres_pw
