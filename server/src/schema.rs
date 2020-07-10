@@ -161,6 +161,19 @@ table! {
 }
 
 table! {
+    community_settings (id) {
+        id -> Int4,
+        community_id -> Int4,
+        read_only -> Bool,
+        hidden -> Bool,
+        post_links -> Bool,
+        post_images -> Bool,
+        comment_images -> Int4,
+        published -> Timestamp,
+    }
+}
+
+table! {
     mod_add (id) {
         id -> Int4,
         mod_user_id -> Int4,
@@ -471,6 +484,7 @@ joinable!(comment_saved -> comment (comment_id));
 joinable!(comment_saved -> user_ (user_id));
 joinable!(community -> category (category_id));
 joinable!(community -> user_ (creator_id));
+joinable!(community_settings -> community (community_id));
 joinable!(community_follower -> community (community_id));
 joinable!(community_follower -> user_ (user_id));
 joinable!(community_moderator -> community (community_id));
@@ -512,6 +526,7 @@ allow_tables_to_appear_in_same_query!(
   comment_saved,
   community,
   community_aggregates_fast,
+  community_settings,
   community_follower,
   community_moderator,
   community_user_ban,
