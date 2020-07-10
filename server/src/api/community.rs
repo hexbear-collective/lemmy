@@ -2,25 +2,16 @@ use super::*;
 use crate::{
   api::{APIError, Oper, Perform},
   apub::{
-    extensions::signatures::generate_actor_keypair,
-    make_apub_endpoint,
-    ActorType,
-    EndpointType,
+    extensions::signatures::generate_actor_keypair, make_apub_endpoint, ActorType, EndpointType,
   },
   blocking,
   db::{Bannable, Crud, Followable, Joinable, SortType},
-  is_valid_community_name,
-  naive_from_unix,
-  naive_now,
-  slur_check,
-  slurs_vec_to_str,
+  is_valid_community_name, naive_from_unix, naive_now, slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -248,6 +239,9 @@ impl Perform for Oper<CreateCommunity> {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
 
+    // Temporary: this could be handled better with a more robust category system
+    let nsfw_override = NSFW_CATEGORY_IDS.contains(&data.category_id);
+
     if let Some(description) = &data.description {
       if let Err(slurs) = slur_check(description) {
         return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
@@ -288,7 +282,7 @@ impl Perform for Oper<CreateCommunity> {
       creator_id: user_id,
       removed: None,
       deleted: None,
-      nsfw: data.nsfw,
+      nsfw: data.nsfw || nsfw_override,
       updated: None,
       actor_id: make_apub_endpoint(EndpointType::Community, &data.name).to_string(),
       local: true,
@@ -354,6 +348,8 @@ impl Perform for Oper<EditCommunity> {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
 
+    let nsfw_override = NSFW_CATEGORY_IDS.contains(&data.category_id);
+
     if let Some(description) = &data.description {
       if let Err(slurs) = slur_check(description) {
         return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
@@ -408,7 +404,7 @@ impl Perform for Oper<EditCommunity> {
       creator_id: user_id,
       removed: data.removed.to_owned(),
       deleted: data.deleted.to_owned(),
-      nsfw: data.nsfw,
+      nsfw: data.nsfw || nsfw_override,
       updated: Some(naive_now()),
       actor_id: read_community.actor_id,
       local: read_community.local,
@@ -913,3 +909,7 @@ impl Perform for Oper<TransferCommunity> {
     })
   }
 }
+
+// Hardcoded NSFW categories until category system is more fleshed out
+// not sure if this is the right number?
+const NSFW_CATEGORY_IDS: [i32; 1] = [23];
