@@ -5,7 +5,7 @@ use crate::{
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
 #[table_name = "community"]
 pub struct Community {
   pub id: i32,
@@ -82,6 +82,14 @@ impl Community {
     use crate::schema::community::dsl::*;
     community
       .filter(name.eq(community_name))
+      .first::<Self>(conn)
+  }
+
+  pub fn read_from_name_local(conn: &PgConnection, community_name: &str) -> Result<Self, Error> {
+    use crate::schema::community::dsl::*;
+    community
+      .filter(name.eq(community_name))
+      .filter(local.eq(true))
       .first::<Self>(conn)
   }
 

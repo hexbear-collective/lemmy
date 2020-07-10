@@ -65,3 +65,64 @@ rustflags = ["-Clink-arg=-fuse-ld=lld"]
 Note that this setup doesn't include image uploads or link previews (provided by pict-rs and
 iframely respectively). If you want to test those, you should use the
 [Docker development](contributing_docker_development.md).
+
+
+### macOS
+
+
+#### Build Requirements
+```
+# install homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+brew install git cargo openssl@1.1 pkg-config libpq yarn curl gnupg2
+```
+
+#### Get the source code
+```
+git clone https://github.com/LemmyNet/lemmy.git
+# or alternatively from gitea
+# git clone https://yerbamate.dev/LemmyNet/lemmy.git
+```
+
+All the following commands need to be run either in `lemmy/server` or `lemmy/ui`, as indicated
+by the `cd` command.
+
+#### Build the backend (Rust)
+```
+cd server
+cargo build
+# for development, use `cargo check` instead)
+```
+
+#### Build the frontend (Typescript)
+```
+cd ui
+yarn
+yarn build
+```
+
+#### Setup postgresql
+```
+brew instal postgresql
+brew services start postgresql
+/usr/local/opt/postgres/bin/createuser -s postgres
+cd server
+./db-init.sh
+```
+
+#### Run a local development instance
+```
+# run each of these in a seperate terminal
+cd server && cargo run
+ui & yarn start
+```
+
+Then open [localhost:4444](http://localhost:4444) in your browser. It will auto-refresh if you edit
+any frontend files. For backend coding, you will have to rerun `cargo run`. You can use
+`cargo check` as a faster way to find compilation errors.
+
+To speed up incremental builds, you can add the following to `~/.cargo/config`:
+```
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-Clink-arg=-fuse-ld=lld"]
+```
