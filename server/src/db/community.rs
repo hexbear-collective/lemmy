@@ -104,13 +104,6 @@ impl Community {
     use crate::schema::community::dsl::*;
     community.filter(local.eq(true)).load::<Community>(conn)
   }
-
-  pub fn get_settings(&self, conn: &PgConnection) -> Result<CommunitySettings, Error> {
-    use crate::schema::community_settings::dsl::*;
-    community_settings
-      .filter(community_id.eq(self.id))
-      .first::<CommunitySettings>(conn)
-  }
 }
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]

@@ -17,6 +17,7 @@ use crate::{
   db::{
     activity::insert_activity,
     community::{Community, CommunityForm},
+    community_settings::CommunitySettings,
     community_view::{CommunityFollowerView, CommunityModeratorView},
     user::User_,
   },
@@ -54,6 +55,15 @@ impl ToApub for Community {
 
   // Turn a Lemmy Community into an ActivityPub group that can be sent out over the network.
   async fn to_apub(&self, pool: &DbPool) -> Result<GroupExt, LemmyError> {
+    let id = self.id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(&conn, id)
+    })
+      .await??;
+    if settings.private {
+      return Err(format_err!("Community is private").into());
+    }
+
     let mut group = Group::default();
     let oprops: &mut ObjectProperties = group.as_mut();
 
