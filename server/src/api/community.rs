@@ -321,7 +321,7 @@ impl Perform for Oper<CreateCommunity> {
       published: None,
     };
 
-    let inserted_settings =
+    let _inserted_settings =
       match blocking(pool, move |conn| CommunitySettings::create(conn, &community_settings_form)).await? {
         Ok(settings) => settings,
         Err(_e) => return Err(APIError::err("settings_already_exist").into()),

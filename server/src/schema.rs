@@ -118,6 +118,8 @@ table! {
         updated -> Nullable<Timestamp>,
         deleted -> Nullable<Bool>,
         nsfw -> Nullable<Bool>,
+        read_only -> Nullable<Bool>,
+        private -> Nullable<Bool>,
         actor_id -> Nullable<Varchar>,
         local -> Nullable<Bool>,
         last_refreshed_at -> Nullable<Timestamp>,

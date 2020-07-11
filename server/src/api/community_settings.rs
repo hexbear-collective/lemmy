@@ -72,8 +72,9 @@ impl Perform for Oper<GetCommunitySettings> {
       None => None,
     };
 
+    let community_id = data.community_id;
     let community_settings = blocking(pool, move |conn| {
-      CommunitySettings::read_from_community_id(conn, data.community_id)
+      CommunitySettings::read_from_community_id(conn, community_id)
     }).await??;
 
     let _community_settings_id = community_settings.id;
@@ -130,8 +131,9 @@ impl Perform for Oper<EditCommunitySettings> {
       return Err(APIError::err("no_post_edit_allowed").into());
     }
 
+    let community_id = data.community_id;
     let community_settings = blocking(pool, move |conn| {
-      CommunitySettings::read_from_community_id(conn, data.community_id)
+      CommunitySettings::read_from_community_id(conn, community_id)
     }).await??;
 
     let res = EditCommunitySettingsResponse {
