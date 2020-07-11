@@ -167,7 +167,6 @@ table! {
         read_only -> Bool,
         private -> Bool,
         post_links -> Bool,
-        post_images -> Bool,
         comment_images -> Int4,
         published -> Nullable<Timestamp>,
     }

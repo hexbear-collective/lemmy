@@ -2,7 +2,7 @@ use super::*;
 use crate::{
   api::{APIError, Oper, Perform},
   blocking,
-  db::community_settings::CommunitySettings,
+  db::community_settings::{CommunitySettings, CommunitySettingsForm},
   naive_now,
   websocket::{
     WebsocketInfo,
@@ -23,7 +23,6 @@ pub struct GetCommunitySettingsResponse {
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,
-  pub post_images: bool,
   pub comment_images: i32,
   pub published: Option<chrono::NaiveDateTime>,
 }
@@ -34,7 +33,6 @@ pub struct EditCommunitySettings {
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,
-  pub post_images: bool,
   pub comment_images: i32,
   pub published: chrono::NaiveDateTime,
   auth: String,
@@ -45,9 +43,8 @@ pub struct EditCommunitySettingsResponse {
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,
-  pub post_images: bool,
   pub comment_images: i32,
-  pub published: chrono::NaiveDateTime,
+  pub published: Option<chrono::NaiveDateTime>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -83,7 +80,6 @@ impl Perform for Oper<GetCommunitySettings> {
       read_only: community_settings.read_only,
       private: community_settings.private,
       post_links: community_settings.post_links,
-      post_images: community_settings.post_images,
       comment_images: community_settings.comment_images,
       published: Some(naive_now()),
     };
@@ -131,18 +127,26 @@ impl Perform for Oper<EditCommunitySettings> {
       return Err(APIError::err("no_post_edit_allowed").into());
     }
 
-    let community_id = data.community_id;
-    let community_settings = blocking(pool, move |conn| {
+    let community_settings_form = CommunitySettingsForm {
+      community_id: data.community_id.to_owned(),
+      read_only: data.read_only.to_owned(),
+      private: data.private.to_owned(),
+      post_links: data.post_links.to_owned(),
+      comment_images: data.comment_images.to_owned(),
+      published: Some(naive_now()),
+    };
+
+    let new_community_settings = blocking(pool, move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     }).await??;
 
+
     let res = EditCommunitySettingsResponse {
-      read_only: data.read_only,
-      private: data.private,
-      post_links: data.post_links,
-      post_images: data.post_images,
-      comment_images: data.comment_images,
-      published: naive_now(),
+      read_only: new_community_settings.read_only,
+      private: new_community_settings.private,
+      post_links: new_community_settings.post_links,
+      comment_images: new_community_settings.comment_images,
+      published: new_community_settings.published,
     };
 
     // Return the jwt

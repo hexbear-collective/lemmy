@@ -316,7 +316,6 @@ impl Perform for Oper<CreateCommunity> {
       read_only: false,
       private: false,
       post_links: true,
-      post_images: true,
       comment_images: 1,
       published: None,
     };

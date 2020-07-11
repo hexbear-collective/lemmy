@@ -10,7 +10,6 @@ pub struct CommunitySettings {
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,
-  pub post_images: bool,
   pub comment_images: i32,
   pub published: Option<chrono::NaiveDateTime>,
 }
@@ -22,7 +21,6 @@ pub struct CommunitySettingsForm {
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,
-  pub post_images: bool,
   pub comment_images: i32,
   pub published: Option<chrono::NaiveDateTime>,
 }
