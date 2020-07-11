@@ -1,4 +1,5 @@
-use crate::db::{fuzzy_search, limit_and_offset, ListingType, MaybeOptional, SortType};
+// TODO, remove the cross join here, just join to user directly
+use crate::{fuzzy_search, limit_and_offset, ListingType, MaybeOptional, SortType};
 use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +27,7 @@ table! {
     creator_actor_id -> Text,
     creator_local -> Bool,
     creator_name -> Varchar,
+    creator_published -> Timestamp,
     creator_avatar -> Nullable<Text>,
     score -> BigInt,
     upvotes -> BigInt,
@@ -39,7 +41,7 @@ table! {
 }
 
 table! {
-  comment_mview (id) {
+  comment_fast_view (id) {
     id -> Int4,
     creator_id -> Int4,
     post_id -> Int4,
@@ -61,6 +63,7 @@ table! {
     creator_actor_id -> Text,
     creator_local -> Bool,
     creator_name -> Varchar,
+    creator_published -> Timestamp,
     creator_avatar -> Nullable<Text>,
     score -> BigInt,
     upvotes -> BigInt,
@@ -76,7 +79,7 @@ table! {
 #[derive(
   Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize, QueryableByName, Clone,
 )]
-#[table_name = "comment_view"]
+#[table_name = "comment_fast_view"]
 pub struct CommentView {
   pub id: i32,
   pub creator_id: i32,
@@ -99,6 +102,7 @@ pub struct CommentView {
   pub creator_actor_id: String,
   pub creator_local: bool,
   pub creator_name: String,
+  pub creator_published: chrono::NaiveDateTime,
   pub creator_avatar: Option<String>,
   pub score: i64,
   pub upvotes: i64,
@@ -112,7 +116,7 @@ pub struct CommentView {
 
 pub struct CommentQueryBuilder<'a> {
   conn: &'a PgConnection,
-  query: super::comment_view::comment_mview::BoxedQuery<'a, Pg>,
+  query: super::comment_view::comment_fast_view::BoxedQuery<'a, Pg>,
   listing_type: ListingType,
   sort: &'a SortType,
   for_community_id: Option<i32>,
@@ -127,9 +131,9 @@ pub struct CommentQueryBuilder<'a> {
 
 impl<'a> CommentQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection) -> Self {
-    use super::comment_view::comment_mview::dsl::*;
+    use super::comment_view::comment_fast_view::dsl::*;
 
-    let query = comment_mview.into_boxed();
+    let query = comment_fast_view.into_boxed();
 
     CommentQueryBuilder {
       conn,
@@ -198,7 +202,7 @@ impl<'a> CommentQueryBuilder<'a> {
   }
 
   pub fn list(self) -> Result<Vec<CommentView>, Error> {
-    use super::comment_view::comment_mview::dsl::*;
+    use super::comment_view::comment_fast_view::dsl::*;
 
     let mut query = self.query;
 
@@ -270,8 +274,8 @@ impl CommentView {
     from_comment_id: i32,
     my_user_id: Option<i32>,
   ) -> Result<Self, Error> {
-    use super::comment_view::comment_mview::dsl::*;
-    let mut query = comment_mview.into_boxed();
+    use super::comment_view::comment_fast_view::dsl::*;
+    let mut query = comment_fast_view.into_boxed();
 
     // The view lets you pass a null user_id, if you're not logged in
     if let Some(my_user_id) = my_user_id {
@@ -290,7 +294,7 @@ impl CommentView {
 
 // The faked schema since diesel doesn't do views
 table! {
-  reply_view (id) {
+  reply_fast_view (id) {
     id -> Int4,
     creator_id -> Int4,
     post_id -> Int4,
@@ -313,6 +317,7 @@ table! {
     creator_local -> Bool,
     creator_name -> Varchar,
     creator_avatar -> Nullable<Text>,
+    creator_published -> Timestamp,
     score -> BigInt,
     upvotes -> BigInt,
     downvotes -> BigInt,
@@ -328,7 +333,7 @@ table! {
 #[derive(
   Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize, QueryableByName, Clone,
 )]
-#[table_name = "reply_view"]
+#[table_name = "reply_fast_view"]
 pub struct ReplyView {
   pub id: i32,
   pub creator_id: i32,
@@ -352,6 +357,7 @@ pub struct ReplyView {
   pub creator_local: bool,
   pub creator_name: String,
   pub creator_avatar: Option<String>,
+  pub creator_published: chrono::NaiveDateTime,
   pub score: i64,
   pub upvotes: i64,
   pub downvotes: i64,
@@ -365,7 +371,7 @@ pub struct ReplyView {
 
 pub struct ReplyQueryBuilder<'a> {
   conn: &'a PgConnection,
-  query: super::comment_view::reply_view::BoxedQuery<'a, Pg>,
+  query: super::comment_view::reply_fast_view::BoxedQuery<'a, Pg>,
   for_user_id: i32,
   sort: &'a SortType,
   unread_only: bool,
@@ -375,9 +381,9 @@ pub struct ReplyQueryBuilder<'a> {
 
 impl<'a> ReplyQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection, for_user_id: i32) -> Self {
-    use super::comment_view::reply_view::dsl::*;
+    use super::comment_view::reply_fast_view::dsl::*;
 
-    let query = reply_view.into_boxed();
+    let query = reply_fast_view.into_boxed();
 
     ReplyQueryBuilder {
       conn,
@@ -411,7 +417,7 @@ impl<'a> ReplyQueryBuilder<'a> {
   }
 
   pub fn list(self) -> Result<Vec<ReplyView>, Error> {
-    use super::comment_view::reply_view::dsl::*;
+    use super::comment_view::reply_fast_view::dsl::*;
 
     let mut query = self.query;
 
@@ -454,11 +460,17 @@ impl<'a> ReplyQueryBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
-  use super::{
-    super::{comment::*, community::*, post::*, user::*},
+  use crate::{
+    comment::*,
+    comment_view::*,
+    community::*,
+    post::*,
+    tests::establish_unpooled_connection,
+    user::*,
+    Crud,
+    Likeable,
     *,
   };
-  use crate::db::{establish_unpooled_connection, Crud, Likeable};
 
   #[test]
   fn test_crud() {
@@ -575,6 +587,7 @@ mod tests {
       published: inserted_comment.published,
       updated: None,
       creator_name: inserted_user.name.to_owned(),
+      creator_published: inserted_user.published,
       creator_avatar: None,
       score: 1,
       downvotes: 0,
@@ -608,6 +621,7 @@ mod tests {
       published: inserted_comment.published,
       updated: None,
       creator_name: inserted_user.name.to_owned(),
+      creator_published: inserted_user.published,
       creator_avatar: None,
       score: 1,
       downvotes: 0,
@@ -615,8 +629,8 @@ mod tests {
       upvotes: 1,
       user_id: Some(inserted_user.id),
       my_vote: Some(1),
-      subscribed: None,
-      saved: None,
+      subscribed: Some(false),
+      saved: Some(false),
       ap_id: "http://fake.com".to_string(),
       local: true,
       community_actor_id: inserted_community.actor_id.to_owned(),
