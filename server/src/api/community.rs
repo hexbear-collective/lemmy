@@ -8,7 +8,15 @@ use crate::{
     EndpointType,
   },
   blocking,
-  db::{Bannable, Crud, Followable, Joinable, SortType},
+  db::{
+    Bannable,
+    community_settings::CommunitySettings, 
+    community_settings::CommunitySettingsForm, 
+    Crud, 
+    Followable, 
+    Joinable, 
+    SortType
+  },
   is_valid_community_name,
   naive_from_unix,
   naive_now,
@@ -302,6 +310,23 @@ impl Perform for Oper<CreateCommunity> {
       match blocking(pool, move |conn| Community::create(conn, &community_form)).await? {
         Ok(community) => community,
         Err(_e) => return Err(APIError::err("community_already_exists").into()),
+      };
+
+    // Initialize community settings
+    let community_settings_form = CommunitySettingsForm {
+      community_id: inserted_community.id,
+      read_only: false,
+      private: false,
+      post_links: true,
+      post_images: true,
+      comment_images: 1,
+      published: None,
+    };
+
+    let inserted_settings =
+      match blocking(pool, move |conn| CommunitySettings::create(conn, &community_settings_form)).await? {
+        Ok(settings) => settings,
+        Err(_e) => return Err(APIError::err("settings_already_exist").into()),
       };
 
     let community_moderator_form = CommunityModeratorForm {

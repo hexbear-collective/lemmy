@@ -8,6 +8,7 @@ use actix_web::client::Client;
 
 pub mod comment;
 pub mod community;
+pub mod community_settings;
 pub mod post;
 pub mod site;
 pub mod user;

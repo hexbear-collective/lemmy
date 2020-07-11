@@ -30,16 +30,14 @@ pub struct CommunitySettingsForm {
 impl CommunitySettings {
   pub fn read_from_community_id(conn: &PgConnection, community_id_: i32) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
-    community_settings
-      .filter(community_id.eq(community_id_))
-      .first::<Self>(conn)
+    community_settings.find(community_id_).first::<Self>(conn)
   }
 }
 
 impl Crud<CommunitySettingsForm> for CommunitySettings {
-  fn read(conn: &PgConnection, community_id_: i32) -> Result<Self, Error> {
+  fn read(conn: &PgConnection, id: i32) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
-    community_settings.find(community_id_).first::<Self>(conn)
+    community_settings.find(id).first::<Self>(conn)
   }
 
   fn delete(conn: &PgConnection, community_id_: i32) -> Result<usize, Error> {
