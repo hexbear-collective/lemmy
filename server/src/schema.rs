@@ -165,11 +165,11 @@ table! {
         id -> Int4,
         community_id -> Int4,
         read_only -> Bool,
-        hidden -> Bool,
+        private -> Bool,
         post_links -> Bool,
         post_images -> Bool,
         comment_images -> Int4,
-        published -> Timestamp,
+        published -> Nullable<Timestamp>,
     }
 }
 

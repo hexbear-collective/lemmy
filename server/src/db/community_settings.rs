@@ -1,26 +1,26 @@
-use crate::{
-  db::{Bannable, Crud, Followable, Joinable},
-  schema::{community, community_settings},
-};
+use crate::{db::Crud, schema::community_settings};
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
 #[table_name = "community_settings"]
 pub struct CommunitySettings {
+  pub id: i32,
   pub community_id: i32,
   pub read_only: bool,
-  pub hidden: bool,
+  pub private: bool,
   pub post_links: bool,
   pub post_images: bool,
   pub comment_images: i32,
   pub published: Option<chrono::NaiveDateTime>,
 }
 
+#[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize, Debug)]
+#[table_name = "community_settings"]
 pub struct CommunitySettingsForm {
   pub community_id: i32,
   pub read_only: bool,
-  pub hidden: bool,
+  pub private: bool,
   pub post_links: bool,
   pub post_images: bool,
   pub comment_images: i32,
@@ -28,31 +28,23 @@ pub struct CommunitySettingsForm {
 }
 
 impl CommunitySettings {
-  pub fn read_from_actor_id(conn: &PgConnection, community_id: &str) -> Result<Self, Error> {
+  pub fn read_from_community_id(conn: &PgConnection, community_id_: i32) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
     community_settings
-      .filter(actor_id.eq(community_id))
+      .filter(community_id.eq(community_id_))
       .first::<Self>(conn)
-  }
-
-  // idk maybe???
-  pub fn list_local(conn: &PgConnection) -> Result<Vec<Self>, Error> {
-    use crate::schema::community::dsl::*;
-    community_settings
-      .filter(local.eq(true))
-      .load::<Community>(conn)
   }
 }
 
 impl Crud<CommunitySettingsForm> for CommunitySettings {
-  fn read(conn: &PgConnection, community_id: i32) -> Result<Self, Error> {
+  fn read(conn: &PgConnection, community_id_: i32) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
-    community_settings.find(community_id).first::<Self>(conn)
+    community_settings.find(community_id_).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, community_id: i32) -> Result<usize, Error> {
+  fn delete(conn: &PgConnection, community_id_: i32) -> Result<usize, Error> {
     use crate::schema::community_settings::dsl::*;
-    diesel::delete(community_settings.find(community_id)).execute(conn)
+    diesel::delete(community_settings.find(community_id_)).execute(conn)
   }
 
   fn create(
@@ -67,11 +59,11 @@ impl Crud<CommunitySettingsForm> for CommunitySettings {
 
   fn update(
     conn: &PgConnection,
-    community_id: i32,
+    community_id_: i32,
     new_community_settings: &CommunitySettingsForm,
   ) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
-    diesel::update(community_settings.find(community_id))
+    diesel::update(community_settings.find(community_id_))
       .set(new_community_settings)
       .get_result::<Self>(conn)
   }
