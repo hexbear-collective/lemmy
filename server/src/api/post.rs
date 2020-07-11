@@ -3,36 +3,16 @@ use crate::{
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
   db::{
-    comment_view::*,
-    community_view::*,
-    moderator::*,
-    post::*,
-    post_view::*,
-    site::*,
-    site_view::*,
-    user::*,
-    user_view::*,
-    Crud,
-    Likeable,
-    ListingType,
-    Saveable,
-    SortType,
+    comment_view::*, community_view::*, moderator::*, post::*, post_view::*, site::*, site_view::*,
+    user::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
   },
-  fetch_iframely_and_pictrs_data,
-  is_within_post_title_char_limit,
-  is_within_post_body_char_limit,
-  naive_now,
-  pii_check,
-  pii_vec_to_str,
-  slur_check,
-  slurs_vec_to_str,
+  fetch_iframely_and_pictrs_data, is_within_post_body_char_limit, is_within_post_title_char_limit,
+  naive_now, pii_check, pii_vec_to_str, slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -151,13 +131,13 @@ impl Perform for Oper<CreatePost> {
     }
 
     if !is_within_post_title_char_limit(&data.name) {
-        return Err(APIError::err("post_title_too_long").into());
+      return Err(APIError::err("post_title_too_long").into());
     }
 
     if let Some(body) = &data.body {
-        if !is_within_post_body_char_limit(body) {
-            return Err(APIError::err("post_body_too_long").into());
-        }
+      if !is_within_post_body_char_limit(body) {
+        return Err(APIError::err("post_body_too_long").into());
+      }
     }
 
     let user_id = claims.id;
@@ -382,8 +362,6 @@ impl Perform for Oper<GetPosts> {
     let type_ = ListingType::from_str(&data.type_)?;
     let sort = SortType::from_str(&data.sort)?;
 
-    let page = data.page;
-    let limit = data.limit;
     let community_id = data.community_id;
     let posts = match blocking(pool, move |conn| {
       PostQueryBuilder::create(conn)
@@ -392,8 +370,6 @@ impl Perform for Oper<GetPosts> {
         .show_nsfw(show_nsfw)
         .for_community_id(community_id)
         .my_user_id(user_id)
-        .page(page)
-        .limit(limit)
         .list()
     })
     .await?
@@ -552,9 +528,9 @@ impl Perform for Oper<EditPost> {
     };
 
     if let Some(body) = &data.body {
-        if !is_within_post_body_char_limit(body) {
-            return Err(APIError::err("post_body_too_long").into());
-        }
+      if !is_within_post_body_char_limit(body) {
+        return Err(APIError::err("post_body_too_long").into());
+      }
     }
 
     let user_id = claims.id;
