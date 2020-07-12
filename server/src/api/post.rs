@@ -358,10 +358,10 @@ impl Perform for Oper<GetPosts> {
       Some(claims) => claims.show_nsfw,
       None => false,
     };
-
+    let page = data.page;
     let type_ = ListingType::from_str(&data.type_)?;
     let sort = SortType::from_str(&data.sort)?;
-
+    let limit = data.limit;
     let community_id = data.community_id;
     let posts = match blocking(pool, move |conn| {
       PostQueryBuilder::create(conn)
@@ -370,6 +370,8 @@ impl Perform for Oper<GetPosts> {
         .show_nsfw(show_nsfw)
         .for_community_id(community_id)
         .my_user_id(user_id)
+        .page(page)
+        .limit(limit)
         .list()
     })
     .await?
