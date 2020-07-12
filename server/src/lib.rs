@@ -403,6 +403,10 @@ pub fn is_within_comment_char_limit(content: &str) -> bool {
   content.len() <= 10000
 }
 
+pub fn is_within_message_char_limit(content: &str) -> bool {
+  content.len() <= 4000
+}
+
 #[cfg(test)]
 mod tests {
   use crate::{
