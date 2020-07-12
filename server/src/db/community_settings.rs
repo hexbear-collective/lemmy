@@ -11,7 +11,7 @@ pub struct CommunitySettings {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub published: Option<chrono::NaiveDateTime>,
+  pub published: chrono::NaiveDateTime,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize, Debug)]
@@ -22,7 +22,7 @@ pub struct CommunitySettingsForm {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub published: Option<chrono::NaiveDateTime>,
+  pub published: chrono::NaiveDateTime,
 }
 
 impl CommunitySettings {

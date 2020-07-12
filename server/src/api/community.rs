@@ -6,19 +6,10 @@ use crate::{
   },
   blocking,
   db::{
-    Bannable,
-    community_settings::CommunitySettings, 
-    community_settings::CommunitySettingsForm, 
-    Crud, 
-    Followable, 
-    Joinable, 
-    SortType
+    community_settings::CommunitySettings, community_settings::CommunitySettingsForm, Bannable,
+    Crud, Followable, Joinable, SortType,
   },
-  is_valid_community_name,
-  naive_from_unix,
-  naive_now,
-  slur_check,
-  slurs_vec_to_str,
+  is_valid_community_name, naive_from_unix, naive_now, slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, SendCommunityRoomMessage},
     UserOperation, WebsocketInfo,
@@ -317,14 +308,17 @@ impl Perform for Oper<CreateCommunity> {
       private: false,
       post_links: true,
       comment_images: 1,
-      published: None,
+      published: naive_now(),
     };
 
-    let _inserted_settings =
-      match blocking(pool, move |conn| CommunitySettings::create(conn, &community_settings_form)).await? {
-        Ok(settings) => settings,
-        Err(_e) => return Err(APIError::err("settings_already_exist").into()),
-      };
+    let _inserted_settings = match blocking(pool, move |conn| {
+      CommunitySettings::create(conn, &community_settings_form)
+    })
+    .await?
+    {
+      Ok(settings) => settings,
+      Err(_e) => return Err(APIError::err("settings_already_exist").into()),
+    };
 
     let community_moderator_form = CommunityModeratorForm {
       community_id: inserted_community.id,

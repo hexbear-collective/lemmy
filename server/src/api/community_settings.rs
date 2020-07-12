@@ -24,7 +24,7 @@ pub struct GetCommunitySettingsResponse {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub published: Option<chrono::NaiveDateTime>,
+  pub published: chrono::NaiveDateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,7 +44,7 @@ pub struct EditCommunitySettingsResponse {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub published: Option<chrono::NaiveDateTime>,
+  pub published: chrono::NaiveDateTime,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -82,7 +82,7 @@ impl Perform for Oper<GetCommunitySettings> {
       private: community_settings.private,
       post_links: community_settings.post_links,
       comment_images: community_settings.comment_images,
-      published: Some(naive_now()),
+      published: naive_now(),
     };
 
     // Return the jwt
@@ -139,7 +139,7 @@ impl Perform for Oper<EditCommunitySettings> {
       private: data.private.to_owned(),
       post_links: data.post_links.to_owned(),
       comment_images: data.comment_images.to_owned(),
-      published: Some(naive_now()),
+      published: naive_now(),
     };
 
     let community_id = data.community_id;

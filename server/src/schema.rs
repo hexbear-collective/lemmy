@@ -168,7 +168,7 @@ table! {
         private -> Bool,
         post_links -> Bool,
         comment_images -> Int4,
-        published -> Nullable<Timestamp>,
+        published -> Timestamp,
     }
 }
 
