@@ -1,5 +1,5 @@
 use crate::{
-  db::{Bannable, Crud, Followable, Joinable},
+  db::{community_settings::CommunitySettings, Bannable, Crud, Followable, Joinable},
   schema::{community, community_follower, community_moderator, community_user_ban},
 };
 use diesel::{dsl::*, result::Error, *};
@@ -103,6 +103,10 @@ impl Community {
   pub fn list_local(conn: &PgConnection) -> Result<Vec<Self>, Error> {
     use crate::schema::community::dsl::*;
     community.filter(local.eq(true)).load::<Community>(conn)
+  }
+
+  pub fn get_settings(&self, conn: &PgConnection) -> Result<CommunitySettings, Error> {
+    CommunitySettings::read_from_community_id(&conn, self.id)
   }
 }
 
