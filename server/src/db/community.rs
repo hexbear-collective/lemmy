@@ -1,5 +1,5 @@
 use crate::{
-  db::{community_settings::CommunitySettings, Bannable, Crud, Followable, Joinable},
+  db::{Bannable, Crud, Followable, Joinable},
   schema::{community, community_follower, community_moderator, community_user_ban},
 };
 use diesel::{dsl::*, result::Error, *};

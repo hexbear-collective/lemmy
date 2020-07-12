@@ -3,16 +3,12 @@ use crate::{
   api::{APIError, Oper, Perform},
   blocking,
   db::{
-    Crud,
     community_settings::{CommunitySettings, CommunitySettingsForm},
+    Crud,
   },
   naive_now,
-  websocket::{
-    server::{JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation, WebsocketInfo,
-  },
-  DbPool,
-  LemmyError,
+  websocket::{server::SendCommunityRoomMessage, UserOperation, WebsocketInfo},
+  DbPool, LemmyError,
 };
 use serde::{Deserialize, Serialize};
 
@@ -58,10 +54,11 @@ impl Perform for Oper<GetCommunitySettings> {
   async fn perform(
     &self,
     pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetCommunitySettingsResponse, LemmyError> {
     let data: &GetCommunitySettings = &self.data;
 
+    /*
     let user_id: Option<i32> = match &data.auth {
       Some(auth) => match Claims::decode(&auth) {
         Ok(claims) => {
@@ -72,30 +69,13 @@ impl Perform for Oper<GetCommunitySettings> {
       },
       None => None,
     };
+    */
 
     let community_id = data.community_id;
     let community_settings = blocking(pool, move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
-    }).await??;
-    /*
-    let online = if let Some(ws) = websocket_info {
-      if let Some(id) = ws.id {
-        ws.chatserver.do_send(JoinCommunityRoom {
-          community_id: data.community_id,
-          id,
-        });
-      }
-
-      // TODO
-      1
-    // let fut = async {
-    //   ws.chatserver.send(GetCommunityUsersOnline {community_id}).await.unwrap()
-    // };
-    // Runtime::new().unwrap().block_on(fut)
-    } else {
-      0
-    };
-    */
+    })
+    .await??;
 
     let res = GetCommunitySettingsResponse {
       read_only: community_settings.read_only,
@@ -122,9 +102,7 @@ impl Perform for Oper<EditCommunitySettings> {
     let data: &EditCommunitySettings = &self.data;
 
     let user_id: i32 = match Claims::decode(&data.auth) {
-      Ok(claims) => {
-        claims.claims.id
-      }
+      Ok(claims) => claims.claims.id,
       Err(_e) => return Err(APIError::err("settings_no_permission").into()),
     };
 
@@ -148,10 +126,12 @@ impl Perform for Oper<EditCommunitySettings> {
       return Err(APIError::err("no_post_edit_allowed").into());
     }
 
+    /*
     let community_id = data.community_id;
     let read_community_settings = blocking(pool, move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     }).await??;
+    */
 
     let community_settings_form = CommunitySettingsForm {
       community_id: data.community_id.to_owned(),
@@ -168,20 +148,16 @@ impl Perform for Oper<EditCommunitySettings> {
     })
     .await?
     {
-      Ok(community) => community,
+      Ok(settings) => settings,
       Err(_e) => return Err(APIError::err("couldnt_update_settings").into()),
     };
 
-    let new_community_settings = blocking(pool, move |conn| {
-      CommunitySettings::read_from_community_id(conn, community_id)
-    }).await??;
-
     let res = EditCommunitySettingsResponse {
-      read_only: new_community_settings.read_only,
-      private: new_community_settings.private,
-      post_links: new_community_settings.post_links,
-      comment_images: new_community_settings.comment_images,
-      published: new_community_settings.published,
+      read_only: updated_community_settings.read_only,
+      private: updated_community_settings.private,
+      post_links: updated_community_settings.post_links,
+      comment_images: updated_community_settings.comment_images,
+      published: updated_community_settings.published,
     };
 
     if let Some(ws) = websocket_info {

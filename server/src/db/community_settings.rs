@@ -33,9 +33,9 @@ impl CommunitySettings {
 }
 
 impl Crud<CommunitySettingsForm> for CommunitySettings {
-  fn read(conn: &PgConnection, id: i32) -> Result<Self, Error> {
+  fn read(conn: &PgConnection, _id: i32) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
-    community_settings.find(id).first::<Self>(conn)
+    community_settings.find(_id).first::<Self>(conn)
   }
 
   fn delete(conn: &PgConnection, community_id_: i32) -> Result<usize, Error> {
