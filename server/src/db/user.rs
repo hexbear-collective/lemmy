@@ -1,7 +1,6 @@
 use crate::{
-  db::Crud,
-  is_email_regex,
-  naive_now,
+  db::{community::CommunityModerator, Crud},
+  is_email_regex, naive_now,
   schema::{user_, user_::dsl::*},
   settings::Settings,
 };
@@ -134,6 +133,20 @@ impl User_ {
   pub fn read_from_actor_id(conn: &PgConnection, object_id: &str) -> Result<Self, Error> {
     use crate::schema::user_::dsl::*;
     user_.filter(actor_id.eq(object_id)).first::<Self>(conn)
+  }
+
+  pub fn is_mod_or_admin(&self, conn: &PgConnection, community_id_: i32) -> Result<bool, Error> {
+    use crate::schema::community_moderator::dsl::*;
+
+    Ok(
+      community_moderator
+        .filter(community_id.eq(community_id_))
+        .filter(user_id.eq(self.id))
+        .first::<CommunityModerator>(conn)
+        .optional()?
+        .is_some()
+        || self.admin,
+    )
   }
 }
 

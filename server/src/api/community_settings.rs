@@ -103,10 +103,20 @@ impl Perform for Oper<EditCommunitySettings> {
 
     let user_id: i32 = match Claims::decode(&data.auth) {
       Ok(claims) => claims.claims.id,
-      Err(_e) => return Err(APIError::err("settings_no_permission").into()),
+      Err(_e) => return Err(APIError::err("no_community_edit_allowed").into()),
     };
 
     // Verify it's a mod or admin
+    let community_id = data.community_id;
+    let _: Result<(), LemmyError> = blocking(pool, move |conn| {
+      if !User_::read(&conn, user_id)?.is_mod_or_admin(&conn, community_id)? {
+        Ok(())
+      } else {
+        Err(APIError::err("no_community_edit_allowed").into())
+      }
+    })
+    .await?;
+    /*
     let community_id = data.community_id;
     let mut editors: Vec<i32> = Vec::new();
     editors.append(
@@ -125,6 +135,7 @@ impl Perform for Oper<EditCommunitySettings> {
     if !editors.contains(&user_id) {
       return Err(APIError::err("no_post_edit_allowed").into());
     }
+    */
 
     /*
     let community_id = data.community_id;

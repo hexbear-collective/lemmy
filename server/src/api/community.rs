@@ -395,25 +395,16 @@ impl Perform for Oper<EditCommunity> {
       return Err(APIError::err("site_ban").into());
     }
 
-    // Verify its a mod
+    // Verify it's a mod or admin
     let edit_id = data.edit_id;
-    let mut editors: Vec<i32> = Vec::new();
-    editors.append(
-      &mut blocking(pool, move |conn| {
-        CommunityModeratorView::for_community(conn, edit_id)
-          .map(|v| v.into_iter().map(|m| m.user_id).collect())
-      })
-      .await??,
-    );
-    editors.append(
-      &mut blocking(pool, move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
-      })
-      .await??,
-    );
-    if !editors.contains(&user_id) {
-      return Err(APIError::err("no_community_edit_allowed").into());
-    }
+    let _: Result<(), LemmyError> = blocking(pool, move |conn| {
+      if !User_::read(&conn, user_id)?.is_mod_or_admin(&conn, edit_id)? {
+        Ok(())
+      } else {
+        Err(APIError::err("no_community_edit_allowed").into())
+      }
+    })
+    .await?;
 
     let edit_id = data.edit_id;
     let read_community = blocking(pool, move |conn| Community::read(conn, edit_id)).await??;
