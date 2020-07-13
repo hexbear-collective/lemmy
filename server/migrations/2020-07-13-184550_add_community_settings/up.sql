@@ -24,6 +24,6 @@ SELECT id,
   FALSE,
   FALSE,
   TRUE,
-  2,
+  1,
   CURRENT_TIMESTAMP
 FROM community;
