@@ -150,7 +150,6 @@ impl Perform for Oper<EditCommunitySettings> {
       private: data.private.to_owned(),
       post_links: data.post_links.to_owned(),
       comment_images: data.comment_images.to_owned(),
-      published: naive_now(),
     };
 
     let community_id = data.community_id;

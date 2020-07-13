@@ -22,7 +22,6 @@ pub struct CommunitySettingsForm {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub published: chrono::NaiveDateTime,
 }
 
 impl CommunitySettings {

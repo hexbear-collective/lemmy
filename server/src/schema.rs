@@ -102,6 +102,8 @@ table! {
         private_key -> Nullable<Text>,
         public_key -> Nullable<Text>,
         last_refreshed_at -> Timestamp,
+        read_only -> Nullable<Bool>,
+        private -> Nullable<Bool>,
     }
 }
 
@@ -152,15 +154,6 @@ table! {
 }
 
 table! {
-    community_user_ban (id) {
-        id -> Int4,
-        community_id -> Int4,
-        user_id -> Int4,
-        published -> Timestamp,
-    }
-}
-
-table! {
     community_settings (id) {
         id -> Int4,
         community_id -> Int4,
@@ -168,6 +161,15 @@ table! {
         private -> Bool,
         post_links -> Bool,
         comment_images -> Int4,
+        published -> Timestamp,
+    }
+}
+
+table! {
+    community_user_ban (id) {
+        id -> Int4,
+        community_id -> Int4,
+        user_id -> Int4,
         published -> Timestamp,
     }
 }
@@ -483,11 +485,11 @@ joinable!(comment_saved -> comment (comment_id));
 joinable!(comment_saved -> user_ (user_id));
 joinable!(community -> category (category_id));
 joinable!(community -> user_ (creator_id));
-joinable!(community_settings -> community (community_id));
 joinable!(community_follower -> community (community_id));
 joinable!(community_follower -> user_ (user_id));
 joinable!(community_moderator -> community (community_id));
 joinable!(community_moderator -> user_ (user_id));
+joinable!(community_settings -> community (community_id));
 joinable!(community_user_ban -> community (community_id));
 joinable!(community_user_ban -> user_ (user_id));
 joinable!(mod_add_community -> community (community_id));
@@ -517,37 +519,37 @@ joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
 
 allow_tables_to_appear_in_same_query!(
-  activity,
-  category,
-  comment,
-  comment_aggregates_fast,
-  comment_like,
-  comment_saved,
-  community,
-  community_aggregates_fast,
-  community_settings,
-  community_follower,
-  community_moderator,
-  community_user_ban,
-  mod_add,
-  mod_add_community,
-  mod_ban,
-  mod_ban_from_community,
-  mod_lock_post,
-  mod_remove_comment,
-  mod_remove_community,
-  mod_remove_post,
-  mod_sticky_post,
-  password_reset_request,
-  post,
-  post_aggregates_fast,
-  post_like,
-  post_read,
-  post_saved,
-  private_message,
-  site,
-  user_,
-  user_ban,
-  user_fast,
-  user_mention,
+    activity,
+    category,
+    comment,
+    comment_aggregates_fast,
+    comment_like,
+    comment_saved,
+    community,
+    community_aggregates_fast,
+    community_follower,
+    community_moderator,
+    community_settings,
+    community_user_ban,
+    mod_add,
+    mod_add_community,
+    mod_ban,
+    mod_ban_from_community,
+    mod_lock_post,
+    mod_remove_comment,
+    mod_remove_community,
+    mod_remove_post,
+    mod_sticky_post,
+    password_reset_request,
+    post,
+    post_aggregates_fast,
+    post_like,
+    post_read,
+    post_saved,
+    private_message,
+    site,
+    user_,
+    user_ban,
+    user_fast,
+    user_mention,
 );
