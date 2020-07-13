@@ -3,8 +3,8 @@ use crate::{
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
   db::{
-    comment_view::*, community_view::*, moderator::*, post::*, post_view::*, site::*, site_view::*,
-    user::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
+    comment_view::*, community_settings::*, community_view::*, moderator::*, post::*, post_view::*,
+    site::*, site_view::*, user::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
   },
   fetch_iframely_and_pictrs_data, is_within_post_body_char_limit, is_within_post_title_char_limit,
   naive_now, pii_check, pii_vec_to_str, slur_check, slurs_vec_to_str,
@@ -140,7 +140,29 @@ impl Perform for Oper<CreatePost> {
       }
     }
 
+    // Check community settings
     let user_id = claims.id;
+    let community_id = data.community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = data.community_id;
+    let privileged = blocking(pool, move |conn| {
+      let user = User_::read(conn, user_id)?;
+      user.is_mod_or_admin(conn, community_id)
+    })
+    .await??;
+    if settings.private && !privileged {
+      return Err(APIError::err("community_is_private").into());
+    }
+    if settings.read_only && !privileged {
+      return Err(APIError::err("community_is_read_only").into());
+    }
+    if !settings.post_links && !privileged && data.url.is_some() {
+      return Err(APIError::err("community_no_link_posts").into());
+    }
 
     // Check for a community ban
     let community_id = data.community_id;
@@ -292,6 +314,27 @@ impl Perform for Oper<GetPost> {
     })
     .await??;
 
+    let community_id = post_view.community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = post_view.community_id;
+    if let Some(user_id) = user_id {
+      let privileged = blocking(pool, move |conn| {
+        let user = User_::read(conn, user_id)?;
+        user.is_mod_or_admin(conn, community_id)
+      })
+      .await??;
+      if settings.private && !privileged {
+        return Err(APIError::err("community_is_private").into());
+      }
+      if settings.read_only && !privileged {
+        return Err(APIError::err("community_is_read_only").into());
+      }
+    }
+
     let site_creator_id =
       blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
@@ -358,6 +401,7 @@ impl Perform for Oper<GetPosts> {
       Some(claims) => claims.show_nsfw,
       None => false,
     };
+
     let page = data.page;
     let type_ = ListingType::from_str(&data.type_)?;
     let sort = SortType::from_str(&data.sort)?;
@@ -439,6 +483,23 @@ impl Perform for Oper<CreatePostLike> {
     let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
     if user.banned {
       return Err(APIError::err("site_ban").into());
+    }
+
+    // Check community settings
+    let community_id = post.community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = post.community_id;
+    let privileged = blocking(pool, move |conn| {
+      let user = User_::read(conn, user_id)?;
+      user.is_mod_or_admin(conn, community_id)
+    })
+    .await??;
+    if settings.private && !privileged {
+      return Err(APIError::err("community_is_private").into());
     }
 
     let like_form = PostLikeForm {
@@ -699,7 +760,26 @@ impl Perform for Oper<SavePost> {
       Err(_e) => return Err(APIError::err("not_logged_in").into()),
     };
 
+    let post_id = data.post_id;
+    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+
+    // Check community settings
     let user_id = claims.id;
+    let community_id = post.community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = post.community_id;
+    let privileged = blocking(pool, move |conn| {
+      let user = User_::read(conn, user_id)?;
+      user.is_mod_or_admin(conn, community_id)
+    })
+    .await??;
+    if settings.private && !privileged {
+      return Err(APIError::err("community_is_private").into());
+    }
 
     let post_saved_form = PostSavedForm {
       post_id: data.post_id,
