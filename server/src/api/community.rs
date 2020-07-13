@@ -302,8 +302,9 @@ impl Perform for Oper<CreateCommunity> {
       };
 
     // Initialize community settings
+    let community_id = inserted_community.id;
     let community_settings_form = CommunitySettingsForm {
-      community_id: inserted_community.id,
+      community_id,
       read_only: false,
       private: false,
       post_links: true,
@@ -311,14 +312,10 @@ impl Perform for Oper<CreateCommunity> {
       published: naive_now(),
     };
 
-    let _inserted_settings = match blocking(pool, move |conn| {
+    let _inserted_settings = blocking(pool, move |conn| {
       CommunitySettings::create(conn, &community_settings_form)
     })
-    .await?
-    {
-      Ok(settings) => settings,
-      Err(_e) => return Err(APIError::err("settings_already_exist").into()),
-    };
+    .await??;
 
     let community_moderator_form = CommunityModeratorForm {
       community_id: inserted_community.id,
@@ -924,5 +921,4 @@ impl Perform for Oper<TransferCommunity> {
 }
 
 // Hardcoded NSFW categories until category system is more fleshed out
-// not sure if this is the right number?
 const NSFW_CATEGORY_IDS: [i32; 1] = [23];
