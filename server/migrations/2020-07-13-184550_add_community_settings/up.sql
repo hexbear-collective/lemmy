@@ -6,7 +6,7 @@ CREATE TABLE community_settings (
   private BOOL NOT NULL,
   post_links BOOL NOT NULL,
   comment_images INT NOT NULL,
-  published TIMESTAMP NOT NULL,
+  published TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (community_id)
     REFERENCES community(id)
     ON UPDATE CASCADE
@@ -18,12 +18,10 @@ INSERT INTO community_settings (
   read_only,
   private,
   post_links,
-  comment_images,
-  published )
+  comment_images )
 SELECT id,
   FALSE,
   FALSE,
   TRUE,
-  1,
-  CURRENT_TIMESTAMP
+  1
 FROM community;
