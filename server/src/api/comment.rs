@@ -3,36 +3,18 @@ use crate::{
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
   db::{
-    comment::*,
-    comment_view::*,
-    community_view::*,
-    moderator::*,
-    post::*,
-    site_view::*,
-    user::*,
-    user_mention::*,
-    user_view::*,
-    Crud,
-    Likeable,
-    ListingType,
-    Saveable,
-    SortType,
+    comment::*, comment_view::*, community_settings::*, community_view::*, moderator::*, post::*,
+    post_view::*, site_view::*, user::*, user_mention::*, user_view::*, Crud, Likeable,
+    ListingType, Saveable, SortType,
   },
-  is_within_comment_char_limit,
-  naive_now,
-  remove_pii,
-  remove_slurs,
-  scrape_text_for_mentions,
+  is_within_comment_char_limit, naive_now, remove_pii, remove_slurs, scrape_text_for_mentions,
   send_email,
   settings::Settings,
   websocket::{
     server::{JoinCommunityRoom, SendComment},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
-  MentionData,
+  DbPool, LemmyError, MentionData,
 };
 use log::error;
 use serde::{Deserialize, Serialize};
@@ -119,7 +101,7 @@ impl Perform for Oper<CreateComment> {
     let content_pii_removed = remove_pii(&content_slurs_removed);
 
     if !is_within_comment_char_limit(&data.content) {
-        return Err(APIError::err("comment_too_long").into());
+      return Err(APIError::err("comment_too_long").into());
     }
 
     let comment_form = CommentForm {
@@ -135,6 +117,37 @@ impl Perform for Oper<CreateComment> {
       ap_id: "http://fake.com".into(),
       local: true,
     };
+
+    let user_id = claims.id;
+    let post_id = data.post_id;
+    let post = blocking(pool, move |conn| {
+      PostView::read(conn, post_id, Some(user_id))
+    })
+    .await??;
+
+    // Check community settings
+    let community_id = post.community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = post.community_id;
+    let privileged = blocking(pool, move |conn| {
+      let user = User_::read(conn, user_id)?;
+      user.is_mod_or_admin(conn, community_id)
+    })
+    .await??;
+    if settings.private && !privileged {
+      return Err(APIError::err("community_is_private").into());
+    }
+    if settings.read_only && !privileged {
+      return Err(APIError::err("community_is_read_only").into());
+    }
+    let num_images: i32 = 0; // temp obviously
+    if !privileged && settings.comment_images < num_images {
+      return Err(APIError::err("community_too_many_images").into());
+    }
 
     // Check for a community ban
     let post_id = data.post_id;
@@ -289,7 +302,7 @@ impl Perform for Oper<EditComment> {
     let content_pii_removed = remove_pii(&content_slurs_removed);
 
     if !is_within_comment_char_limit(&data.content) {
-        return Err(APIError::err("comment_too_long").into());
+      return Err(APIError::err("comment_too_long").into());
     }
 
     let edit_id = data.edit_id;
@@ -586,6 +599,29 @@ impl Perform for Oper<GetComments> {
       Some(claims) => Some(claims.id),
       None => None,
     };
+
+    // Check community settings
+    if let Some(community_id) = data.community_id {
+      let settings = blocking(pool, move |conn| {
+        CommunitySettings::read_from_community_id(conn, community_id)
+      })
+      .await??;
+
+      let privileged = {
+        if let Some(id) = user_id {
+          blocking(pool, move |conn| {
+            let user = User_::read(conn, id)?;
+            user.is_mod_or_admin(conn, community_id)
+          })
+          .await??
+        } else {
+          false
+        }
+      };
+      if settings.private && !privileged {
+        return Err(APIError::err("community_is_private").into());
+      }
+    }
 
     let type_ = ListingType::from_str(&data.type_)?;
     let sort = SortType::from_str(&data.sort)?;
