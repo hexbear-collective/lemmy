@@ -16,6 +16,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use url::Url;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreatePost {
@@ -154,6 +155,13 @@ impl Perform for Oper<CreatePost> {
     let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
     if user.banned {
       return Err(APIError::err("site_ban").into());
+    }
+
+    if data.url.is_some() {
+      match Url::parse(data.url.as_ref().unwrap()) {
+        Ok(_t) => (),
+        Err(_e) => return Err(APIError::err("invalid_url").into()),
+      }
     }
 
     // Fetch Iframely and pictrs cached image
