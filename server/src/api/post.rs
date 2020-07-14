@@ -95,6 +95,13 @@ pub struct SavePost {
   auth: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct CreatePostReport {
+  post_id: i32,
+  reason: Option<String>,
+  auth: String,
+}
+
 #[async_trait::async_trait(?Send)]
 impl Perform for Oper<CreatePost> {
   type Response = PostResponse;
@@ -733,5 +740,21 @@ impl Perform for Oper<SavePost> {
     .await??;
 
     Ok(PostResponse { post: post_view })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<CreatePostReport> {
+  type Response = PostResponse;  // I don't know what we want to send back yet
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<PostResponse, LemmyError> {
+    let data: &CreatePostReport = &self.data;
+
+    // TODO: implement me
+    Err(APIError::err("not_implemented").into())
   }
 }
