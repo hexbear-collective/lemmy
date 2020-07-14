@@ -135,7 +135,7 @@ impl Perform for Oper<CreateComment> {
     let community_id = post.community_id;
     let privileged = blocking(pool, move |conn| {
       let user = User_::read(conn, user_id)?;
-      user.is_mod_or_admin(conn, community_id)
+      user.is_moderator(conn, community_id)
     })
     .await??;
     if settings.private && !privileged {
@@ -315,7 +315,7 @@ impl Perform for Oper<EditComment> {
     let community_id = orig_community_id;
     let privileged = blocking(pool, move |conn| {
       let user = User_::read(conn, user_id)?;
-      user.is_mod_or_admin(conn, community_id)
+      user.is_moderator(conn, community_id)
     })
     .await??;
     let num_images: i32 = num_md_images(&content_pii_removed);
@@ -629,7 +629,7 @@ impl Perform for Oper<GetComments> {
         if let Some(id) = user_id {
           blocking(pool, move |conn| {
             let user = User_::read(conn, id)?;
-            user.is_mod_or_admin(conn, community_id)
+            user.is_moderator(conn, community_id)
           })
           .await??
         } else {

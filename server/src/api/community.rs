@@ -2,22 +2,14 @@ use super::*;
 use crate::{
   api::{APIError, Oper, Perform},
   apub::{
-    extensions::signatures::generate_actor_keypair, 
-    make_apub_endpoint, 
-    ActorType, 
-    EndpointType,
+    extensions::signatures::generate_actor_keypair, make_apub_endpoint, ActorType, EndpointType,
   },
   blocking,
   db::{
-    community_settings::CommunitySettings,
-    community_settings::CommunitySettingsForm,
-    Bannable, Crud, Followable, Joinable, SortType,
+    community_settings::CommunitySettings, community_settings::CommunitySettingsForm, Bannable,
+    Crud, Followable, Joinable, SortType,
   },
-  is_valid_community_name,
-  naive_from_unix,
-  naive_now,
-  slur_check,
-  slurs_vec_to_str,
+  is_valid_community_name, naive_from_unix, naive_now, slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, SendCommunityRoomMessage},
     UserOperation, WebsocketInfo,
@@ -402,7 +394,7 @@ impl Perform for Oper<EditCommunity> {
     // Verify it's a mod or admin
     let edit_id = data.edit_id;
     let _: Result<(), LemmyError> = blocking(pool, move |conn| {
-      if !User_::read(&conn, user_id)?.is_mod_or_admin(&conn, edit_id)? {
+      if !User_::read(&conn, user_id)?.is_moderator(&conn, edit_id)? {
         Ok(())
       } else {
         Err(APIError::err("no_community_edit_allowed").into())

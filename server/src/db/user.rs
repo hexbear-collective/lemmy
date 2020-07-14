@@ -135,7 +135,7 @@ impl User_ {
     user_.filter(actor_id.eq(object_id)).first::<Self>(conn)
   }
 
-  pub fn is_mod_or_admin(&self, conn: &PgConnection, community_id_: i32) -> Result<bool, Error> {
+  pub fn is_moderator(&self, conn: &PgConnection, community_id_: i32) -> Result<bool, Error> {
     use crate::schema::community_moderator::dsl::*;
 
     Ok(
@@ -144,8 +144,7 @@ impl User_ {
         .filter(user_id.eq(self.id))
         .first::<CommunityModerator>(conn)
         .optional()?
-        .is_some()
-        || self.admin,
+        .is_some(),
     )
   }
 }

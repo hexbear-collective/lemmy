@@ -96,7 +96,7 @@ impl Perform for Oper<EditCommunitySettings> {
     // Verify it's a mod or admin
     let community_id = data.community_id;
     let _: Result<(), LemmyError> = blocking(pool, move |conn| {
-      if !User_::read(&conn, user_id)?.is_mod_or_admin(&conn, community_id)? {
+      if !User_::read(&conn, user_id)?.is_moderator(&conn, community_id)? {
         Ok(())
       } else {
         Err(APIError::err("no_community_edit_allowed").into())

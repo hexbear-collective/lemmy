@@ -151,7 +151,7 @@ impl Perform for Oper<CreatePost> {
     let community_id = data.community_id;
     let privileged = blocking(pool, move |conn| {
       let user = User_::read(conn, user_id)?;
-      user.is_mod_or_admin(conn, community_id)
+      user.is_moderator(conn, community_id)
     })
     .await??;
     if settings.private && !privileged {
@@ -324,7 +324,7 @@ impl Perform for Oper<GetPost> {
     if let Some(user_id) = user_id {
       let privileged = blocking(pool, move |conn| {
         let user = User_::read(conn, user_id)?;
-        user.is_mod_or_admin(conn, community_id)
+        user.is_moderator(conn, community_id)
       })
       .await??;
       if settings.private && !privileged {
@@ -495,7 +495,7 @@ impl Perform for Oper<CreatePostLike> {
     let community_id = post.community_id;
     let privileged = blocking(pool, move |conn| {
       let user = User_::read(conn, user_id)?;
-      user.is_mod_or_admin(conn, community_id)
+      user.is_moderator(conn, community_id)
     })
     .await??;
     if settings.private && !privileged {
@@ -774,7 +774,7 @@ impl Perform for Oper<SavePost> {
     let community_id = post.community_id;
     let privileged = blocking(pool, move |conn| {
       let user = User_::read(conn, user_id)?;
-      user.is_mod_or_admin(conn, community_id)
+      user.is_moderator(conn, community_id)
     })
     .await??;
     if settings.private && !privileged {
