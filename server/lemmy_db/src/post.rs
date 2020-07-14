@@ -1,6 +1,6 @@
 use crate::{
   naive_now,
-  schema::{post, post_like, post_read, post_saved},
+  schema::{post, post_like, post_read, post_report, post_saved},
   Crud,
   Likeable,
   Readable,
@@ -220,6 +220,18 @@ pub struct PostRead {
 pub struct PostReadForm {
   pub post_id: i32,
   pub user_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[belongs_to(Post)]
+#[table_name = "post_report"]
+pub struct PostReport {
+  pub id: i32,
+  pub post_id: i32,
+  pub user_id: i32,
+  pub reason: Option<String>,
+  pub time: chrono::NaiveDateTime,
+  pub resolved: bool,
 }
 
 impl Readable<PostReadForm> for PostRead {
