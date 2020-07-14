@@ -58,19 +58,6 @@ impl Perform for Oper<GetCommunitySettings> {
   ) -> Result<GetCommunitySettingsResponse, LemmyError> {
     let data: &GetCommunitySettings = &self.data;
 
-    /*
-    let user_id: Option<i32> = match &data.auth {
-      Some(auth) => match Claims::decode(&auth) {
-        Ok(claims) => {
-          let user_id = claims.claims.id;
-          Some(user_id)
-        }
-        Err(_e) => None,
-      },
-      None => None,
-    };
-    */
-
     let community_id = data.community_id;
     let community_settings = blocking(pool, move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
@@ -116,33 +103,6 @@ impl Perform for Oper<EditCommunitySettings> {
       }
     })
     .await?;
-    /*
-    let community_id = data.community_id;
-    let mut editors: Vec<i32> = Vec::new();
-    editors.append(
-      &mut blocking(pool, move |conn| {
-        CommunityModeratorView::for_community(conn, community_id)
-          .map(|v| v.into_iter().map(|m| m.user_id).collect())
-      })
-      .await??,
-    );
-    editors.append(
-      &mut blocking(pool, move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
-      })
-      .await??,
-    );
-    if !editors.contains(&user_id) {
-      return Err(APIError::err("no_post_edit_allowed").into());
-    }
-    */
-
-    /*
-    let community_id = data.community_id;
-    let read_community_settings = blocking(pool, move |conn| {
-      CommunitySettings::read_from_community_id(conn, community_id)
-    }).await??;
-    */
 
     let community_settings_form = CommunitySettingsForm {
       community_id: data.community_id.to_owned(),

@@ -141,6 +141,10 @@ pub async fn is_image_content_type(client: &Client, test: &str) -> Result<(), Le
   }
 }
 
+pub fn num_md_images(test: &str) -> i32 {
+  MD_IMAGE_REGEX.find_iter(test).count() as i32
+}
+
 pub fn remove_slurs(test: &str) -> String {
   SLUR_REGEX.replace_all(test, "*removed*").to_string()
 }
@@ -514,6 +518,7 @@ mod tests {
 lazy_static! {
   static ref EMAIL_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$").unwrap();
   static ref PII_REGEX: Regex = Regex::new(r"(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}").unwrap();
+  static ref MD_IMAGE_REGEX: Regex = Regex::new(r"!\[[\s\S]*?\]\([\s\S]*?\)").unwrap();
   static ref SLUR_REGEX: Regex = RegexBuilder::new(r"([^\p{P}\s]*?(f(a|4)g(got|g)?){1,}|maricos?|(n(i|1)gg((a|er)?(s|z)?)){1,}|(nig){2,}|dindu(s?){1,}|mudslime?s?|(k(i|y)kes?){1,}|(mongoloids?){1,}|(towel\s*heads?){1,}|\bspi(c|k)s?\b|(spi(c|k)s){2,}|\bchinks?|(chinks?){1,}|(niglets?){1,}|be(a|@|4)ners?|\bjaps?\b|(japs){2,}|\bcoons?\b|(coons?){2,}|(jungle\s*bunn(y|ies?)){1,}|(jigg?aboo?s?){1,}|\bpakis?\b|(pakis?){2,}|(rag\s*heads?){1,}|(gooks?){1,}|(cunt(s|boy)?){1,}|(feminazis?){1,}|(whor(es?|ing)){1,}|\bslut(s|t?y)?|(slut(s|t?y)){2,}|\btr(a|@)nn?(y|ies?)|(tr(a|@)nn?(y|ies?)){1,}|(l(a|@|4)dyboy(s?)){1,}|([^\p{P}\s]*?t(a|@|4)rd(ed)?(s)*?){1,}\b|(t(a|@|4)rd){1,}|(hymie){1,}|(porch\s?monkey){1,}|(zh(y|i)d(ovka)?){1,}|\bching\s?chong\b|(ching\s?chong\s?){1,}|(chong\s?ching\s?){1,}|(hefem(a|@|4)le){1,}|(dickgirl){1,}|(hermie){1,}|(\babb?o\b)|(abb?o){2,}|(boong){1,})").case_insensitive(true).build().unwrap();
   static ref USERNAME_MATCHES_REGEX: Regex = Regex::new(r"/u/[a-zA-Z][0-9a-zA-Z_]*").unwrap();
   // TODO keep this old one, it didn't work with port well tho
