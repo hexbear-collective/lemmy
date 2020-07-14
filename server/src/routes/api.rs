@@ -73,7 +73,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("", web::put().to(route_post::<EditPost>))
           .route("/list", web::get().to(route_get::<GetPosts>))
           .route("/like", web::post().to(route_post::<CreatePostLike>))
-          .route("/save", web::put().to(route_post::<SavePost>)),
+          .route("/save", web::put().to(route_post::<SavePost>))
+          .route("/report", web::put().to(route_post::<CreatePostReport>)),
       )
       // Comment
       .service(
@@ -82,7 +83,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("", web::post().to(route_post::<CreateComment>))
           .route("", web::put().to(route_post::<EditComment>))
           .route("/like", web::post().to(route_post::<CreateCommentLike>))
-          .route("/save", web::put().to(route_post::<SaveComment>)),
+          .route("/save", web::put().to(route_post::<SaveComment>))
+	  .route("/report", web::post().to(route_post::<CreateCommentReport>)),
       )
       // Private Message
       .service(

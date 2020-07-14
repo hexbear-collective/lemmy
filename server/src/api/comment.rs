@@ -97,6 +97,13 @@ pub struct GetCommentsResponse {
   comments: Vec<CommentView>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct CreateCommentReport {
+  comment_id: i32,
+  reason: Option<String>,
+  auth: String,
+}
+
 #[async_trait::async_trait(?Send)]
 impl Perform for Oper<CreateComment> {
   type Response = CommentResponse;
@@ -624,6 +631,22 @@ impl Perform for Oper<GetComments> {
     }
 
     Ok(GetCommentsResponse { comments })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<CreateCommentReport> {
+  type Response = CommentResponse;  // I don't know what we want to send back yet
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<CommentResponse, LemmyError> {
+    let data: &CreateCommentReport = &self.data;
+
+    // TODO: implement me
+    Err(APIError::err("not_implemented").into())
   }
 }
 
