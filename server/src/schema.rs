@@ -56,6 +56,7 @@ table! {
         creator_actor_id -> Nullable<Varchar>,
         creator_local -> Nullable<Bool>,
         creator_name -> Nullable<Varchar>,
+        creator_published -> Nullable<Timestamp>,
         creator_avatar -> Nullable<Text>,
         score -> Nullable<Int8>,
         upvotes -> Nullable<Int8>,
@@ -72,6 +73,17 @@ table! {
         post_id -> Int4,
         score -> Int2,
         published -> Timestamp,
+    }
+}
+
+table! {
+    comment_report (id) {
+        id -> Int4,
+        comment_id -> Int4,
+        user_id -> Int4,
+        reason -> Nullable<Text>,
+        time -> Timestamp,
+        resolved -> Bool,
     }
 }
 
@@ -317,6 +329,7 @@ table! {
         creator_actor_id -> Nullable<Varchar>,
         creator_local -> Nullable<Bool>,
         creator_name -> Nullable<Varchar>,
+        creator_published -> Nullable<Timestamp>,
         creator_avatar -> Nullable<Text>,
         banned -> Nullable<Bool>,
         banned_from_community -> Nullable<Bool>,
@@ -351,6 +364,17 @@ table! {
         post_id -> Int4,
         user_id -> Int4,
         published -> Timestamp,
+    }
+}
+
+table! {
+    post_report (id) {
+        id -> Int4,
+        post_id -> Int4,
+        user_id -> Int4,
+        reason -> Nullable<Text>,
+        time -> Timestamp,
+        resolved -> Bool,
     }
 }
 
@@ -467,6 +491,8 @@ joinable!(comment -> user_ (creator_id));
 joinable!(comment_like -> comment (comment_id));
 joinable!(comment_like -> post (post_id));
 joinable!(comment_like -> user_ (user_id));
+joinable!(comment_report -> comment (comment_id));
+joinable!(comment_report -> user_ (user_id));
 joinable!(comment_saved -> comment (comment_id));
 joinable!(comment_saved -> user_ (user_id));
 joinable!(community -> category (category_id));
@@ -496,6 +522,8 @@ joinable!(post_like -> post (post_id));
 joinable!(post_like -> user_ (user_id));
 joinable!(post_read -> post (post_id));
 joinable!(post_read -> user_ (user_id));
+joinable!(post_report -> post (post_id));
+joinable!(post_report -> user_ (user_id));
 joinable!(post_saved -> post (post_id));
 joinable!(post_saved -> user_ (user_id));
 joinable!(site -> user_ (creator_id));
@@ -504,36 +532,38 @@ joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
 
 allow_tables_to_appear_in_same_query!(
-  activity,
-  category,
-  comment,
-  comment_aggregates_fast,
-  comment_like,
-  comment_saved,
-  community,
-  community_aggregates_fast,
-  community_follower,
-  community_moderator,
-  community_user_ban,
-  mod_add,
-  mod_add_community,
-  mod_ban,
-  mod_ban_from_community,
-  mod_lock_post,
-  mod_remove_comment,
-  mod_remove_community,
-  mod_remove_post,
-  mod_sticky_post,
-  password_reset_request,
-  post,
-  post_aggregates_fast,
-  post_like,
-  post_read,
-  post_saved,
-  private_message,
-  site,
-  user_,
-  user_ban,
-  user_fast,
-  user_mention,
+    activity,
+    category,
+    comment,
+    comment_aggregates_fast,
+    comment_like,
+    comment_report,
+    comment_saved,
+    community,
+    community_aggregates_fast,
+    community_follower,
+    community_moderator,
+    community_user_ban,
+    mod_add,
+    mod_add_community,
+    mod_ban,
+    mod_ban_from_community,
+    mod_lock_post,
+    mod_remove_comment,
+    mod_remove_community,
+    mod_remove_post,
+    mod_sticky_post,
+    password_reset_request,
+    post,
+    post_aggregates_fast,
+    post_like,
+    post_read,
+    post_report,
+    post_saved,
+    private_message,
+    site,
+    user_,
+    user_ban,
+    user_fast,
+    user_mention,
 );

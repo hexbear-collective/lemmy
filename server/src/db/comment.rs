@@ -2,7 +2,7 @@ use super::{post::Post, *};
 use crate::{
   apub::{make_apub_endpoint, EndpointType},
   naive_now,
-  schema::{comment, comment_like, comment_saved},
+  schema::{comment, comment_like, comment_saved, comment_report},
 };
 
 // WITH RECURSIVE MyTree AS (
@@ -183,6 +183,19 @@ pub struct CommentSavedForm {
   pub comment_id: i32,
   pub user_id: i32,
 }
+
+#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[belongs_to(Comment)]
+#[table_name = "comment_report"]
+pub struct CommentReport {
+  pub id: i32,
+  pub comment_id: i32,
+  pub user_id: i32,
+  pub reason: Option<String>,
+  pub time: chrono::NaiveDateTime,
+  pub resolved: bool,
+}
+  
 
 impl Saveable<CommentSavedForm> for CommentSaved {
   fn save(conn: &PgConnection, comment_saved_form: &CommentSavedForm) -> Result<Self, Error> {
