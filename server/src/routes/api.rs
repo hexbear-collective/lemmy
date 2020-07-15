@@ -1,5 +1,5 @@
 use crate::{
-  api::{comment::*, community::*, post::*, site::*, user::*, Oper, Perform},
+  api::{comment::*, community::*, post::*, report::*, site::*, user::*, Oper, Perform},
   rate_limit::RateLimit,
   routes::{ChatServerParam, DbPoolParam},
   websocket::WebsocketInfo,
