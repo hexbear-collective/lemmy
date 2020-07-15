@@ -136,7 +136,9 @@ impl User_ {
   }
 
   pub fn is_moderator(&self, conn: &PgConnection, community_id_: i32) -> Result<bool, Error> {
+    use crate::db::community::Community;
     use crate::schema::community_moderator::dsl::*;
+    let community = Community::read(conn, community_id_)?;
 
     Ok(
       community_moderator
@@ -144,7 +146,8 @@ impl User_ {
         .filter(user_id.eq(self.id))
         .first::<CommunityModerator>(conn)
         .optional()?
-        .is_some(),
+        .is_some()
+        || community.creator_id == self.id,
     )
   }
 }
@@ -307,14 +310,39 @@ mod tests {
   }
 
   #[test]
-  fn test_methods() {
-    use crate::db::community::*;
+  fn test_user_methods() {
+    use crate::db::{community::*, Joinable};
     let conn = establish_unpooled_connection();
+
+    let new_creator_user = UserForm {
+      name: "creator".into(),
+      preferred_username: None,
+      password_encrypted: "creator".into(),
+      email: None,
+      matrix_user_id: None,
+      avatar: None,
+      admin: false,
+      banned: false,
+      updated: None,
+      show_nsfw: false,
+      theme: "darkly".into(),
+      default_sort_type: SortType::Hot as i16,
+      default_listing_type: ListingType::Subscribed as i16,
+      lang: "browser".into(),
+      show_avatars: true,
+      send_notifications_to_email: false,
+      actor_id: "http://fake.com".into(),
+      bio: None,
+      local: true,
+      private_key: None,
+      public_key: None,
+      last_refreshed_at: None,
+    };
 
     let new_mod_user = UserForm {
       name: "moderator".into(),
       preferred_username: None,
-      password_encrypted: "nope".into(),
+      password_encrypted: "mod".into(),
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -361,6 +389,7 @@ mod tests {
       last_refreshed_at: None,
     };
 
+    let inserted_creator_user = User_::create(&conn, &new_creator_user).unwrap();
     let inserted_mod_user = User_::create(&conn, &new_mod_user).unwrap();
     let inserted_notmod_user = User_::create(&conn, &new_notmod_user).unwrap();
 
@@ -369,7 +398,7 @@ mod tests {
       title: "nada".to_owned(),
       description: None,
       category_id: 1,
-      creator_id: inserted_mod_user.id,
+      creator_id: inserted_creator_user.id,
       removed: None,
       deleted: None,
       updated: None,
@@ -383,11 +412,19 @@ mod tests {
     };
 
     let inserted_community = Community::create(&conn, &new_community).unwrap();
+    let new_moderator = CommunityModeratorForm {
+      community_id: inserted_community.id,
+      user_id: inserted_mod_user.id,
+    };
+    let _inserted_moderator = CommunityModerator::join(&conn, &new_moderator);
 
+    assert!(!inserted_notmod_user
+      .is_moderator(&conn, inserted_community.id)
+      .unwrap());
     assert!(inserted_mod_user
       .is_moderator(&conn, inserted_community.id)
       .unwrap());
-    assert!(!inserted_notmod_user
+    assert!(inserted_creator_user
       .is_moderator(&conn, inserted_community.id)
       .unwrap());
   }
