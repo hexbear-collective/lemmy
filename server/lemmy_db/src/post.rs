@@ -4,6 +4,7 @@ use crate::{
   Crud,
   Likeable,
   Readable,
+  Reportable,
   Saveable,
 };
 use diesel::{dsl::*, result::Error, *};
@@ -172,6 +173,37 @@ impl Likeable<PostLikeForm> for PostLike {
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
 #[belongs_to(Post)]
+#[table_name = "post_report"]
+pub struct PostReport {
+  pub id: i32,
+  pub post_id: i32,
+  pub user_id: i32,
+  pub reason: Option<String>,
+  pub time: chrono::NaiveDateTime,
+  pub resolved: bool,
+}
+
+#[derive(Insertable, AsChangeset, Clone)]
+#[table_name = "post_report"]
+pub struct PostReportForm {
+  pub post_id: i32,
+  pub user_id: i32,
+  pub reason: Option<String>,
+  pub time: Option<chrono::NaiveDateTime>,
+  pub resolved: Option<bool>,
+}
+
+impl Reportable<PostReportForm> for PostReport {
+  fn report(conn: &PgConnection, post_report_form: &PostReportForm) -> Result<Self, Error> {
+    use crate::schema::post_report::dsl::*;
+    insert_into(post_report)
+      .values(post_report_form)
+      .get_result::<Self>(conn)
+  }
+}
+
+#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[belongs_to(Post)]
 #[table_name = "post_saved"]
 pub struct PostSaved {
   pub id: i32,
@@ -220,18 +252,6 @@ pub struct PostRead {
 pub struct PostReadForm {
   pub post_id: i32,
   pub user_id: i32,
-}
-
-#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
-#[belongs_to(Post)]
-#[table_name = "post_report"]
-pub struct PostReport {
-  pub id: i32,
-  pub post_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
-  pub time: chrono::NaiveDateTime,
-  pub resolved: bool,
 }
 
 impl Readable<PostReadForm> for PostRead {

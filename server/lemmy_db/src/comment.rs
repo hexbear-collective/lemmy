@@ -168,6 +168,37 @@ impl CommentLike {
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
 #[belongs_to(Comment)]
+#[table_name = "comment_report"]
+pub struct CommentReport {
+  pub id: i32,
+  pub comment_id: i32,
+  pub user_id: i32,
+  pub reason: Option<String>,
+  pub time: chrono::NaiveDateTime,
+  pub resolved: bool,
+}
+
+#[derive(Insertable, AsChangeset, Clone)]
+#[table_name = "comment_report"]
+pub struct CommentReportForm {
+  pub comment_id: i32,
+  pub user_id: i32,
+  pub reason: Option<String>,
+  pub time: Option<chrono::NaiveDateTime>,
+  pub resolved: Option<bool>,
+}
+
+impl Reportable<CommentReportForm> for CommentReport {
+  fn report(conn: &PgConnection, comment_report_form: &CommentReportForm) -> Result<Self, Error> {
+    use crate::schema::comment_report::dsl::*;
+    insert_into(comment_report)
+      .values(comment_report_form)
+      .get_result::<Self>(conn)
+  }
+}
+
+#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[belongs_to(Comment)]
 #[table_name = "comment_saved"]
 pub struct CommentSaved {
   pub id: i32,
@@ -181,20 +212,7 @@ pub struct CommentSaved {
 pub struct CommentSavedForm {
   pub comment_id: i32,
   pub user_id: i32,
-}
-
-#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
-#[belongs_to(Comment)]
-#[table_name = "comment_report"]
-pub struct CommentReport {
-  pub id: i32,
-  pub comment_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
-  pub time: chrono::NaiveDateTime,
-  pub resolved: bool,
-}
-  
+} 
 
 impl Saveable<CommentSavedForm> for CommentSaved {
   fn save(conn: &PgConnection, comment_saved_form: &CommentSavedForm) -> Result<Self, Error> {
