@@ -9,6 +9,7 @@ use crate::{
     post_view::*,
     user::*,
     Crud,
+    Reportable,
   },
   websocket::{
     server::{JoinCommunityRoom, SendComment},
@@ -30,7 +31,7 @@ pub struct CreateCommentReport {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CommentReportResponse {
-  pub comment: CommentView,
+  pub success: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,7 +43,7 @@ pub struct CreatePostReport {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PostReportResponse {
-  pub post: PostView,
+  pub success: bool,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -69,7 +70,7 @@ impl Perform for Oper<CreateCommentReport> {
       return Err(APIError::err("site_ban").into());
     }
 
-    // Fetch comment information from the database
+    // Fetch comment information
     let comment_id = data.comment;
     let comment = blocking
       (pool, move |conn| CommentView::read(&conn, comment_id, None)).await??;
@@ -81,8 +82,18 @@ impl Perform for Oper<CreateCommentReport> {
     if blocking(pool, is_banned).await? {
       return Err(APIError::err("community_ban").into());
     }
+
+    // Insert the report
+    let report_form = CommentReportForm {
+      comment_id: comment_id,
+      user_id: user_id,
+      reason: data.reason.clone(),
+      time: None, // column defaults to now() in table
+      resolved: None, // columb defaults to false
+    };
+    blocking(pool, move |conn| CommentReport::report(conn, &report_form)).await??;      
     
-    return Err(APIError::err("comment_report_not_implemented").into());
+    return Ok(CommentReportResponse{success:true});
   }
 }
 
@@ -122,7 +133,17 @@ impl Perform for Oper<CreatePostReport> {
     if blocking(pool, is_banned).await? {
       return Err(APIError::err("community_ban").into());
     }
+
+    // Insert the report
+    let report_form = PostReportForm {
+      post_id: post_id,
+      user_id: user_id,
+      reason: data.reason.clone(),
+      time: None, // column defaults to now() in table
+      resolved: None, // columb defaults to false
+    };
+    blocking(pool, move |conn| PostReport::report(conn, &report_form)).await??;      
     
-    return Err(APIError::err("post_report_not_implemented").into());
+    return Ok(PostReportResponse{success:true});    
   }
 }

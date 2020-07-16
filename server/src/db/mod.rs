@@ -68,6 +68,12 @@ pub trait Likeable<T> {
     Self: Sized;
 }
 
+pub trait Reportable<T> {
+  fn report(conn: &PgConnection, form: &T) -> Result<Self, Error>
+  where
+    Self: Sized;
+}
+
 pub trait Bannable<T> {
   fn ban(conn: &PgConnection, form: &T) -> Result<Self, Error>
   where
