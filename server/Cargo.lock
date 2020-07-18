@@ -404,12 +404,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc9a9dd069569f212bc4330af9f17c4afb5e8ce185e83dbb14f1349dda18b10"
 
 [[package]]
-name = "adler32"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccc9a9dd069569f212bc4330af9f17c4afb5e8ce185e83dbb14f1349dda18b10"
-
-[[package]]
 name = "aho-corasick"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -512,7 +506,7 @@ dependencies = [
  "addr2line",
  "cfg-if",
  "libc",
- "miniz_oxide 0.3.7",
+ "miniz_oxide",
  "object",
  "rustc-demangle",
 ]
@@ -1142,7 +1136,7 @@ dependencies = [
  "cfg-if",
  "crc32fast",
  "libc",
- "miniz_oxide 0.4.0",
+ "miniz_oxide",
 ]
 
 [[package]]
@@ -1662,7 +1656,6 @@ dependencies = [
  "openssl",
  "percent-encoding",
  "rand 0.7.3",
- "regex",
  "reqwest",
  "rss",
  "serde 1.0.114",
@@ -1874,15 +1867,6 @@ checksum = "2684d4c2e97d99848d30b324b00c8fcc7e5c897b7cbb5819b09e7c90e8baf212"
 dependencies = [
  "mime",
  "unicase",
-]
-
-[[package]]
-name = "miniz_oxide"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0f75932c1f6cfae3c04000e40114adf955636e19040f9c0a2c380702aa1c7f"
-dependencies = [
- "adler",
 ]
 
 [[package]]

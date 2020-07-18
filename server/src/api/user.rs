@@ -48,7 +48,7 @@ use lemmy_utils::{
   slurs_vec_to_str,
   EndpointType,
 };
-use log::error;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::{env, str::FromStr};
 

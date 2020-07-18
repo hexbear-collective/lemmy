@@ -5,11 +5,6 @@ use crate::{
   fetch_iframely_and_pictrs_data,
   is_within_post_body_char_limit,
   is_within_post_title_char_limit,
-  naive_now,
-  pii_check,
-  pii_vec_to_str,
-  slur_check,
-  slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, JoinPostRoom, SendPost},
     UserOperation,
@@ -38,6 +33,8 @@ use lemmy_db::{
 use lemmy_utils::{
   is_valid_post_title,
   make_apub_endpoint,
+  pii_check,
+  pii_vec_to_str,
   slur_check,
   slurs_vec_to_str,
   EndpointType,

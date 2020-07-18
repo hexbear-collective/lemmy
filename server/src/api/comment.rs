@@ -2,6 +2,7 @@ use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
+  is_within_comment_char_limit,
   websocket::{
     server::{JoinCommunityRoom, SendComment},
     UserOperation,
@@ -29,6 +30,7 @@ use lemmy_db::{
 };
 use lemmy_utils::{
   make_apub_endpoint,
+  remove_pii,
   remove_slurs,
   scrape_text_for_mentions,
   send_email,
@@ -329,7 +331,7 @@ impl Perform for Oper<EditComment> {
         };
 
         CommentForm {
-          content: content_slurs_removed,
+          content: content_pii_removed,
           parent_id: read_comment.parent_id,
           post_id: read_comment.post_id,
           creator_id: read_comment.creator_id,
