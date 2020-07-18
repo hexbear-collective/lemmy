@@ -25,6 +25,8 @@ use lemmy_db::{
 
 use serde::{Deserialize, Serialize};
 
+const MAX_REPORT_LEN: usize = 1000;
+
 #[derive(Serialize, Deserialize)]
 pub struct CreateCommentReport {
   comment: i32,
@@ -92,6 +94,16 @@ impl Perform for Oper<CreateCommentReport> {
       Err(_e) => return Err(APIError::err("not_logged_in").into()),
     };
 
+    // Check size of report and check for whitespace
+    let reason: Option<String> = match data.reason.clone() {
+      Some(s) if s.trim().len() == 0 => None,
+      Some(s) if s.len() > MAX_REPORT_LEN => {
+        return Err(APIError::err("report_too_long").into());
+      }
+      Some(s) => Some(s),
+      None => None,
+    };
+
     // Check for site ban
     let user_id = claims.id;
     let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
@@ -104,23 +116,98 @@ impl Perform for Oper<CreateCommentReport> {
     let comment = blocking(pool, move |conn| CommentView::read(&conn, comment_id, None)).await??;
 
     // Check for community ban
+    let community_id = comment.community_id;
     let is_banned =
-      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, comment.community_id).is_ok();
+      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, community_id).is_ok();
     if blocking(pool, is_banned).await? {
       return Err(APIError::err("community_ban").into());
     }
 
     // Insert the report
+    let comment_time = match comment.updated {
+      Some(s) => s,
+      None => comment.published,
+    };
     let report_form = CommentReportForm {
-      comment_id,
+      time: None, // column defaults to now() in table
+      reason,
+      resolved: None, // column defaults to false
       user_id,
-      reason: data.reason.clone(),
-      time: None,     // column defaults to now() in table
-      resolved: None, // columb defaults to false
+      comment_id,
+      comment_text: comment.content,
+      comment_time,
     };
     blocking(pool, move |conn| CommentReport::report(conn, &report_form)).await??;
 
     Ok(CommentReportResponse { success: true })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<CreatePostReport> {
+  type Response = PostReportResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<PostReportResponse, LemmyError> {
+    let data: &CreatePostReport = &self.data;
+
+    // Verify auth token
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    // Check size of report and check for whitespace
+    let reason: Option<String> = match data.reason.clone() {
+      Some(s) if s.trim().len() == 0 => None,
+      Some(s) if s.len() > MAX_REPORT_LEN => {
+        return Err(APIError::err("report_too_long").into());
+      }
+      Some(s) => Some(s),
+      None => None,
+    };
+
+    // Check for site ban
+    let user_id = claims.id;
+    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
+    if user.banned {
+      return Err(APIError::err("site_ban").into());
+    }
+
+    // Fetch post information from the database
+    let post_id = data.post;
+    let post = blocking(pool, move |conn| PostView::read(&conn, post_id, None)).await??;
+
+    // Check for community ban
+    let community_id = post.community_id;
+    let is_banned =
+      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, community_id).is_ok();
+    if blocking(pool, is_banned).await? {
+      return Err(APIError::err("community_ban").into());
+    }
+
+    // Insert the report
+    let post_time = match post.updated {
+      Some(s) => s,
+      None => post.published,
+    };
+    let report_form = PostReportForm {
+      time: None, // column defaults to now() in table
+      reason,
+      resolved: None, // columb defaults to false
+      user_id,
+      post_id,
+      post_name: post.name,
+      post_url: post.url,
+      post_body: post.body,
+      post_time: post_time,
+    };
+    blocking(pool, move |conn| PostReport::report(conn, &report_form)).await??;
+
+    Ok(PostReportResponse { success: true })
   }
 }
 
@@ -260,54 +347,5 @@ impl Perform for Oper<ListPostReports> {
     .await??;
 
     Ok(ListPostReportResponse { reports })
-  }
-}
-
-#[async_trait::async_trait(?Send)]
-impl Perform for Oper<CreatePostReport> {
-  type Response = PostReportResponse;
-
-  async fn perform(
-    &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
-  ) -> Result<PostReportResponse, LemmyError> {
-    let data: &CreatePostReport = &self.data;
-
-    // Verify auth token
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    // Check for site ban
-    let user_id = claims.id;
-    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
-    if user.banned {
-      return Err(APIError::err("site_ban").into());
-    }
-
-    // Fetch post information from the database
-    let post_id = data.post;
-    let post = blocking(pool, move |conn| PostView::read(&conn, post_id, None)).await??;
-
-    // Check for community ban
-    let is_banned =
-      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, post.community_id).is_ok();
-    if blocking(pool, is_banned).await? {
-      return Err(APIError::err("community_ban").into());
-    }
-
-    // Insert the report
-    let report_form = PostReportForm {
-      post_id,
-      user_id,
-      reason: data.reason.clone(),
-      time: None,     // column defaults to now() in table
-      resolved: None, // columb defaults to false
-    };
-    blocking(pool, move |conn| PostReport::report(conn, &report_form)).await??;
-
-    Ok(PostReportResponse { success: true })
   }
 }

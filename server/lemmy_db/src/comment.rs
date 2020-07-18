@@ -170,22 +170,26 @@ impl CommentLike {
 #[belongs_to(Comment)]
 #[table_name = "comment_report"]
 pub struct CommentReport {
-  pub id: i32,
-  pub comment_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
+  pub id: uuid::Uuid,
   pub time: chrono::NaiveDateTime,
+  pub reason: Option<String>,
   pub resolved: bool,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
 }
 
 #[derive(Insertable, AsChangeset, Clone)]
 #[table_name = "comment_report"]
 pub struct CommentReportForm {
-  pub comment_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
   pub time: Option<chrono::NaiveDateTime>,
+  pub reason: Option<String>,
   pub resolved: Option<bool>,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
 }
 
 impl Reportable<CommentReportForm> for CommentReport {
@@ -212,7 +216,7 @@ pub struct CommentSaved {
 pub struct CommentSavedForm {
   pub comment_id: i32,
   pub user_id: i32,
-} 
+}
 
 impl Saveable<CommentSavedForm> for CommentSaved {
   fn save(conn: &PgConnection, comment_saved_form: &CommentSavedForm) -> Result<Self, Error> {
