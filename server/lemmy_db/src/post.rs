@@ -171,7 +171,7 @@ impl Likeable<PostLikeForm> for PostLike {
   }
 }
 
-#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[derive(Identifiable, Queryable, Associations, PartialEq, Serialize, Deserialize, Debug)]
 #[belongs_to(Post)]
 #[table_name = "post_report"]
 pub struct PostReport {
