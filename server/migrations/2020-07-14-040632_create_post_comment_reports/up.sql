@@ -1,3 +1,5 @@
+create extension "uuid-ossp";
+
 create table comment_report (
   id            uuid      primary key default uuid_generate_v4(),
   time          timestamp not null default now(),
