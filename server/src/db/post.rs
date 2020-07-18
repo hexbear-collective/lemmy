@@ -6,6 +6,7 @@ use crate::{
 };
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
+use uuid::prelude::*;
 
 #[derive(Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
 #[table_name = "post"]
@@ -173,22 +174,30 @@ impl Likeable<PostLikeForm> for PostLike {
 #[belongs_to(Post)]
 #[table_name = "post_report"]
 pub struct PostReport {
-  pub id: i32,
-  pub post_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
+  pub id: Uuid,
   pub time: chrono::NaiveDateTime,
+  pub reason: Option<String>,
   pub resolved: bool,
+  pub user_id: i32,
+  pub post_id: i32,
+  pub post_name: String,
+  pub post_url: Option<String>,
+  pub post_body: Option<String>,
+  pub post_time: chrono::NaiveDateTime,
 }
 
 #[derive(Insertable, AsChangeset, Clone)]
 #[table_name = "post_report"]
 pub struct PostReportForm {
-  pub post_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
   pub time: Option<chrono::NaiveDateTime>,
+  pub reason: Option<String>,
   pub resolved: Option<bool>,
+  pub user_id: i32,
+  pub post_id: i32,
+  pub post_name: String,
+  pub post_url: Option<String>,
+  pub post_body: Option<String>,
+  pub post_time: chrono::NaiveDateTime,
 }
 
 impl Reportable<PostReportForm> for PostReport {

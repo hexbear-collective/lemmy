@@ -2,8 +2,9 @@ use super::{post::Post, *};
 use crate::{
   apub::{make_apub_endpoint, EndpointType},
   naive_now,
-  schema::{comment, comment_like, comment_saved, comment_report},
+  schema::{comment, comment_like, comment_report, comment_saved},
 };
+use uuid::prelude::*;
 
 // WITH RECURSIVE MyTree AS (
 //     SELECT * FROM comment WHERE parent_id IS NULL
@@ -171,22 +172,26 @@ impl CommentLike {
 #[belongs_to(Comment)]
 #[table_name = "comment_report"]
 pub struct CommentReport {
-  pub id: i32,
-  pub comment_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
+  pub id: Uuid,
   pub time: chrono::NaiveDateTime,
+  pub reason: Option<String>,
   pub resolved: bool,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
 }
 
 #[derive(Insertable, AsChangeset, Clone)]
 #[table_name = "comment_report"]
 pub struct CommentReportForm {
-  pub comment_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
   pub time: Option<chrono::NaiveDateTime>,
+  pub reason: Option<String>,
   pub resolved: Option<bool>,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
 }
 
 impl Reportable<CommentReportForm> for CommentReport {
@@ -213,7 +218,7 @@ pub struct CommentSaved {
 pub struct CommentSavedForm {
   pub comment_id: i32,
   pub user_id: i32,
-} 
+}
 
 impl Saveable<CommentSavedForm> for CommentSaved {
   fn save(conn: &PgConnection, comment_saved_form: &CommentSavedForm) -> Result<Self, Error> {
