@@ -70,7 +70,6 @@ pub fn pii_check(test: &str) -> Result<(), Vec<&str>> {
   }
 }
 
-
 pub fn slur_check(test: &str) -> Result<(), Vec<&str>> {
   let mut matches: Vec<&str> = SLUR_REGEX.find_iter(test).map(|mat| mat.as_str()).collect();
 
@@ -96,7 +95,6 @@ pub fn pii_vec_to_str(pii: Vec<&str>) -> String {
   let combined = &pii.join(", ");
   [start, combined].concat()
 }
-
 
 pub fn generate_random_string() -> String {
   thread_rng().sample_iter(&Alphanumeric).take(30).collect()
