@@ -1,46 +1,25 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
-  blocking,
-  fetch_iframely_and_pictrs_data,
-  is_within_post_body_char_limit,
+  blocking, fetch_iframely_and_pictrs_data, is_within_post_body_char_limit,
   is_within_post_title_char_limit,
   websocket::{
     server::{JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
-  comment_view::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  post::*,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_view::*,
-  Crud,
-  Likeable,
-  ListingType,
-  Saveable,
-  SortType,
+  comment_view::*, community_view::*, moderator::*, naive_now, post::*, post_view::*, site::*,
+  site_view::*, user::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
 };
 use lemmy_utils::{
-  is_valid_post_title,
-  make_apub_endpoint,
-  pii_check,
-  pii_vec_to_str,
-  slur_check,
-  slurs_vec_to_str,
+  is_valid_post_title, make_apub_endpoint, pii_check, pii_vec_to_str, slur_check, slurs_vec_to_str,
   EndpointType,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use url::Url;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreatePost {
@@ -184,6 +163,13 @@ impl Perform for Oper<CreatePost> {
     let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
     if user.banned {
       return Err(APIError::err("site_ban").into());
+    }
+
+    if data.url.is_some() {
+      match Url::parse(data.url.as_ref().unwrap()) {
+        Ok(_t) => (),
+        Err(_e) => return Err(APIError::err("invalid_url").into()),
+      }
     }
 
     // Fetch Iframely and pictrs cached image
@@ -393,11 +379,9 @@ impl Perform for Oper<GetPosts> {
       Some(claims) => claims.show_nsfw,
       None => false,
     };
-
+    let page = data.page;
     let type_ = ListingType::from_str(&data.type_)?;
     let sort = SortType::from_str(&data.sort)?;
-
-    let page = data.page;
     let limit = data.limit;
     let community_id = data.community_id;
     let community_name = data.community_name.to_owned();

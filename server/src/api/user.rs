@@ -1,51 +1,23 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::ApubObjectType,
-  blocking,
+  blocking, is_within_message_char_limit,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  password_reset_request::*,
-  post::*,
-  post_view::*,
-  private_message::*,
-  private_message_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  user_mention_view::*,
-  user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  comment::*, comment_view::*, community::*, community_view::*, moderator::*, naive_now,
+  password_reset_request::*, post::*, post_view::*, private_message::*, private_message_view::*,
+  site::*, site_view::*, user::*, user_mention::*, user_mention_view::*, user_view::*, Crud,
+  Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, slur_check, slurs_vec_to_str,
   EndpointType,
 };
 use log::{error, info};
@@ -1269,6 +1241,10 @@ impl Perform for Oper<CreatePrivateMessage> {
     }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
+
+    if !is_within_message_char_limit(&data.content) {
+      return Err(APIError::err("message_too_long").into());
+    }
 
     let private_message_form = PrivateMessageForm {
       content: content_slurs_removed.to_owned(),
