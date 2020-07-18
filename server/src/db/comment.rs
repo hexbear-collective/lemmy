@@ -4,7 +4,6 @@ use crate::{
   naive_now,
   schema::{comment, comment_like, comment_report, comment_saved},
 };
-use uuid::prelude::*;
 
 // WITH RECURSIVE MyTree AS (
 //     SELECT * FROM comment WHERE parent_id IS NULL
@@ -172,7 +171,7 @@ impl CommentLike {
 #[belongs_to(Comment)]
 #[table_name = "comment_report"]
 pub struct CommentReport {
-  pub id: Uuid,
+  pub id: uuid::Uuid,
   pub time: chrono::NaiveDateTime,
   pub reason: Option<String>,
   pub resolved: bool,

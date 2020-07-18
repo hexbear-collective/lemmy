@@ -251,7 +251,7 @@ impl Perform for Oper<ListCommentReports> {
       .await??,
     );
     if !mod_ids.contains(&user_id) {
-      return Err(APIError::err("no_view_reports_allowed").into());
+      return Err(APIError::err("no_report_views_allowed").into());
     }
 
     let page = data.page;
@@ -321,7 +321,7 @@ impl Perform for Oper<ListPostReports> {
       .await??,
     );
     if !mod_ids.contains(&user_id) {
-      return Err(APIError::err("no_view_reports_allowed").into());
+      return Err(APIError::err("no_report_viewsx_allowed").into());
     }
 
     let page = data.page;

@@ -5,17 +5,15 @@ use serde::{Deserialize, Serialize};
 
 table! {
     comment_report_view (id) {
-      id -> Int4,
-      comment_id -> Int4,
-      user_id -> Int4,
-      reason -> Nullable<Text>,
+      id -> Uuid,
       time -> Timestamp,
+      reason -> Nullable<Text>,
       resolved -> Bool,
+      user_id -> Int4,
+      comment_id -> Int4,
+      comment_text -> Text,
+      comment_time -> Timestamp,
       community_id -> Int4,
-      comment_contents -> Text,
-      username -> Varchar,
-      banned -> Bool,
-      community_name -> Varchar,
     }
 }
 
@@ -24,23 +22,20 @@ table! {
 )]
 #[table_name = "comment_report_view"]
 pub struct CommentReportView {
-  pub id: i32,
-  pub comment_id: i32,
-  pub user_id: i32,
-  pub reason: Option<String>,
+  pub id: uuid::Uuid,
   pub time: chrono::NaiveDateTime,
+  pub reason: Option<String>,
   pub resolved: bool,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
   pub community_id: i32,
-  pub comment_contents: String,
-  pub username: String,
-  pub banned: bool,
-  pub community_name: String,
 }
 
 pub struct CommentReportViewQueryBuilder<'a> {
   conn: &'a PgConnection,
   query: BoxedQuery<'a, Pg>,
-  for_creator_id: Option<i32>,
   for_community_id: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
@@ -56,7 +51,6 @@ impl<'a> CommentReportViewQueryBuilder<'a> {
     CommentReportViewQueryBuilder {
       conn,
       query,
-      for_creator_id: None,
       for_community_id: None,
       page: None,
       limit: None,
@@ -66,11 +60,6 @@ impl<'a> CommentReportViewQueryBuilder<'a> {
 
   pub fn community_id<T: MaybeOptional<i32>>(mut self, community_id: T) -> Self {
     self.for_community_id = community_id.get_optional();
-    self
-  }
-
-  pub fn creator_id<T: MaybeOptional<i32>>(mut self, creator_id: T) -> Self {
-    self.for_creator_id = creator_id.get_optional();
     self
   }
 
@@ -93,10 +82,6 @@ impl<'a> CommentReportViewQueryBuilder<'a> {
     use super::comment_report_view::comment_report_view::dsl::*;
 
     let mut query = self.query;
-
-    if let Some(creator_id) = self.for_creator_id {
-      query = query.filter(user_id.eq(creator_id));
-    }
 
     if let Some(comm_id) = self.for_community_id {
       query = query.filter(community_id.eq(comm_id));
