@@ -1,46 +1,36 @@
-use activitystreams::object::Note;
-use actix_web::client::Client;
-use diesel::{result::Error::NotFound, PgConnection};
-use log::debug;
-use serde::Deserialize;
-use std::{fmt::Debug, time::Duration};
-use url::Url;
-
 use crate::{
   api::site::SearchResponse,
+  apub::{is_apub_id_valid, FromApub, GroupExt, PageExt, PersonExt, APUB_JSON_CONTENT_TYPE},
   blocking,
-  db::{
-    comment::{Comment, CommentForm},
-    comment_view::CommentView,
-    community::{Community, CommunityForm, CommunityModerator, CommunityModeratorForm},
-    community_view::CommunityView,
-    post::{Post, PostForm},
-    post_view::PostView,
-    user::{UserForm, User_},
-    Crud,
-    Joinable,
-    SearchType,
-  },
-  naive_now,
   request::{retry, RecvError},
   routes::nodeinfo::{NodeInfo, NodeInfoWellKnown},
   DbPool,
   LemmyError,
 };
-
-use crate::{
-  apub::{
-    get_apub_protocol_string,
-    is_apub_id_valid,
-    FromApub,
-    GroupExt,
-    PageExt,
-    PersonExt,
-    APUB_JSON_CONTENT_TYPE,
-  },
-  db::user_view::UserView,
-};
+use activitystreams::object::Note;
+use activitystreams_new::{base::BaseExt, prelude::*, primitives::XsdAnyUri};
+use actix_web::client::Client;
 use chrono::NaiveDateTime;
+use diesel::{result::Error::NotFound, PgConnection};
+use lemmy_db::{
+  comment::{Comment, CommentForm},
+  comment_view::CommentView,
+  community::{Community, CommunityForm, CommunityModerator, CommunityModeratorForm},
+  community_view::CommunityView,
+  naive_now,
+  post::{Post, PostForm},
+  post_view::PostView,
+  user::{UserForm, User_},
+  user_view::UserView,
+  Crud,
+  Joinable,
+  SearchType,
+};
+use lemmy_utils::get_apub_protocol_string;
+use log::debug;
+use serde::Deserialize;
+use std::{fmt::Debug, time::Duration};
+use url::Url;
 
 static ACTOR_REFETCH_INTERVAL_SECONDS: i64 = 24 * 60 * 60;
 
@@ -149,7 +139,7 @@ pub async fn search_by_apub_id(
 
   let response = match fetch_remote_object::<SearchAcceptedObjects>(client, &query_url).await? {
     SearchAcceptedObjects::Person(p) => {
-      let user_uri = p.inner.object_props.get_id().unwrap().to_string();
+      let user_uri = p.inner.id().unwrap().to_string();
 
       let user = get_or_fetch_and_upsert_remote_user(&user_uri, client, pool).await?;
 
@@ -158,7 +148,7 @@ pub async fn search_by_apub_id(
       response
     }
     SearchAcceptedObjects::Group(g) => {
-      let community_uri = g.inner.object_props.get_id().unwrap().to_string();
+      let community_uri = g.inner.id().unwrap().to_string();
 
       let community =
         get_or_fetch_and_upsert_remote_community(&community_uri, client, pool).await?;
@@ -292,11 +282,13 @@ pub async fn get_or_fetch_and_upsert_remote_community(
       let community = blocking(pool, move |conn| Community::create(conn, &cf)).await??;
 
       // Also add the community moderators too
-      let creator_and_moderator_uris = group
-        .inner
-        .object_props
-        .get_many_attributed_to_xsd_any_uris()
-        .unwrap();
+      let attributed_to = group.inner.attributed_to().unwrap();
+      let creator_and_moderator_uris: Vec<&XsdAnyUri> = attributed_to
+        .as_many()
+        .unwrap()
+        .iter()
+        .map(|a| a.as_xsd_any_uri().unwrap())
+        .collect();
 
       let mut creator_and_moderators = Vec::new();
 

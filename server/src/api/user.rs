@@ -1,27 +1,54 @@
 use crate::{
-  api::{APIError, Oper, Perform},
-  apub::{
-    extensions::signatures::generate_actor_keypair, make_apub_endpoint, ApubObjectType,
-    EndpointType,
-  },
+  api::{claims::Claims, APIError, Oper, Perform},
+  apub::ApubObjectType,
   blocking,
-  db::{
-    comment::*, comment_view::*, community::*, community_view::*, moderator::*,
-    password_reset_request::*, post::*, post_view::*, private_message::*, private_message_view::*,
-    site::*, site_view::*, user::*, user_mention::*, user_mention_view::*, user_view::*, Crud,
-    Followable, Joinable, ListingType, SortType,
-  },
-  generate_random_string, is_valid_username, is_within_message_char_limit, naive_from_unix,
-  naive_now, remove_slurs, send_email,
-  settings::Settings,
-  slur_check, slurs_vec_to_str,
+  is_within_message_char_limit,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use bcrypt::verify;
+use lemmy_db::{
+  comment::*,
+  comment_view::*,
+  community::*,
+  community_view::*,
+  moderator::*,
+  naive_now,
+  password_reset_request::*,
+  post::*,
+  post_view::*,
+  private_message::*,
+  private_message_view::*,
+  site::*,
+  site_view::*,
+  user::*,
+  user_mention::*,
+  user_mention_view::*,
+  user_view::*,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
+};
+use lemmy_utils::{
+  generate_actor_keypair,
+  generate_random_string,
+  is_valid_username,
+  make_apub_endpoint,
+  naive_from_unix,
+  remove_slurs,
+  send_email,
+  settings::Settings,
+  slur_check,
+  slurs_vec_to_str,
+  EndpointType,
+};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::{env, str::FromStr};
@@ -276,7 +303,7 @@ impl Perform for Oper<Login> {
     // Fetch that username / email
     let username_or_email = data.username_or_email.clone();
     let user = match blocking(pool, move |conn| {
-      User_::find_by_email_or_username(conn, &username_or_email)
+      Claims::find_by_email_or_username(conn, &username_or_email)
     })
     .await?
     {
@@ -290,7 +317,9 @@ impl Perform for Oper<Login> {
     }
 
     // Return the jwt
-    Ok(LoginResponse { jwt: user.jwt() })
+    Ok(LoginResponse {
+      jwt: Claims::jwt(user, Settings::get().hostname),
+    })
   }
 }
 
@@ -465,7 +494,7 @@ impl Perform for Oper<Register> {
 
     // Return the jwt
     Ok(LoginResponse {
-      jwt: inserted_user.jwt(),
+      jwt: Claims::jwt(inserted_user, Settings::get().hostname),
     })
   }
 }
@@ -493,6 +522,11 @@ impl Perform for Oper<SaveUserSettings> {
     let email = match &data.email {
       Some(email) => Some(email.to_owned()),
       None => read_user.email,
+    };
+
+    let avatar = match &data.avatar {
+      Some(avatar) => Some(avatar.to_owned()),
+      None => read_user.avatar,
     };
 
     let password_encrypted = match &data.new_password {
@@ -532,7 +566,7 @@ impl Perform for Oper<SaveUserSettings> {
       name: read_user.name,
       email,
       matrix_user_id: data.matrix_user_id.to_owned(),
-      avatar: data.avatar.to_owned(),
+      avatar,
       password_encrypted,
       preferred_username: read_user.preferred_username,
       updated: Some(naive_now()),
@@ -571,7 +605,7 @@ impl Perform for Oper<SaveUserSettings> {
 
     // Return the jwt
     Ok(LoginResponse {
-      jwt: updated_user.jwt(),
+      jwt: Claims::jwt(updated_user, Settings::get().hostname),
     })
   }
 }
@@ -676,12 +710,10 @@ impl Perform for Oper<GetUserDetails> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    // If its not the same user, remove the email
-    if let Some(user_id) = user_id {
-      if user_details_id != user_id {
-        user_view.email = None;
-      }
-    } else {
+    // If its not the same user, remove the email, and settings
+    // TODO an if let chain would be better here, but can't figure it out
+    // TODO separate out settings into its own thing
+    if user_id.is_none() || user_details_id != user_id.unwrap_or(0) {
       user_view.email = None;
     }
 
@@ -919,23 +951,27 @@ impl Perform for Oper<EditUserMention> {
     let user_id = claims.id;
 
     let user_mention_id = data.user_mention_id;
-    let user_mention =
+    let read_user_mention =
       blocking(pool, move |conn| UserMention::read(conn, user_mention_id)).await??;
 
+    if user_id != read_user_mention.recipient_id {
+      return Err(APIError::err("couldnt_update_comment").into());
+    }
+
     let user_mention_form = UserMentionForm {
-      recipient_id: user_id,
-      comment_id: user_mention.comment_id,
+      recipient_id: read_user_mention.recipient_id,
+      comment_id: read_user_mention.comment_id,
       read: data.read.to_owned(),
     };
 
-    let user_mention_id = user_mention.id;
+    let user_mention_id = read_user_mention.id;
     let update_mention =
       move |conn: &'_ _| UserMention::update(conn, user_mention_id, &user_mention_form);
     if blocking(pool, update_mention).await?.is_err() {
       return Err(APIError::err("couldnt_update_comment").into());
     };
 
-    let user_mention_id = user_mention.id;
+    let user_mention_id = read_user_mention.id;
     let user_mention_view = blocking(pool, move |conn| {
       UserMentionView::read(conn, user_mention_id, user_id)
     })
@@ -1202,7 +1238,7 @@ impl Perform for Oper<PasswordChange> {
 
     // Return the jwt
     Ok(LoginResponse {
-      jwt: updated_user.jwt(),
+      jwt: Claims::jwt(updated_user, Settings::get().hostname),
     })
   }
 }
@@ -1264,7 +1300,12 @@ impl Perform for Oper<CreatePrivateMessage> {
 
     let inserted_private_message_id = inserted_private_message.id;
     let updated_private_message = match blocking(pool, move |conn| {
-      PrivateMessage::update_ap_id(&conn, inserted_private_message_id)
+      let apub_id = make_apub_endpoint(
+        EndpointType::PrivateMessage,
+        &inserted_private_message_id.to_string(),
+      )
+      .to_string();
+      PrivateMessage::update_ap_id(&conn, inserted_private_message_id, apub_id)
     })
     .await?
     {
@@ -1354,23 +1395,35 @@ impl Perform for Oper<EditPrivateMessage> {
 
     let content_slurs_removed = match &data.content {
       Some(content) => remove_slurs(content),
-      None => orig_private_message.content,
+      None => orig_private_message.content.clone(),
     };
 
-    let private_message_form = PrivateMessageForm {
-      content: content_slurs_removed,
-      creator_id: orig_private_message.creator_id,
-      recipient_id: orig_private_message.recipient_id,
-      deleted: data.deleted.to_owned(),
-      read: data.read.to_owned(),
-      updated: if data.read.is_some() {
-        orig_private_message.updated
+    let private_message_form = {
+      if data.read.is_some() {
+        PrivateMessageForm {
+          content: orig_private_message.content.to_owned(),
+          creator_id: orig_private_message.creator_id,
+          recipient_id: orig_private_message.recipient_id,
+          read: data.read.to_owned(),
+          updated: orig_private_message.updated,
+          deleted: Some(orig_private_message.deleted),
+          ap_id: orig_private_message.ap_id,
+          local: orig_private_message.local,
+          published: None,
+        }
       } else {
-        Some(naive_now())
-      },
-      ap_id: orig_private_message.ap_id,
-      local: orig_private_message.local,
-      published: None,
+        PrivateMessageForm {
+          content: content_slurs_removed,
+          creator_id: orig_private_message.creator_id,
+          recipient_id: orig_private_message.recipient_id,
+          deleted: data.deleted.to_owned(),
+          read: Some(orig_private_message.read),
+          updated: Some(naive_now()),
+          ap_id: orig_private_message.ap_id,
+          local: orig_private_message.local,
+          published: None,
+        }
+      }
     };
 
     let edit_id = data.edit_id;
@@ -1383,14 +1436,20 @@ impl Perform for Oper<EditPrivateMessage> {
       Err(_e) => return Err(APIError::err("couldnt_update_private_message").into()),
     };
 
-    if let Some(deleted) = data.deleted.to_owned() {
-      if deleted {
-        updated_private_message
-          .send_delete(&user, &self.client, pool)
-          .await?;
+    if data.read.is_none() {
+      if let Some(deleted) = data.deleted.to_owned() {
+        if deleted {
+          updated_private_message
+            .send_delete(&user, &self.client, pool)
+            .await?;
+        } else {
+          updated_private_message
+            .send_undo_delete(&user, &self.client, pool)
+            .await?;
+        }
       } else {
         updated_private_message
-          .send_undo_delete(&user, &self.client, pool)
+          .send_update(&user, &self.client, pool)
           .await?;
       }
     } else {

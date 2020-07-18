@@ -1,6 +1,9 @@
 use crate::{
-  db::{Bannable, Crud, Followable, Joinable},
   schema::{community, community_follower, community_moderator, community_user_ban},
+  Bannable,
+  Crud,
+  Followable,
+  Joinable,
 };
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
@@ -85,18 +88,10 @@ impl Community {
       .first::<Self>(conn)
   }
 
-  pub fn read_from_name_local(conn: &PgConnection, community_name: &str) -> Result<Self, Error> {
+  pub fn read_from_actor_id(conn: &PgConnection, for_actor_id: &str) -> Result<Self, Error> {
     use crate::schema::community::dsl::*;
     community
-      .filter(name.eq(community_name))
-      .filter(local.eq(true))
-      .first::<Self>(conn)
-  }
-
-  pub fn read_from_actor_id(conn: &PgConnection, community_id: &str) -> Result<Self, Error> {
-    use crate::schema::community::dsl::*;
-    community
-      .filter(actor_id.eq(community_id))
+      .filter(actor_id.eq(for_actor_id))
       .first::<Self>(conn)
   }
 
@@ -240,8 +235,7 @@ impl Followable<CommunityFollowerForm> for CommunityFollower {
 
 #[cfg(test)]
 mod tests {
-  use super::{super::user::*, *};
-  use crate::db::{establish_unpooled_connection, ListingType, SortType};
+  use crate::{community::*, tests::establish_unpooled_connection, user::*, ListingType, SortType};
 
   #[test]
   fn test_crud() {
