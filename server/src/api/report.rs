@@ -96,7 +96,7 @@ impl Perform for Oper<CreateCommentReport> {
 
     // Check size of report and check for whitespace
     let reason: Option<String> = match data.reason.clone() {
-      Some(s) if s.trim().len() == 0 => None,
+      Some(s) if s.trim().is_empty() => None,
       Some(s) if s.len() > MAX_REPORT_LEN => {
         return Err(APIError::err("report_too_long").into());
       }
@@ -162,7 +162,7 @@ impl Perform for Oper<CreatePostReport> {
 
     // Check size of report and check for whitespace
     let reason: Option<String> = match data.reason.clone() {
-      Some(s) if s.trim().len() == 0 => None,
+      Some(s) if s.trim().is_empty() => None,
       Some(s) if s.len() > MAX_REPORT_LEN => {
         return Err(APIError::err("report_too_long").into());
       }
@@ -203,7 +203,7 @@ impl Perform for Oper<CreatePostReport> {
       post_name: post.name,
       post_url: post.url,
       post_body: post.body,
-      post_time: post_time,
+      post_time,
     };
     blocking(pool, move |conn| PostReport::report(conn, &report_form)).await??;
 
