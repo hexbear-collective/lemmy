@@ -7,13 +7,7 @@ use crate::{
   api::{comment::*, community::*, post::*, report::*, site::*, user::*, *},
   rate_limit::RateLimit,
   websocket::UserOperation,
-  CommunityId,
-  ConnectionId,
-  DbPool,
-  IPAddr,
-  LemmyError,
-  PostId,
-  UserId,
+  CommunityId, ConnectionId, DbPool, IPAddr, LemmyError, PostId, UserId,
 };
 use actix_web::client::Client;
 
@@ -487,7 +481,8 @@ impl ChatServer {
         UserOperation::EditPost => do_user_operation::<EditPost>(args).await,
         UserOperation::CreatePostLike => do_user_operation::<CreatePostLike>(args).await,
         UserOperation::SavePost => do_user_operation::<SavePost>(args).await,
-	UserOperation::CreatePostReport => do_user_operation::<CreatePostReport>(args).await,
+        UserOperation::CreatePostReport => do_user_operation::<CreatePostReport>(args).await,
+        UserOperation::ListPostReports => do_user_operation::<ListPostReports>(args).await,
 
         // Comment ops
         UserOperation::CreateComment => do_user_operation::<CreateComment>(args).await,
@@ -496,6 +491,7 @@ impl ChatServer {
         UserOperation::GetComments => do_user_operation::<GetComments>(args).await,
         UserOperation::CreateCommentLike => do_user_operation::<CreateCommentLike>(args).await,
         UserOperation::CreateCommentReport => do_user_operation::<CreateCommentReport>(args).await,
+        UserOperation::ListCommentReports => do_user_operation::<ListCommentReports>(args).await,
       }
     }
   }

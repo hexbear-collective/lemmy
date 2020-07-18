@@ -2,7 +2,7 @@ use crate::{
   apub::{make_apub_endpoint, EndpointType},
   db::{Crud, Likeable, Readable, Reportable, Saveable},
   naive_now,
-  schema::{post, post_like, post_read, post_saved, post_report},
+  schema::{post, post_like, post_read, post_report, post_saved},
 };
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
@@ -169,7 +169,7 @@ impl Likeable<PostLikeForm> for PostLike {
   }
 }
 
-#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[derive(Identifiable, Queryable, Associations, PartialEq, Serialize, Deserialize, Debug)]
 #[belongs_to(Post)]
 #[table_name = "post_report"]
 pub struct PostReport {
