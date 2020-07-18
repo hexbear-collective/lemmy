@@ -404,6 +404,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc9a9dd069569f212bc4330af9f17c4afb5e8ce185e83dbb14f1349dda18b10"
 
 [[package]]
+name = "adler32"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccc9a9dd069569f212bc4330af9f17c4afb5e8ce185e83dbb14f1349dda18b10"
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -506,7 +512,7 @@ dependencies = [
  "addr2line",
  "cfg-if",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.3.7",
  "object",
  "rustc-demangle",
 ]
@@ -1136,7 +1142,7 @@ dependencies = [
  "cfg-if",
  "crc32fast",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.4.0",
 ]
 
 [[package]]
@@ -1394,12 +1400,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "htmlescape"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9025058dae765dee5070ec375f591e2ba14638c63feff74f13805a72e523163"
-
-[[package]]
 name = "http"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1614,6 +1614,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
+name = "lemmy_db"
+version = "0.1.0"
+dependencies = [
+ "bcrypt",
+ "chrono",
+ "diesel",
+ "log",
+ "serde 1.0.114",
+ "serde_json",
+ "sha2",
+ "strum",
+ "strum_macros",
+]
+
+[[package]]
 name = "lemmy_server"
 version = "0.0.1"
 dependencies = [
@@ -1630,22 +1645,19 @@ dependencies = [
  "base64 0.12.3",
  "bcrypt",
  "chrono",
- "comrak",
- "config",
  "diesel",
  "diesel_migrations",
  "dotenv",
  "env_logger",
  "failure",
  "futures",
- "htmlescape",
  "http",
  "http-signature-normalization-actix",
  "itertools",
  "jsonwebtoken",
  "lazy_static",
- "lettre",
- "lettre_email",
+ "lemmy_db",
+ "lemmy_utils",
  "log",
  "openssl",
  "percent-encoding",
@@ -1661,6 +1673,26 @@ dependencies = [
  "tokio",
  "url",
  "uuid 0.8.1",
+]
+
+[[package]]
+name = "lemmy_utils"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "comrak",
+ "config",
+ "itertools",
+ "lazy_static",
+ "lettre",
+ "lettre_email",
+ "log",
+ "openssl",
+ "rand 0.7.3",
+ "regex",
+ "serde 1.0.114",
+ "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -1842,6 +1874,15 @@ checksum = "2684d4c2e97d99848d30b324b00c8fcc7e5c897b7cbb5819b09e7c90e8baf212"
 dependencies = [
  "mime",
  "unicase",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be0f75932c1f6cfae3c04000e40114adf955636e19040f9c0a2c380702aa1c7f"
+dependencies = [
+ "adler",
 ]
 
 [[package]]

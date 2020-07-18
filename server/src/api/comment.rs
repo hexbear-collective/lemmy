@@ -1,30 +1,7 @@
 use crate::{
-  api::{APIError, Oper, Perform},
+  api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
-  db::{
-    comment::*,
-    comment_view::*,
-    community_view::*,
-    moderator::*,
-    post::*,
-    site_view::*,
-    user::*,
-    user_mention::*,
-    user_view::*,
-    Crud,
-    Likeable,
-    ListingType,
-    Saveable,
-    SortType,
-  },
-  is_within_comment_char_limit,
-  naive_now,
-  remove_pii,
-  remove_slurs,
-  scrape_text_for_mentions,
-  send_email,
-  settings::Settings,
   websocket::{
     server::{JoinCommunityRoom, SendComment},
     UserOperation,
@@ -32,6 +9,31 @@ use crate::{
   },
   DbPool,
   LemmyError,
+};
+use lemmy_db::{
+  comment::*,
+  comment_view::*,
+  community_view::*,
+  moderator::*,
+  naive_now,
+  post::*,
+  site_view::*,
+  user::*,
+  user_mention::*,
+  user_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  Saveable,
+  SortType,
+};
+use lemmy_utils::{
+  make_apub_endpoint,
+  remove_slurs,
+  scrape_text_for_mentions,
+  send_email,
+  settings::Settings,
+  EndpointType,
   MentionData,
 };
 use log::error;
@@ -119,7 +121,7 @@ impl Perform for Oper<CreateComment> {
     let content_pii_removed = remove_pii(&content_slurs_removed);
 
     if !is_within_comment_char_limit(&data.content) {
-        return Err(APIError::err("comment_too_long").into());
+      return Err(APIError::err("comment_too_long").into());
     }
 
     let comment_form = CommentForm {
@@ -162,7 +164,9 @@ impl Perform for Oper<CreateComment> {
 
     let inserted_comment_id = inserted_comment.id;
     let updated_comment: Comment = match blocking(pool, move |conn| {
-      Comment::update_ap_id(&conn, inserted_comment_id)
+      let apub_id =
+        make_apub_endpoint(EndpointType::Comment, &inserted_comment_id.to_string()).to_string();
+      Comment::update_ap_id(&conn, inserted_comment_id, apub_id)
     })
     .await?
     {
@@ -244,28 +248,28 @@ impl Perform for Oper<EditComment> {
     let orig_comment =
       blocking(pool, move |conn| CommentView::read(&conn, edit_id, None)).await??;
 
+    let mut editors: Vec<i32> = vec![orig_comment.creator_id];
+    let mut moderators: Vec<i32> = vec![];
+
+    let community_id = orig_comment.community_id;
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(&conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+
+    editors.extend(&moderators);
     // You are allowed to mark the comment as read even if you're banned.
     if data.read.is_none() {
       // Verify its the creator or a mod, or an admin
-      let mut editors: Vec<i32> = vec![data.creator_id];
-      let community_id = orig_comment.community_id;
-      editors.append(
-        &mut blocking(pool, move |conn| {
-          Ok(
-            CommunityModeratorView::for_community(&conn, community_id)?
-              .into_iter()
-              .map(|m| m.user_id)
-              .collect(),
-          ) as Result<_, LemmyError>
-        })
-        .await??,
-      );
-      editors.append(
-        &mut blocking(pool, move |conn| {
-          Ok(UserView::admins(conn)?.into_iter().map(|a| a.id).collect()) as Result<_, LemmyError>
-        })
-        .await??,
-      );
 
       if !editors.contains(&user_id) {
         return Err(APIError::err("no_comment_edit_allowed").into());
@@ -283,34 +287,76 @@ impl Perform for Oper<EditComment> {
       if user.banned {
         return Err(APIError::err("site_ban").into());
       }
+    } else {
+      // check that user can mark as read
+      let parent_id = orig_comment.parent_id;
+      match parent_id {
+        Some(pid) => {
+          let parent_comment =
+            blocking(pool, move |conn| CommentView::read(&conn, pid, None)).await??;
+          if user_id != parent_comment.creator_id {
+            return Err(APIError::err("no_comment_edit_allowed").into());
+          }
+        }
+        None => {
+          let parent_post_id = orig_comment.post_id;
+          let parent_post = blocking(pool, move |conn| Post::read(conn, parent_post_id)).await??;
+          if user_id != parent_post.creator_id {
+            return Err(APIError::err("no_comment_edit_allowed").into());
+          }
+        }
+      }
     }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
     let content_pii_removed = remove_pii(&content_slurs_removed);
 
     if !is_within_comment_char_limit(&data.content) {
-        return Err(APIError::err("comment_too_long").into());
+      return Err(APIError::err("comment_too_long").into());
     }
 
     let edit_id = data.edit_id;
     let read_comment = blocking(pool, move |conn| Comment::read(conn, edit_id)).await??;
 
-    let comment_form = CommentForm {
-      content: content_pii_removed,
-      parent_id: data.parent_id,
-      post_id: data.post_id,
-      creator_id: data.creator_id,
-      removed: data.removed.to_owned(),
-      deleted: data.deleted.to_owned(),
-      read: data.read.to_owned(),
-      published: None,
-      updated: if data.read.is_some() {
-        orig_comment.updated
+    let comment_form = {
+      if data.read.is_none() {
+        // the ban etc checks should been made and have passed
+        // the comment can be properly edited
+        let post_removed = if moderators.contains(&user_id) {
+          data.removed
+        } else {
+          Some(read_comment.removed)
+        };
+
+        CommentForm {
+          content: content_slurs_removed,
+          parent_id: read_comment.parent_id,
+          post_id: read_comment.post_id,
+          creator_id: read_comment.creator_id,
+          removed: post_removed.to_owned(),
+          deleted: data.deleted.to_owned(),
+          read: Some(read_comment.read),
+          published: None,
+          updated: Some(naive_now()),
+          ap_id: read_comment.ap_id,
+          local: read_comment.local,
+        }
       } else {
-        Some(naive_now())
-      },
-      ap_id: read_comment.ap_id,
-      local: read_comment.local,
+        // the only field that can be updated it the read field
+        CommentForm {
+          content: read_comment.content,
+          parent_id: read_comment.parent_id,
+          post_id: read_comment.post_id,
+          creator_id: read_comment.creator_id,
+          removed: Some(read_comment.removed).to_owned(),
+          deleted: Some(read_comment.deleted).to_owned(),
+          read: data.read.to_owned(),
+          published: None,
+          updated: orig_comment.updated,
+          ap_id: read_comment.ap_id,
+          local: read_comment.local,
+        }
+      }
     };
 
     let edit_id = data.edit_id;
@@ -324,30 +370,47 @@ impl Perform for Oper<EditComment> {
       Err(_e) => return Err(APIError::err("couldnt_update_comment").into()),
     };
 
-    if let Some(deleted) = data.deleted.to_owned() {
-      if deleted {
-        updated_comment
-          .send_delete(&user, &self.client, pool)
-          .await?;
+    if data.read.is_none() {
+      if let Some(deleted) = data.deleted.to_owned() {
+        if deleted {
+          updated_comment
+            .send_delete(&user, &self.client, pool)
+            .await?;
+        } else {
+          updated_comment
+            .send_undo_delete(&user, &self.client, pool)
+            .await?;
+        }
+      } else if let Some(removed) = data.removed.to_owned() {
+        if moderators.contains(&user_id) {
+          if removed {
+            updated_comment
+              .send_remove(&user, &self.client, pool)
+              .await?;
+          } else {
+            updated_comment
+              .send_undo_remove(&user, &self.client, pool)
+              .await?;
+          }
+        }
       } else {
         updated_comment
-          .send_undo_delete(&user, &self.client, pool)
+          .send_update(&user, &self.client, pool)
           .await?;
       }
-    } else if let Some(removed) = data.removed.to_owned() {
-      if removed {
-        updated_comment
-          .send_remove(&user, &self.client, pool)
-          .await?;
-      } else {
-        updated_comment
-          .send_undo_remove(&user, &self.client, pool)
-          .await?;
+
+      // Mod tables
+      if moderators.contains(&user_id) {
+        if let Some(removed) = data.removed.to_owned() {
+          let form = ModRemoveCommentForm {
+            mod_user_id: user_id,
+            comment_id: data.edit_id,
+            removed: Some(removed),
+            reason: data.reason.to_owned(),
+          };
+          blocking(pool, move |conn| ModRemoveComment::create(conn, &form)).await??;
+        }
       }
-    } else {
-      updated_comment
-        .send_update(&user, &self.client, pool)
-        .await?;
     }
 
     let post_id = data.post_id;
@@ -355,17 +418,6 @@ impl Perform for Oper<EditComment> {
 
     let mentions = scrape_text_for_mentions(&comment_form.content);
     let recipient_ids = send_local_notifs(mentions, updated_comment, user, post, pool).await?;
-
-    // Mod tables
-    if let Some(removed) = data.removed.to_owned() {
-      let form = ModRemoveCommentForm {
-        mod_user_id: user_id,
-        comment_id: data.edit_id,
-        removed: Some(removed),
-        reason: data.reason.to_owned(),
-      };
-      blocking(pool, move |conn| ModRemoveComment::create(conn, &form)).await??;
-    }
 
     let edit_id = data.edit_id;
     let comment_view = blocking(pool, move |conn| {
