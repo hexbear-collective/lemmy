@@ -87,6 +87,9 @@ pub trait Reportable<T> {
   fn report(conn: &PgConnection, form: &T) -> Result<Self, Error>
   where
     Self: Sized;
+  fn resolve(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<usize, Error>
+  where
+    Self: Sized;
 }
 
 pub trait Bannable<T> {

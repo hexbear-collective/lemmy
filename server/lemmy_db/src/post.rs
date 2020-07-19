@@ -208,6 +208,13 @@ impl Reportable<PostReportForm> for PostReport {
       .values(post_report_form)
       .get_result::<Self>(conn)
   }
+  
+  fn resolve(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<usize, Error> {
+    use crate::schema::post_report::dsl::*;
+    update(post_report.find(report_id))
+      .set(resolved.eq(true))
+      .execute(conn)
+  }
 }
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]

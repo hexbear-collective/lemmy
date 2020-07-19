@@ -36,7 +36,7 @@ pub struct PostReportView {
   pub community_id: i32,
 }
 
-pub struct PostReportViewQueryBuilder<'a> {
+pub struct PostReportQueryBuilder<'a> {
   conn: &'a PgConnection,
   query: BoxedQuery<'a, Pg>,
   for_community_id: Option<i32>,
@@ -45,13 +45,13 @@ pub struct PostReportViewQueryBuilder<'a> {
   resolved: Option<bool>,
 }
 
-impl<'a> PostReportViewQueryBuilder<'a> {
+impl<'a> PostReportQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection) -> Self {
     use super::post_report_view::post_report_view::dsl::*;
 
     let query = post_report_view.into_boxed();
 
-    PostReportViewQueryBuilder {
+    PostReportQueryBuilder {
       conn,
       query,
       for_community_id: None,

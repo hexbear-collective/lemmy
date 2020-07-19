@@ -33,7 +33,7 @@ pub struct CommentReportView {
   pub community_id: i32,
 }
 
-pub struct CommentReportViewQueryBuilder<'a> {
+pub struct CommentReportQueryBuilder<'a> {
   conn: &'a PgConnection,
   query: BoxedQuery<'a, Pg>,
   for_community_id: Option<i32>,
@@ -42,13 +42,13 @@ pub struct CommentReportViewQueryBuilder<'a> {
   resolved: Option<bool>,
 }
 
-impl<'a> CommentReportViewQueryBuilder<'a> {
+impl<'a> CommentReportQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection) -> Self {
     use super::comment_report_view::comment_report_view::dsl::*;
 
     let query = comment_report_view.into_boxed();
 
-    CommentReportViewQueryBuilder {
+    CommentReportQueryBuilder {
       conn,
       query,
       for_community_id: None,

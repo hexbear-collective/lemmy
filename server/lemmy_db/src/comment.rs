@@ -199,6 +199,13 @@ impl Reportable<CommentReportForm> for CommentReport {
       .values(comment_report_form)
       .get_result::<Self>(conn)
   }
+  
+  fn resolve(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<usize, Error> {
+    use crate::schema::comment_report::dsl::*;
+    update(comment_report.find(report_id))
+      .set(resolved.eq(true))
+      .execute(conn)
+  }
 }
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
