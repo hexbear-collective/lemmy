@@ -78,6 +78,13 @@ pub struct CommentReportQueryBuilder<'a> {
   resolved: Option<bool>,
 }
 
+impl CommentReportView {
+  pub fn read(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<Self, Error> {
+    use super::report_views::comment_report_view::dsl::*;
+    comment_report_view.filter(id.eq(report_id)).first::<Self>(conn)
+  }
+}
+
 impl<'a> CommentReportQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection) -> Self {
     use super::report_views::comment_report_view::dsl::*;
@@ -135,6 +142,14 @@ impl<'a> CommentReportQueryBuilder<'a> {
       .load::<CommentReportView>(self.conn)
   }
 }
+
+impl PostReportView {
+  pub fn read(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<Self, Error> {
+    use super::report_views::post_report_view::dsl::*;
+    post_report_view.filter(id.eq(report_id)).first::<Self>(conn)
+  }
+}
+
 
 pub struct PostReportQueryBuilder<'a> {
   conn: &'a PgConnection,

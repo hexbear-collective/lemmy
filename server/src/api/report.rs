@@ -1,26 +1,21 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   blocking,
-  websocket::{
-    server::{JoinCommunityRoom, SendComment},
-    UserOperation,
-    WebsocketInfo,
-  },
-  DbPool,
-  LemmyError,
+  websocket::WebsocketInfo,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
   comment::*,
-  comment_report_view::{CommentReportView, CommentReportViewQueryBuilder},
   comment_view::*,
   community_view::*,
   post::*,
-  post_report_view::{PostReportView, PostReportViewQueryBuilder},
   post_view::*,
+  report_views::{
+    CommentReportQueryBuilder, CommentReportView, PostReportQueryBuilder, PostReportView,
+  },
   user::*,
   user_view::UserView,
-  Crud,
-  Reportable,
+  Crud, Reportable,
 };
 
 use serde::{Deserialize, Serialize};
@@ -39,11 +34,6 @@ pub struct CommentReportResponse {
   pub success: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ListCommentReportResponse {
-  pub reports: Vec<CommentReportView>,
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct CreatePostReport {
   post: i32,
@@ -57,24 +47,53 @@ pub struct PostReportResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ListPostReports {
+pub struct ListCommentReports {
   page: Option<i64>,
   limit: Option<i64>,
-  pub community_id: i32,
+  pub community: i32,
   auth: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ListCommentReports {
+pub struct ListCommentReportResponse {
+  pub reports: Vec<CommentReportView>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListPostReports {
   page: Option<i64>,
   limit: Option<i64>,
-  pub community_id: i32,
+  pub community: i32,
   auth: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListPostReportResponse {
   pub reports: Vec<PostReportView>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResolveCommentReport {
+  pub report: uuid::Uuid,
+  pub auth: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResolveCommentReportResponse {
+  pub report: uuid::Uuid,
+  pub resolved: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResolvePostReport {
+  pub report: uuid::Uuid,
+  pub auth: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResolvePostReportResponse {
+  pub report: uuid::Uuid,
+  pub resolved: bool,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -233,7 +252,7 @@ impl Perform for Oper<ListCommentReports> {
       return Err(APIError::err("site_ban").into());
     }
 
-    let community_id = data.community_id;
+    let community_id = data.community;
     //Check community exists.
     let community_id = blocking(pool, move |conn| {
       CommunityView::read(conn, community_id, None)
@@ -262,13 +281,13 @@ impl Perform for Oper<ListCommentReports> {
       .await??,
     );
     if !mod_ids.contains(&user_id) {
-      return Err(APIError::err("no_report_views_allowed").into());
+      return Err(APIError::err("report_view_not_allowed").into());
     }
 
     let page = data.page;
     let limit = data.limit;
     let reports = blocking(pool, move |conn| {
-      CommentReportViewQueryBuilder::create(conn)
+      CommentReportQueryBuilder::create(conn)
         .community_id(community_id)
         .page(page)
         .limit(limit)
@@ -303,7 +322,7 @@ impl Perform for Oper<ListPostReports> {
       return Err(APIError::err("site_ban").into());
     }
 
-    let community_id = data.community_id;
+    let community_id = data.community;
     //Check community exists.
     let community_id = blocking(pool, move |conn| {
       CommunityView::read(conn, community_id, None)
@@ -332,13 +351,13 @@ impl Perform for Oper<ListPostReports> {
       .await??,
     );
     if !mod_ids.contains(&user_id) {
-      return Err(APIError::err("no_report_viewsx_allowed").into());
+      return Err(APIError::err("report_view_not_allowed").into());
     }
 
     let page = data.page;
     let limit = data.limit;
     let reports = blocking(pool, move |conn| {
-      PostReportViewQueryBuilder::create(conn)
+      PostReportQueryBuilder::create(conn)
         .community_id(community_id)
         .page(page)
         .limit(limit)
@@ -347,5 +366,137 @@ impl Perform for Oper<ListPostReports> {
     .await??;
 
     Ok(ListPostReportResponse { reports })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<ResolveCommentReport> {
+  type Response = ResolveCommentReportResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<ResolveCommentReportResponse, LemmyError> {
+    let data: &ResolveCommentReport = &self.data;
+
+    // Verify auth token
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user_id = claims.id;
+    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
+    if user.banned {
+      return Err(APIError::err("site_ban").into());
+    }
+
+    // Fetch the report view
+    let report_id = data.report;
+    let report = blocking(pool, move |conn| CommentReportView::read(&conn, &report_id)).await??;
+
+    // Check for community ban
+    let community_id = report.community_id;
+    let is_banned =
+      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, community_id).is_ok();
+    if blocking(pool, is_banned).await? {
+      return Err(APIError::err("community_ban").into());
+    }
+
+    // Check for mod/admin privileges
+    let mut mod_ids: Vec<i32> = Vec::new();
+    mod_ids.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    mod_ids.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+    if !mod_ids.contains(&user_id) {
+      return Err(APIError::err("resolve_report_not_allowed").into());
+    }
+
+    blocking(pool, move |conn| {
+      CommentReport::resolve(conn, &report_id.clone())
+    })
+    .await??;
+
+    Ok(ResolveCommentReportResponse {
+      report: report_id,
+      resolved: true,
+    })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<ResolvePostReport> {
+  type Response = ResolvePostReportResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<ResolvePostReportResponse, LemmyError> {
+    let data: &ResolvePostReport = &self.data;
+
+    // Verify auth token
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user_id = claims.id;
+    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
+    if user.banned {
+      return Err(APIError::err("site_ban").into());
+    }
+
+    // Fetch the report view
+    let report_id = data.report;
+    let report = blocking(pool, move |conn| PostReportView::read(&conn, &report_id)).await??;
+
+    // Check for community ban
+    let community_id = report.community_id;
+    let is_banned =
+      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, community_id).is_ok();
+    if blocking(pool, is_banned).await? {
+      return Err(APIError::err("community_ban").into());
+    }
+
+    // Check for mod/admin privileges
+    let mut mod_ids: Vec<i32> = Vec::new();
+    mod_ids.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    mod_ids.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+    if !mod_ids.contains(&user_id) {
+      return Err(APIError::err("resolve_report_not_allowed").into());
+    }
+
+    blocking(pool, move |conn| {
+      PostReport::resolve(conn, &report_id.clone())
+    })
+    .await??;
+
+    Ok(ResolvePostReportResponse {
+      report: report_id,
+      resolved: true,
+    })
   }
 }

@@ -483,6 +483,7 @@ impl ChatServer {
         UserOperation::SavePost => do_user_operation::<SavePost>(args).await,
         UserOperation::CreatePostReport => do_user_operation::<CreatePostReport>(args).await,
         UserOperation::ListPostReports => do_user_operation::<ListPostReports>(args).await,
+        UserOperation::ResolvePostReport => do_user_operation::<ResolvePostReport>(args).await,
 
         // Comment ops
         UserOperation::CreateComment => do_user_operation::<CreateComment>(args).await,
@@ -492,6 +493,9 @@ impl ChatServer {
         UserOperation::CreateCommentLike => do_user_operation::<CreateCommentLike>(args).await,
         UserOperation::CreateCommentReport => do_user_operation::<CreateCommentReport>(args).await,
         UserOperation::ListCommentReports => do_user_operation::<ListCommentReports>(args).await,
+        UserOperation::ResolveCommentReport => {
+          do_user_operation::<ResolveCommentReport>(args).await
+        }
       }
     }
   }
