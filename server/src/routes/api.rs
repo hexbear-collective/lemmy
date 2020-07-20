@@ -56,7 +56,12 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           // Mod Actions
           .route("/transfer", web::post().to(route_post::<TransferCommunity>))
           .route("/ban_user", web::post().to(route_post::<BanFromCommunity>))
-          .route("/mod", web::post().to(route_post::<AddModToCommunity>)),
+          .route("/mod", web::post().to(route_post::<AddModToCommunity>))
+          .route(
+            "/comment_reports",
+            web::get().to(route_get::<ListCommentReports>),
+          )
+          .route("/post_reports", web::get().to(route_get::<ListPostReports>)),
       )
       // Post
       .service(
@@ -74,7 +79,11 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/list", web::get().to(route_get::<GetPosts>))
           .route("/like", web::post().to(route_post::<CreatePostLike>))
           .route("/save", web::put().to(route_post::<SavePost>))
-          .route("/report", web::put().to(route_post::<CreatePostReport>)),
+          .route("/report", web::put().to(route_post::<CreatePostReport>))
+          .route(
+            "/resolve_report",
+            web::post().to(route_post::<ResolvePostReport>),
+          ),
       )
       // Comment
       .service(
@@ -84,7 +93,11 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("", web::put().to(route_post::<EditComment>))
           .route("/like", web::post().to(route_post::<CreateCommentLike>))
           .route("/save", web::put().to(route_post::<SaveComment>))
-	  .route("/report", web::post().to(route_post::<CreateCommentReport>)),
+          .route("/report", web::post().to(route_post::<CreateCommentReport>))
+          .route(
+            "/resolve_report",
+            web::post().to(route_post::<ResolveCommentReport>),
+          ),
       )
       // Private Message
       .service(
