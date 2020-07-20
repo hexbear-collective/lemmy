@@ -137,6 +137,7 @@ impl<'a> CommentReportQueryBuilder<'a> {
     let (limit, offset) = limit_and_offset(self.page, self.limit);
 
     query
+      .order_by(time.desc())
       .limit(limit)
       .offset(offset)
       .load::<CommentReportView>(self.conn)
@@ -212,6 +213,7 @@ impl<'a> PostReportQueryBuilder<'a> {
     let (limit, offset) = limit_and_offset(self.page, self.limit);
 
     query
+      .order_by(time.desc())
       .limit(limit)
       .offset(offset)
       .load::<PostReportView>(self.conn)
