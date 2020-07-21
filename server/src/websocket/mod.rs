@@ -30,8 +30,14 @@ pub enum UserOperation {
   EditComment,
   SaveComment,
   CreateCommentLike,
+  CreateCommentReport,
+  ListCommentReports,
+  ResolveCommentReport,
   GetPosts,
   CreatePostLike,
+  CreatePostReport,
+  ListPostReports,
+  ResolvePostReport,
   EditPost,
   SavePost,
   EditCommunity,
@@ -64,6 +70,7 @@ pub enum UserOperation {
   GetComments,
   GetSiteConfig,
   SaveSiteConfig,
+  GetReportCount,
 }
 
 #[derive(Clone)]
