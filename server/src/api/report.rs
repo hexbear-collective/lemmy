@@ -73,6 +73,19 @@ pub struct ListPostReportResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GetReportCount {
+  community: i32,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetReportCountResponse {
+  community: i32,
+  comment_reports: usize,
+  post_reports: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResolveCommentReport {
   pub report: uuid::Uuid,
   pub auth: String,
@@ -227,6 +240,85 @@ impl Perform for Oper<CreatePostReport> {
     blocking(pool, move |conn| PostReport::report(conn, &report_form)).await??;
 
     Ok(PostReportResponse { success: true })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetReportCount> {
+  type Response = GetReportCountResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<GetReportCountResponse, LemmyError> {
+    let data: &GetReportCount = &self.data;
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user_id = claims.id;
+    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
+    if user.banned {
+      return Err(APIError::err("site_ban").into());
+    }
+
+    let community_id = data.community;
+    //Check community exists.
+    let community_id = blocking(pool, move |conn| {
+      CommunityView::read(conn, community_id, None)
+    })
+    .await??
+    .id;
+    // Check for community ban
+    let is_banned =
+      move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, community_id).is_ok();
+    if blocking(pool, is_banned).await? {
+      return Err(APIError::err("community_ban").into());
+    }
+
+    let mut mod_ids: Vec<i32> = Vec::new();
+    mod_ids.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    mod_ids.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+    if !mod_ids.contains(&user_id) {
+      return Err(APIError::err("report_view_not_allowed").into());
+    }
+
+    let comment_reports = blocking(pool, move |conn| {
+      CommentReportQueryBuilder::create(conn)
+        .community_id(community_id)
+        .resolved(false)
+        .count()
+    })
+    .await??;
+    let post_reports = blocking(pool, move |conn| {
+      PostReportQueryBuilder::create(conn)
+        .community_id(community_id)
+        .resolved(false)
+        .count()
+    })
+    .await??;
+
+    let response = GetReportCountResponse {
+      community: community_id,
+      comment_reports,
+      post_reports,
+    };
+
+    Ok(response)
   }
 }
 

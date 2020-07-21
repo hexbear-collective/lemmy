@@ -473,6 +473,7 @@ impl ChatServer {
         }
         UserOperation::BanFromCommunity => do_user_operation::<BanFromCommunity>(args).await,
         UserOperation::AddModToCommunity => do_user_operation::<AddModToCommunity>(args).await,
+        UserOperation::GetReportCount => do_user_operation::<GetReportCount>(args).await,
 
         // Post ops
         UserOperation::CreatePost => do_user_operation::<CreatePost>(args).await,

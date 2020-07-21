@@ -142,6 +142,21 @@ impl<'a> CommentReportQueryBuilder<'a> {
       .offset(offset)
       .load::<CommentReportView>(self.conn)
   }
+  
+  pub fn count(self) -> Result<usize, Error> {
+    use super::report_views::comment_report_view::dsl::*;
+    let mut query = self.query;
+
+    if let Some(comm_id) = self.for_community_id {
+      query = query.filter(community_id.eq(comm_id));
+    }
+
+    if let Some(resolved_flag) = self.resolved {
+      query = query.filter(resolved.eq(resolved_flag));
+    }
+
+    query.execute(self.conn)
+  }
 }
 
 impl PostReportView {
@@ -217,5 +232,20 @@ impl<'a> PostReportQueryBuilder<'a> {
       .limit(limit)
       .offset(offset)
       .load::<PostReportView>(self.conn)
+  }
+
+  pub fn count(self) -> Result<usize, Error> {
+    use super::report_views::post_report_view::dsl::*;
+    let mut query = self.query;
+    
+    if let Some(comm_id) = self.for_community_id {
+      query = query.filter(community_id.eq(comm_id));
+    }
+
+    if let Some(resolved_flag) = self.resolved {
+      query = query.filter(resolved.eq(resolved_flag));
+    }
+
+    query.execute(self.conn)
   }
 }

@@ -61,7 +61,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
             "/comment_reports",
             web::get().to(route_get::<ListCommentReports>),
           )
-          .route("/post_reports", web::get().to(route_get::<ListPostReports>)),
+          .route("/post_reports", web::get().to(route_get::<ListPostReports>))
+          .route("/reports", web::get().to(route_get::<GetReportCount>)),
       )
       // Post
       .service(

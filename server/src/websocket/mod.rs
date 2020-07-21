@@ -70,6 +70,7 @@ pub enum UserOperation {
   GetComments,
   GetSiteConfig,
   SaveSiteConfig,
+  GetReportCount,
 }
 
 #[derive(Clone)]
