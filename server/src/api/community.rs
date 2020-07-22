@@ -1,20 +1,32 @@
 use super::*;
 use crate::{
-  api::{APIError, Oper, Perform},
-  apub::{
-    extensions::signatures::generate_actor_keypair, make_apub_endpoint, ActorType, EndpointType,
-  },
+  api::{claims::Claims, APIError, Oper, Perform},
+  apub::ActorType,
   blocking,
-  db::{
-    community_settings::CommunitySettings, community_settings::CommunitySettingsForm, Bannable,
-    Crud, Followable, Joinable, SortType,
-  },
-  is_valid_community_name, naive_from_unix, naive_now, slur_check, slurs_vec_to_str,
   websocket::{
     server::{JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+};
+use lemmy_db::{
+  community_settings::{CommunitySettings, CommunitySettingsForm},
+  naive_now,
+  Bannable,
+  Crud,
+  Followable,
+  Joinable,
+  SortType,
+};
+use lemmy_utils::{
+  generate_actor_keypair,
+  is_valid_community_name,
+  make_apub_endpoint,
+  naive_from_unix,
+  slur_check,
+  slurs_vec_to_str,
+  EndpointType,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -94,7 +106,6 @@ pub struct AddModToCommunityResponse {
 #[derive(Serialize, Deserialize)]
 pub struct EditCommunity {
   pub edit_id: i32,
-  name: String,
   title: String,
   description: Option<String>,
   category_id: i32,
@@ -263,15 +274,15 @@ impl Perform for Oper<CreateCommunity> {
       return Err(APIError::err("site_ban").into());
     }
 
-    let comunity_name = data.name.to_owned();
-
-    match blocking(pool, move |conn| {
-      Community::read_from_name_local(conn, &comunity_name)
+    // Double check for duplicate community actor_ids
+    let actor_id = make_apub_endpoint(EndpointType::Community, &data.name).to_string();
+    let actor_id_cloned = actor_id.to_owned();
+    let community_dupe = blocking(pool, move |conn| {
+      Community::read_from_actor_id(conn, &actor_id_cloned)
     })
-    .await?
-    {
-      Ok(_) => return Err(APIError::err("community_already_exists").into()),
-      Err(_e) => (),
+    .await?;
+    if community_dupe.is_ok() {
+      return Err(APIError::err("community_already_exists").into());
     }
 
     // When you create a community, make sure the user becomes a moderator and a follower
@@ -287,7 +298,7 @@ impl Perform for Oper<CreateCommunity> {
       deleted: None,
       nsfw: data.nsfw || nsfw_override,
       updated: None,
-      actor_id: make_apub_endpoint(EndpointType::Community, &data.name).to_string(),
+      actor_id,
       local: true,
       private_key: Some(keypair.private_key),
       public_key: Some(keypair.public_key),
@@ -358,10 +369,6 @@ impl Perform for Oper<EditCommunity> {
   ) -> Result<CommunityResponse, LemmyError> {
     let data: &EditCommunity = &self.data;
 
-    if let Err(slurs) = slur_check(&data.name) {
-      return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
-    }
-
     if let Err(slurs) = slur_check(&data.title) {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
@@ -378,10 +385,6 @@ impl Perform for Oper<EditCommunity> {
       Ok(claims) => claims.claims,
       Err(_e) => return Err(APIError::err("not_logged_in").into()),
     };
-
-    if !is_valid_community_name(&data.name) {
-      return Err(APIError::err("invalid_community_name").into());
-    }
 
     let user_id = claims.id;
 
@@ -406,11 +409,11 @@ impl Perform for Oper<EditCommunity> {
     let read_community = blocking(pool, move |conn| Community::read(conn, edit_id)).await??;
 
     let community_form = CommunityForm {
-      name: data.name.to_owned(),
+      name: read_community.name,
       title: data.title.to_owned(),
       description: data.description.to_owned(),
       category_id: data.category_id.to_owned(),
-      creator_id: user_id,
+      creator_id: read_community.creator_id,
       removed: data.removed.to_owned(),
       deleted: data.deleted.to_owned(),
       nsfw: data.nsfw || nsfw_override,
@@ -670,6 +673,28 @@ impl Perform for Oper<BanFromCommunity> {
 
     let user_id = claims.id;
 
+    let mut community_moderators: Vec<i32> = vec![];
+
+    let community_id = data.community_id;
+
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(&conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+
+    if !community_moderators.contains(&user_id) {
+      return Err(APIError::err("couldnt_update_community").into());
+    }
+
     let community_user_ban_form = CommunityUserBanForm {
       community_id: data.community_id,
       user_id: data.user_id,
@@ -746,6 +771,28 @@ impl Perform for Oper<AddModToCommunity> {
       community_id: data.community_id,
       user_id: data.user_id,
     };
+
+    let mut community_moderators: Vec<i32> = vec![];
+
+    let community_id = data.community_id;
+
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(&conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+
+    if !community_moderators.contains(&user_id) {
+      return Err(APIError::err("couldnt_update_community").into());
+    }
 
     if data.added {
       let join = move |conn: &'_ _| CommunityModerator::join(conn, &community_moderator_form);

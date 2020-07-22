@@ -1,48 +1,46 @@
 use crate::{
   apub::{
-    activities::{populate_object_props, send_activity},
+    activities::send_activity,
     create_apub_response,
     create_apub_tombstone_response,
     create_tombstone,
-    extensions::{group_extensions::GroupExtension, signatures::PublicKey},
+    extensions::group_extensions::GroupExtension,
     fetcher::get_or_fetch_and_upsert_remote_user,
     get_shared_inbox,
+    insert_activity,
     ActorType,
     FromApub,
     GroupExt,
     ToApub,
   },
   blocking,
-  convert_datetime,
-  db::{
-    activity::insert_activity,
-    community::{Community, CommunityForm},
-    community_settings::CommunitySettings,
-    community_view::{CommunityFollowerView, CommunityModeratorView},
-    user::User_,
-  },
-  naive_now,
   routes::DbPoolParam,
   DbPool,
   LemmyError,
 };
-use activitystreams::{
-  activity::{Accept, Announce, Delete, Remove, Undo},
-  actor::{kind::GroupType, properties::ApActorProperties, Group},
+use activitystreams_ext::Ext2;
+use activitystreams_new::{
+  activity::{Accept, Announce, Delete, Follow, Remove, Undo},
+  actor::{kind::GroupType, ApActor, Endpoints, Group},
+  base::{AnyBase, BaseExt},
   collection::UnorderedCollection,
   context,
-  endpoint::EndpointProperties,
-  object::properties::ObjectProperties,
-  Activity,
-  Base,
-  BaseBox,
+  object::Tombstone,
+  prelude::*,
+  public,
 };
-use activitystreams_ext::Ext3;
-use activitystreams_new::{activity::Follow, object::Tombstone};
 use actix_web::{body::Body, client::Client, web, HttpResponse};
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use lemmy_db::{
+  community::{Community, CommunityForm},
+  community_settings::CommunitySettings,
+  community_view::{CommunityFollowerView, CommunityModeratorView},
+  naive_now,
+  user::User_,
+};
+use lemmy_utils::convert_datetime;
+use serde::Deserialize;
+use url::Url;
 
 #[derive(Deserialize)]
 pub struct CommunityQuery {
@@ -59,13 +57,10 @@ impl ToApub for Community {
     let settings = blocking(pool, move |conn| {
       CommunitySettings::read_from_community_id(&conn, id)
     })
-      .await??;
+    .await??;
     if settings.private {
       return Err(format_err!("Community is private").into());
     }
-
-    let mut group = Group::default();
-    let oprops: &mut ObjectProperties = group.as_mut();
 
     // The attributed to, is an ordered vector with the creator actor_ids first,
     // then the rest of the moderators
@@ -76,36 +71,36 @@ impl ToApub for Community {
       CommunityModeratorView::for_community(&conn, id)
     })
     .await??;
-    let moderators = moderators.into_iter().map(|m| m.user_actor_id).collect();
+    let moderators: Vec<String> = moderators.into_iter().map(|m| m.user_actor_id).collect();
 
-    oprops
-      .set_context_xsd_any_uri(context())?
-      .set_id(self.actor_id.to_owned())?
-      .set_name_xsd_string(self.name.to_owned())?
-      .set_published(convert_datetime(self.published))?
-      .set_many_attributed_to_xsd_any_uris(moderators)?;
+    let mut group = Group::new();
+    group
+      .set_context(context())
+      .set_id(Url::parse(&self.actor_id)?)
+      .set_name(self.name.to_owned())
+      .set_published(convert_datetime(self.published))
+      .set_many_attributed_tos(moderators);
 
     if let Some(u) = self.updated.to_owned() {
-      oprops.set_updated(convert_datetime(u))?;
+      group.set_updated(convert_datetime(u));
     }
     if let Some(d) = self.description.to_owned() {
       // TODO: this should be html, also add source field with raw markdown
       //       -> same for post.content and others
-      oprops.set_content_xsd_string(d)?;
+      group.set_content(d);
     }
 
-    let mut endpoint_props = EndpointProperties::default();
-
-    endpoint_props.set_shared_inbox(self.get_shared_inbox_url())?;
-
-    let mut actor_props = ApActorProperties::default();
-
-    actor_props
-      .set_preferred_username(self.title.to_owned())?
-      .set_inbox(self.get_inbox_url())?
-      .set_outbox(self.get_outbox_url())?
-      .set_endpoints(endpoint_props)?
-      .set_followers(self.get_followers_url())?;
+    let mut ap_actor = ApActor::new(self.get_inbox_url().parse()?, group);
+    ap_actor
+      .set_preferred_username(self.title.to_owned())
+      .set_outbox(self.get_outbox_url().parse()?)
+      .set_followers(self.get_followers_url().parse()?)
+      .set_following(self.get_following_url().parse()?)
+      .set_liked(self.get_liked_url().parse()?)
+      .set_endpoints(Endpoints {
+        shared_inbox: Some(self.get_shared_inbox_url().parse()?),
+        ..Default::default()
+      });
 
     let nsfw = self.nsfw;
     let category_id = self.category_id;
@@ -114,10 +109,9 @@ impl ToApub for Community {
     })
     .await??;
 
-    Ok(Ext3::new(
-      group,
+    Ok(Ext2::new(
+      ap_actor,
       group_extension,
-      actor_props,
       self.get_public_key_ext(),
     ))
   }
@@ -127,14 +121,14 @@ impl ToApub for Community {
       self.deleted,
       &self.actor_id,
       self.updated,
-      GroupType.to_string(),
+      GroupType::Group.to_string(),
     )
   }
 }
 
 #[async_trait::async_trait(?Send)]
 impl ActorType for Community {
-  fn actor_id(&self) -> String {
+  fn actor_id_str(&self) -> String {
     self.actor_id.to_owned()
   }
 
@@ -148,27 +142,23 @@ impl ActorType for Community {
   /// As a local community, accept the follow request from a remote user.
   async fn send_accept_follow(
     &self,
-    follow: &Follow,
+    follow: Follow,
     client: &Client,
     pool: &DbPool,
   ) -> Result<(), LemmyError> {
-    let actor_uri = follow.actor.as_single_xsd_any_uri().unwrap().to_string();
+    let actor_uri = follow.actor()?.as_single_xsd_any_uri().unwrap().to_string();
     let id = format!("{}/accept/{}", self.actor_id, uuid::Uuid::new_v4());
 
-    let mut accept = Accept::new();
-    accept
-      .object_props
-      .set_context_xsd_any_uri(context())?
-      .set_id(id)?;
-    accept
-      .accept_props
-      .set_actor_xsd_any_uri(self.actor_id.to_owned())?
-      .set_object_base_box(BaseBox::from_concrete(follow.clone())?)?;
+    let mut accept = Accept::new(self.actor_id.to_owned(), follow.into_any_base()?);
     let to = format!("{}/inbox", actor_uri);
+    accept
+      .set_context(context())
+      .set_id(Url::parse(&id)?)
+      .set_to(to.clone());
 
     insert_activity(self.creator_id, accept.clone(), true, pool).await?;
 
-    send_activity(client, &accept, self, vec![to]).await?;
+    send_activity(client, &accept.into_any_base()?, self, vec![to]).await?;
     Ok(())
   }
 
@@ -182,17 +172,12 @@ impl ActorType for Community {
 
     let id = format!("{}/delete/{}", self.actor_id, uuid::Uuid::new_v4());
 
-    let mut delete = Delete::default();
-    populate_object_props(
-      &mut delete.object_props,
-      vec![self.get_followers_url()],
-      &id,
-    )?;
-
+    let mut delete = Delete::new(creator.actor_id.to_owned(), group.into_any_base()?);
     delete
-      .delete_props
-      .set_actor_xsd_any_uri(creator.actor_id.to_owned())?
-      .set_object_base_box(BaseBox::from_concrete(group)?)?;
+      .set_context(context())
+      .set_id(Url::parse(&id)?)
+      .set_to(public())
+      .set_many_ccs(vec![self.get_followers_url()]);
 
     insert_activity(self.creator_id, delete.clone(), true, pool).await?;
 
@@ -201,7 +186,7 @@ impl ActorType for Community {
     // Note: For an accept, since it was automatic, no one pushed a button,
     // the community was the actor.
     // But for delete, the creator is the actor, and does the signing
-    send_activity(client, &delete, creator, inboxes).await?;
+    send_activity(client, &delete.into_any_base()?, creator, inboxes).await?;
     Ok(())
   }
 
@@ -215,33 +200,22 @@ impl ActorType for Community {
 
     let id = format!("{}/delete/{}", self.actor_id, uuid::Uuid::new_v4());
 
-    let mut delete = Delete::default();
-    populate_object_props(
-      &mut delete.object_props,
-      vec![self.get_followers_url()],
-      &id,
-    )?;
-
+    let mut delete = Delete::new(creator.actor_id.to_owned(), group.into_any_base()?);
     delete
-      .delete_props
-      .set_actor_xsd_any_uri(creator.actor_id.to_owned())?
-      .set_object_base_box(BaseBox::from_concrete(group)?)?;
+      .set_context(context())
+      .set_id(Url::parse(&id)?)
+      .set_to(public())
+      .set_many_ccs(vec![self.get_followers_url()]);
 
     // TODO
     // Undo that fake activity
     let undo_id = format!("{}/undo/delete/{}", self.actor_id, uuid::Uuid::new_v4());
-    let mut undo = Undo::default();
-
-    populate_object_props(
-      &mut undo.object_props,
-      vec![self.get_followers_url()],
-      &undo_id,
-    )?;
-
+    let mut undo = Undo::new(creator.actor_id.to_owned(), delete.into_any_base()?);
     undo
-      .undo_props
-      .set_actor_xsd_any_uri(creator.actor_id.to_owned())?
-      .set_object_base_box(delete)?;
+      .set_context(context())
+      .set_id(Url::parse(&undo_id)?)
+      .set_to(public())
+      .set_many_ccs(vec![self.get_followers_url()]);
 
     insert_activity(self.creator_id, undo.clone(), true, pool).await?;
 
@@ -250,7 +224,7 @@ impl ActorType for Community {
     // Note: For an accept, since it was automatic, no one pushed a button,
     // the community was the actor.
     // But for delete, the creator is the actor, and does the signing
-    send_activity(client, &undo, creator, inboxes).await?;
+    send_activity(client, &undo.into_any_base()?, creator, inboxes).await?;
     Ok(())
   }
 
@@ -264,17 +238,12 @@ impl ActorType for Community {
 
     let id = format!("{}/remove/{}", self.actor_id, uuid::Uuid::new_v4());
 
-    let mut remove = Remove::default();
-    populate_object_props(
-      &mut remove.object_props,
-      vec![self.get_followers_url()],
-      &id,
-    )?;
-
+    let mut remove = Remove::new(mod_.actor_id.to_owned(), group.into_any_base()?);
     remove
-      .remove_props
-      .set_actor_xsd_any_uri(mod_.actor_id.to_owned())?
-      .set_object_base_box(BaseBox::from_concrete(group)?)?;
+      .set_context(context())
+      .set_id(Url::parse(&id)?)
+      .set_to(public())
+      .set_many_ccs(vec![self.get_followers_url()]);
 
     insert_activity(mod_.id, remove.clone(), true, pool).await?;
 
@@ -283,7 +252,7 @@ impl ActorType for Community {
     // Note: For an accept, since it was automatic, no one pushed a button,
     // the community was the actor.
     // But for delete, the creator is the actor, and does the signing
-    send_activity(client, &remove, mod_, inboxes).await?;
+    send_activity(client, &remove.into_any_base()?, mod_, inboxes).await?;
     Ok(())
   }
 
@@ -297,32 +266,21 @@ impl ActorType for Community {
 
     let id = format!("{}/remove/{}", self.actor_id, uuid::Uuid::new_v4());
 
-    let mut remove = Remove::default();
-    populate_object_props(
-      &mut remove.object_props,
-      vec![self.get_followers_url()],
-      &id,
-    )?;
-
+    let mut remove = Remove::new(mod_.actor_id.to_owned(), group.into_any_base()?);
     remove
-      .remove_props
-      .set_actor_xsd_any_uri(mod_.actor_id.to_owned())?
-      .set_object_base_box(BaseBox::from_concrete(group)?)?;
+      .set_context(context())
+      .set_id(Url::parse(&id)?)
+      .set_to(public())
+      .set_many_ccs(vec![self.get_followers_url()]);
 
     // Undo that fake activity
     let undo_id = format!("{}/undo/remove/{}", self.actor_id, uuid::Uuid::new_v4());
-    let mut undo = Undo::default();
-
-    populate_object_props(
-      &mut undo.object_props,
-      vec![self.get_followers_url()],
-      &undo_id,
-    )?;
-
+    let mut undo = Undo::new(mod_.actor_id.to_owned(), remove.into_any_base()?);
     undo
-      .undo_props
-      .set_actor_xsd_any_uri(mod_.actor_id.to_owned())?
-      .set_object_base_box(remove)?;
+      .set_context(context())
+      .set_id(Url::parse(&undo_id)?)
+      .set_to(public())
+      .set_many_ccs(vec![self.get_followers_url()]);
 
     insert_activity(mod_.id, undo.clone(), true, pool).await?;
 
@@ -331,7 +289,7 @@ impl ActorType for Community {
     // Note: For an accept, since it was automatic, no one pushed a button,
     // the community was the actor.
     // But for remove , the creator is the actor, and does the signing
-    send_activity(client, &undo, mod_, inboxes).await?;
+    send_activity(client, &undo.into_any_base()?, mod_, inboxes).await?;
     Ok(())
   }
 
@@ -345,7 +303,7 @@ impl ActorType for Community {
     .await??;
     let inboxes = inboxes
       .into_iter()
-      .map(|c| get_shared_inbox(&c.user_actor_id))
+      .map(|c| get_shared_inbox(&Url::parse(&c.user_actor_id).unwrap()))
       .filter(|s| !s.is_empty())
       .unique()
       .collect();
@@ -377,38 +335,56 @@ impl FromApub for CommunityForm {
   type ApubType = GroupExt;
 
   /// Parse an ActivityPub group received from another instance into a Lemmy community.
-  async fn from_apub(group: &GroupExt, client: &Client, pool: &DbPool) -> Result<Self, LemmyError> {
-    let group_extensions: &GroupExtension = &group.ext_one;
-    let oprops = &group.inner.object_props;
-    let aprops = &group.ext_two;
-    let public_key: &PublicKey = &group.ext_three.public_key;
+  async fn from_apub(
+    group: &GroupExt,
+    client: &Client,
+    pool: &DbPool,
+    actor_id: &Url,
+  ) -> Result<Self, LemmyError> {
+    let creator_and_moderator_uris = group.inner.attributed_to().unwrap();
+    let creator_uri = creator_and_moderator_uris
+      .as_many()
+      .unwrap()
+      .iter()
+      .next()
+      .unwrap()
+      .as_xsd_any_uri()
+      .unwrap();
 
-    let mut creator_and_moderator_uris = oprops.get_many_attributed_to_xsd_any_uris().unwrap();
-    let creator_uri = creator_and_moderator_uris.next().unwrap();
-
-    let creator = get_or_fetch_and_upsert_remote_user(creator_uri.as_str(), client, pool).await?;
+    let creator = get_or_fetch_and_upsert_remote_user(creator_uri, client, pool).await?;
 
     Ok(CommunityForm {
-      name: oprops.get_name_xsd_string().unwrap().to_string(),
-      title: aprops.get_preferred_username().unwrap().to_string(),
+      name: group
+        .inner
+        .name()
+        .unwrap()
+        .as_one()
+        .unwrap()
+        .as_xsd_string()
+        .unwrap()
+        .into(),
+      title: group.inner.preferred_username().unwrap().to_string(),
       // TODO: should be parsed as html and tags like <script> removed (or use markdown source)
       //       -> same for post.content etc
-      description: oprops.get_content_xsd_string().map(|s| s.to_string()),
-      category_id: group_extensions.category.identifier.parse::<i32>()?,
+      description: group
+        .inner
+        .content()
+        .map(|s| s.as_single_xsd_string().unwrap().into()),
+      category_id: group.ext_one.category.identifier.parse::<i32>()?,
       creator_id: creator.id,
       removed: None,
-      published: oprops
-        .get_published()
-        .map(|u| u.as_ref().to_owned().naive_local()),
-      updated: oprops
-        .get_updated()
-        .map(|u| u.as_ref().to_owned().naive_local()),
+      published: group.inner.published().map(|u| u.to_owned().naive_local()),
+      updated: group.inner.updated().map(|u| u.to_owned().naive_local()),
       deleted: None,
-      nsfw: group_extensions.sensitive,
-      actor_id: oprops.get_id().unwrap().to_string(),
+      nsfw: group.ext_one.sensitive,
+      actor_id: group
+        .inner
+        .id(actor_id.domain().unwrap())?
+        .unwrap()
+        .to_string(),
       local: false,
       private_key: None,
-      public_key: Some(public_key.to_owned().public_key_pem),
+      public_key: Some(group.ext_two.to_owned().public_key.public_key_pem),
       last_refreshed_at: Some(naive_now()),
     })
   }
@@ -449,50 +425,40 @@ pub async fn get_apub_community_followers(
   })
   .await??;
 
-  let mut collection = UnorderedCollection::default();
-  let oprops: &mut ObjectProperties = collection.as_mut();
-  oprops
-    .set_context_xsd_any_uri(context())?
-    .set_id(community.actor_id)?;
+  let mut collection = UnorderedCollection::new(vec![]);
   collection
-    .collection_props
-    .set_total_items(community_followers.len() as u64)?;
+    .set_context(context())
+    // TODO: this needs its own ID
+    .set_id(community.actor_id.parse()?)
+    .set_total_items(community_followers.len() as u64);
   Ok(create_apub_response(&collection))
 }
 
-impl Community {
-  pub async fn do_announce<A>(
-    activity: A,
-    community: &Community,
-    sender: &dyn ActorType,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<HttpResponse, LemmyError>
-  where
-    A: Activity + Base + Serialize + Debug,
-  {
-    let mut announce = Announce::default();
-    populate_object_props(
-      &mut announce.object_props,
-      vec![community.get_followers_url()],
-      &format!("{}/announce/{}", community.actor_id, uuid::Uuid::new_v4()),
-    )?;
-    announce
-      .announce_props
-      .set_actor_xsd_any_uri(community.actor_id.to_owned())?
-      .set_object_base_box(BaseBox::from_concrete(activity)?)?;
+pub async fn do_announce(
+  activity: AnyBase,
+  community: &Community,
+  sender: &dyn ActorType,
+  client: &Client,
+  pool: &DbPool,
+) -> Result<HttpResponse, LemmyError> {
+  let id = format!("{}/announce/{}", community.actor_id, uuid::Uuid::new_v4());
+  let mut announce = Announce::new(community.actor_id.to_owned(), activity);
+  announce
+    .set_context(context())
+    .set_id(Url::parse(&id)?)
+    .set_to(public())
+    .set_many_ccs(vec![community.get_followers_url()]);
 
-    insert_activity(community.creator_id, announce.clone(), true, pool).await?;
+  insert_activity(community.creator_id, announce.clone(), true, pool).await?;
 
-    // dont send to the instance where the activity originally came from, because that would result
-    // in a database error (same data inserted twice)
-    let mut to = community.get_follower_inboxes(pool).await?;
+  // dont send to the instance where the activity originally came from, because that would result
+  // in a database error (same data inserted twice)
+  let mut to = community.get_follower_inboxes(pool).await?;
 
-    // this seems to be the "easiest" stable alternative for remove_item()
-    to.retain(|x| *x != sender.get_shared_inbox_url());
+  // this seems to be the "easiest" stable alternative for remove_item()
+  to.retain(|x| *x != sender.get_shared_inbox_url());
 
-    send_activity(client, &announce, community, to).await?;
+  send_activity(client, &announce.into_any_base()?, community, to).await?;
 
-    Ok(HttpResponse::Ok().finish())
-  }
+  Ok(HttpResponse::Ok().finish())
 }

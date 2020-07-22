@@ -110,3 +110,4 @@ services:
     image: jolt/iframely:v1.4.3
     volumes:
       - ../iframely.config.local.js:/iframely/config.local.js:ro
+    restart: always

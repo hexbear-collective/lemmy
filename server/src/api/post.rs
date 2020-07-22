@@ -1,21 +1,48 @@
 use crate::{
-  api::{APIError, Oper, Perform},
+  api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
-  db::{
-    comment_view::*, community_settings::*, community_view::*, moderator::*, post::*, post_view::*,
-    site::*, site_view::*, user::*, user_view::*, Crud, Likeable, ListingType, Saveable, SortType,
-  },
-  fetch_iframely_and_pictrs_data, is_within_post_body_char_limit, is_within_post_title_char_limit,
-  naive_now, pii_check, pii_vec_to_str, slur_check, slurs_vec_to_str,
+  fetch_iframely_and_pictrs_data,
+  is_within_post_body_char_limit,
+  is_within_post_title_char_limit,
   websocket::{
     server::{JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
+};
+use lemmy_db::{
+  comment_view::*,
+  community_settings::*,
+  community_view::*,
+  moderator::*,
+  naive_now,
+  post::*,
+  post_view::*,
+  site::*,
+  site_view::*,
+  user::*,
+  user_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  Saveable,
+  SortType,
+};
+use lemmy_utils::{
+  is_valid_post_title,
+  make_apub_endpoint,
+  pii_check,
+  pii_vec_to_str,
+  slur_check,
+  slurs_vec_to_str,
+  EndpointType,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use url::Url;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreatePost {
@@ -55,6 +82,7 @@ pub struct GetPosts {
   page: Option<i64>,
   limit: Option<i64>,
   pub community_id: Option<i32>,
+  pub community_name: Option<String>,
   auth: Option<String>,
 }
 
@@ -140,7 +168,10 @@ impl Perform for Oper<CreatePost> {
       }
     }
 
-    // Check community settings
+    if !is_valid_post_title(&data.name) {
+      return Err(APIError::err("invalid_post_title").into());
+    }
+
     let user_id = claims.id;
     let community_id = data.community_id;
     let settings = blocking(pool, move |conn| {
@@ -178,12 +209,19 @@ impl Perform for Oper<CreatePost> {
       return Err(APIError::err("site_ban").into());
     }
 
+    if let Some(url) = data.url.as_ref() {
+      match Url::parse(url) {
+        Ok(_t) => (),
+        Err(_e) => return Err(APIError::err("invalid_url").into()),
+      }
+    }
+
     // Fetch Iframely and pictrs cached image
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
       fetch_iframely_and_pictrs_data(&self.client, data.url.to_owned()).await;
 
     let post_form = PostForm {
-      name: data.name.to_owned(),
+      name: data.name.trim().to_owned(),
       url: data.url.to_owned(),
       body: data.body.to_owned(),
       community_id: data.community_id,
@@ -217,11 +255,16 @@ impl Perform for Oper<CreatePost> {
     };
 
     let inserted_post_id = inserted_post.id;
-    let updated_post =
-      match blocking(pool, move |conn| Post::update_ap_id(conn, inserted_post_id)).await? {
-        Ok(post) => post,
-        Err(_e) => return Err(APIError::err("couldnt_create_post").into()),
-      };
+    let updated_post = match blocking(pool, move |conn| {
+      let apub_id =
+        make_apub_endpoint(EndpointType::Post, &inserted_post_id.to_string()).to_string();
+      Post::update_ap_id(conn, inserted_post_id, apub_id)
+    })
+    .await?
+    {
+      Ok(post) => post,
+      Err(_e) => return Err(APIError::err("couldnt_create_post").into()),
+    };
 
     updated_post.send_create(&user, &self.client, pool).await?;
 
@@ -291,6 +334,37 @@ impl Perform for Oper<GetPost> {
       Ok(post) => post,
       Err(_e) => return Err(APIError::err("couldnt_find_post").into()),
     };
+
+    if post_view.removed || post_view.deleted {
+      // Verify its the creator or a mod or admin
+      let community_id = post_view.community_id;
+      let mut editors: Vec<i32> = vec![post_view.creator_id];
+      let mut moderators: Vec<i32> = vec![];
+
+      moderators.append(
+        &mut blocking(pool, move |conn| {
+          CommunityModeratorView::for_community(conn, community_id)
+            .map(|v| v.into_iter().map(|m| m.user_id).collect())
+        })
+        .await??,
+      );
+      moderators.append(
+        &mut blocking(pool, move |conn| {
+          UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        })
+        .await??,
+      );
+
+      editors.extend(&moderators);
+
+      if let Some(u_id) = user_id {
+        if !editors.contains(&u_id) {
+          return Err(APIError::err("couldnt_find_post").into());
+        }
+      } else {
+        return Err(APIError::err("couldnt_find_post").into());
+      }
+    }
 
     let id = data.id;
     let comments = blocking(pool, move |conn| {
@@ -407,12 +481,14 @@ impl Perform for Oper<GetPosts> {
     let sort = SortType::from_str(&data.sort)?;
     let limit = data.limit;
     let community_id = data.community_id;
+    let community_name = data.community_name.to_owned();
     let posts = match blocking(pool, move |conn| {
       PostQueryBuilder::create(conn)
         .listing_type(type_)
         .sort(&sort)
         .show_nsfw(show_nsfw)
         .for_community_id(community_id)
+        .for_community_name(community_name)
         .my_user_id(user_id)
         .page(page)
         .limit(limit)
@@ -585,6 +661,10 @@ impl Perform for Oper<EditPost> {
       }
     }
 
+    if !is_valid_post_title(&data.name) {
+      return Err(APIError::err("invalid_post_title").into());
+    }
+
     let claims = match Claims::decode(&data.auth) {
       Ok(claims) => claims.claims,
       Err(_e) => return Err(APIError::err("not_logged_in").into()),
@@ -598,28 +678,36 @@ impl Perform for Oper<EditPost> {
 
     let user_id = claims.id;
 
+    let edit_id = data.edit_id;
+    let read_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
+
     // Verify its the creator or a mod or admin
-    let community_id = data.community_id;
-    let mut editors: Vec<i32> = vec![data.creator_id];
-    editors.append(
+    let community_id = read_post.community_id;
+    let mut editors: Vec<i32> = vec![read_post.creator_id];
+    let mut moderators: Vec<i32> = vec![];
+
+    moderators.append(
       &mut blocking(pool, move |conn| {
         CommunityModeratorView::for_community(conn, community_id)
           .map(|v| v.into_iter().map(|m| m.user_id).collect())
       })
       .await??,
     );
-    editors.append(
+    moderators.append(
       &mut blocking(pool, move |conn| {
         UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
+
+    editors.extend(&moderators);
+
     if !editors.contains(&user_id) {
       return Err(APIError::err("no_post_edit_allowed").into());
     }
 
     // Check for a community ban
-    let community_id = data.community_id;
+    let community_id = read_post.community_id;
     let is_banned =
       move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, community_id).is_ok();
     if blocking(pool, is_banned).await? {
@@ -636,28 +724,51 @@ impl Perform for Oper<EditPost> {
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
       fetch_iframely_and_pictrs_data(&self.client, data.url.to_owned()).await;
 
-    let edit_id = data.edit_id;
-    let read_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
-
-    let post_form = PostForm {
-      name: data.name.to_owned(),
-      url: data.url.to_owned(),
-      body: data.body.to_owned(),
-      creator_id: data.creator_id.to_owned(),
-      community_id: data.community_id,
-      removed: data.removed.to_owned(),
-      deleted: data.deleted.to_owned(),
-      nsfw: data.nsfw,
-      locked: data.locked.to_owned(),
-      stickied: data.stickied.to_owned(),
-      updated: Some(naive_now()),
-      embed_title: iframely_title,
-      embed_description: iframely_description,
-      embed_html: iframely_html,
-      thumbnail_url: pictrs_thumbnail,
-      ap_id: read_post.ap_id,
-      local: read_post.local,
-      published: None,
+    let post_form = {
+      // only modify some properties if they are a moderator
+      if moderators.contains(&user_id) {
+        PostForm {
+          name: data.name.trim().to_owned(),
+          url: data.url.to_owned(),
+          body: data.body.to_owned(),
+          creator_id: read_post.creator_id.to_owned(),
+          community_id: read_post.community_id,
+          removed: data.removed.to_owned(),
+          deleted: data.deleted.to_owned(),
+          nsfw: data.nsfw,
+          locked: data.locked.to_owned(),
+          stickied: data.stickied.to_owned(),
+          updated: Some(naive_now()),
+          embed_title: iframely_title,
+          embed_description: iframely_description,
+          embed_html: iframely_html,
+          thumbnail_url: pictrs_thumbnail,
+          ap_id: read_post.ap_id,
+          local: read_post.local,
+          published: None,
+        }
+      } else {
+        PostForm {
+          name: read_post.name.trim().to_owned(),
+          url: data.url.to_owned(),
+          body: data.body.to_owned(),
+          creator_id: read_post.creator_id.to_owned(),
+          community_id: read_post.community_id,
+          removed: Some(read_post.removed),
+          deleted: data.deleted.to_owned(),
+          nsfw: data.nsfw,
+          locked: Some(read_post.locked),
+          stickied: Some(read_post.stickied),
+          updated: Some(naive_now()),
+          embed_title: iframely_title,
+          embed_description: iframely_description,
+          embed_html: iframely_html,
+          thumbnail_url: pictrs_thumbnail,
+          ap_id: read_post.ap_id,
+          local: read_post.local,
+          published: None,
+        }
+      }
     };
 
     let edit_id = data.edit_id;
@@ -675,33 +786,35 @@ impl Perform for Oper<EditPost> {
       }
     };
 
-    // Mod tables
-    if let Some(removed) = data.removed.to_owned() {
-      let form = ModRemovePostForm {
-        mod_user_id: user_id,
-        post_id: data.edit_id,
-        removed: Some(removed),
-        reason: data.reason.to_owned(),
-      };
-      blocking(pool, move |conn| ModRemovePost::create(conn, &form)).await??;
-    }
+    if moderators.contains(&user_id) {
+      // Mod tables
+      if let Some(removed) = data.removed.to_owned() {
+        let form = ModRemovePostForm {
+          mod_user_id: user_id,
+          post_id: data.edit_id,
+          removed: Some(removed),
+          reason: data.reason.to_owned(),
+        };
+        blocking(pool, move |conn| ModRemovePost::create(conn, &form)).await??;
+      }
 
-    if let Some(locked) = data.locked.to_owned() {
-      let form = ModLockPostForm {
-        mod_user_id: user_id,
-        post_id: data.edit_id,
-        locked: Some(locked),
-      };
-      blocking(pool, move |conn| ModLockPost::create(conn, &form)).await??;
-    }
+      if let Some(locked) = data.locked.to_owned() {
+        let form = ModLockPostForm {
+          mod_user_id: user_id,
+          post_id: data.edit_id,
+          locked: Some(locked),
+        };
+        blocking(pool, move |conn| ModLockPost::create(conn, &form)).await??;
+      }
 
-    if let Some(stickied) = data.stickied.to_owned() {
-      let form = ModStickyPostForm {
-        mod_user_id: user_id,
-        post_id: data.edit_id,
-        stickied: Some(stickied),
-      };
-      blocking(pool, move |conn| ModStickyPost::create(conn, &form)).await??;
+      if let Some(stickied) = data.stickied.to_owned() {
+        let form = ModStickyPostForm {
+          mod_user_id: user_id,
+          post_id: data.edit_id,
+          stickied: Some(stickied),
+        };
+        blocking(pool, move |conn| ModStickyPost::create(conn, &form)).await??;
+      }
     }
 
     if let Some(deleted) = data.deleted.to_owned() {
@@ -713,12 +826,14 @@ impl Perform for Oper<EditPost> {
           .await?;
       }
     } else if let Some(removed) = data.removed.to_owned() {
-      if removed {
-        updated_post.send_remove(&user, &self.client, pool).await?;
-      } else {
-        updated_post
-          .send_undo_remove(&user, &self.client, pool)
-          .await?;
+      if moderators.contains(&user_id) {
+        if removed {
+          updated_post.send_remove(&user, &self.client, pool).await?;
+        } else {
+          updated_post
+            .send_undo_remove(&user, &self.client, pool)
+            .await?;
+        }
       }
     } else {
       updated_post.send_update(&user, &self.client, pool).await?;

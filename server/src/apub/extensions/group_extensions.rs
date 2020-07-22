@@ -1,9 +1,8 @@
-use crate::{
-  db::{category::Category, Crud},
-  LemmyError,
-};
-use activitystreams::{ext::Extension, Actor};
+use crate::LemmyError;
+use activitystreams_ext::UnparsedExtension;
+use activitystreams_new::unparsed::UnparsedMutExt;
 use diesel::PgConnection;
+use lemmy_db::{category::Category, Crud};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -39,4 +38,22 @@ impl GroupExtension {
   }
 }
 
-impl<T> Extension<T> for GroupExtension where T: Actor {}
+impl<U> UnparsedExtension<U> for GroupExtension
+where
+  U: UnparsedMutExt,
+{
+  type Error = serde_json::Error;
+
+  fn try_from_unparsed(unparsed_mut: &mut U) -> Result<Self, Self::Error> {
+    Ok(GroupExtension {
+      category: unparsed_mut.remove("category")?,
+      sensitive: unparsed_mut.remove("sensitive")?,
+    })
+  }
+
+  fn try_into_unparsed(self, unparsed_mut: &mut U) -> Result<(), Self::Error> {
+    unparsed_mut.insert("category", self.category)?;
+    unparsed_mut.insert("sensitive", self.sensitive)?;
+    Ok(())
+  }
+}
