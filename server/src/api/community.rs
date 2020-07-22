@@ -315,7 +315,7 @@ impl Perform for Oper<CreateCommunity> {
     // Initialize community settings
     let community_id = inserted_community.id;
     let community_settings_form = CommunitySettingsForm {
-      community_id,
+      id: community_id,
       read_only: false,
       private: false,
       post_links: true,

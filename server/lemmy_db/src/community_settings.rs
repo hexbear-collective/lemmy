@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 #[table_name = "community_settings"]
 pub struct CommunitySettings {
   pub id: i32,
-  pub community_id: i32,
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,
@@ -17,7 +16,7 @@ pub struct CommunitySettings {
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize, Debug)]
 #[table_name = "community_settings"]
 pub struct CommunitySettingsForm {
-  pub community_id: i32,
+  pub id: i32,
   pub read_only: bool,
   pub private: bool,
   pub post_links: bool,

@@ -60,10 +60,14 @@ impl Perform for Oper<GetCommunitySettings> {
     let data: &GetCommunitySettings = &self.data;
 
     let community_id = data.community_id;
-    let community_settings = blocking(pool, move |conn| {
+    let community_settings = match blocking(pool, move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
-    .await??;
+    .await?
+    {
+      Ok(community_settings) => community_settings,
+      Err(_e) => return Err(APIError::err("couldnt_find_community").into()),
+    };
 
     let res = GetCommunitySettingsResponse {
       read_only: community_settings.read_only,
@@ -106,7 +110,7 @@ impl Perform for Oper<EditCommunitySettings> {
     .await?;
 
     let community_settings_form = CommunitySettingsForm {
-      community_id: data.community_id.to_owned(),
+      id: data.community_id.to_owned(),
       read_only: data.read_only.to_owned(),
       private: data.private.to_owned(),
       post_links: data.post_links.to_owned(),

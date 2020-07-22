@@ -168,7 +168,6 @@ table! {
 table! {
     community_settings (id) {
         id -> Int4,
-        community_id -> Int4,
         read_only -> Bool,
         private -> Bool,
         post_links -> Bool,
@@ -518,7 +517,7 @@ joinable!(community_follower -> community (community_id));
 joinable!(community_follower -> user_ (user_id));
 joinable!(community_moderator -> community (community_id));
 joinable!(community_moderator -> user_ (user_id));
-joinable!(community_settings -> community (community_id));
+joinable!(community_settings -> community (id));
 joinable!(community_user_ban -> community (community_id));
 joinable!(community_user_ban -> user_ (user_id));
 joinable!(mod_add_community -> community (community_id));
