@@ -1,20 +1,19 @@
 -- Your SQL goes here
 CREATE TABLE community_settings (
-  id SERIAL PRIMARY KEY,
-  community_id INT NOT NULL,
+  id INT NOT NULL PRIMARY KEY,
   read_only BOOL NOT NULL,
   private BOOL NOT NULL,
   post_links BOOL NOT NULL,
   comment_images INT NOT NULL,
   published TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (community_id)
+  FOREIGN KEY (id)
     REFERENCES community(id)
     ON UPDATE CASCADE
     ON DELETE CASCADE
 );
 
 INSERT INTO community_settings (
-  community_id,
+  id,
   read_only,
   private,
   post_links,

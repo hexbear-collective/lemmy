@@ -1,5 +1,6 @@
 use crate::{apub::ActorType, LemmyError};
-use activitystreams::ext::Extension;
+use activitystreams_ext::UnparsedExtension;
+use activitystreams_new::unparsed::UnparsedMutExt;
 use actix_web::{client::ClientRequest, HttpRequest};
 use http_signature_normalization_actix::{
   digest::{DigestClient, SignExt},
@@ -9,7 +10,6 @@ use log::debug;
 use openssl::{
   hash::MessageDigest,
   pkey::PKey,
-  rsa::Rsa,
   sign::{Signer, Verifier},
 };
 use serde::{Deserialize, Serialize};
@@ -19,30 +19,13 @@ lazy_static! {
   static ref HTTP_SIG_CONFIG: Config = Config::new();
 }
 
-pub struct Keypair {
-  pub private_key: String,
-  pub public_key: String,
-}
-
-/// Generate the asymmetric keypair for ActivityPub HTTP signatures.
-pub fn generate_actor_keypair() -> Result<Keypair, LemmyError> {
-  let rsa = Rsa::generate(2048)?;
-  let pkey = PKey::from_rsa(rsa)?;
-  let public_key = pkey.public_key_to_pem()?;
-  let private_key = pkey.private_key_to_pem_pkcs8()?;
-  Ok(Keypair {
-    private_key: String::from_utf8(private_key)?,
-    public_key: String::from_utf8(public_key)?,
-  })
-}
-
 /// Signs request headers with the given keypair.
 pub async fn sign(
   request: ClientRequest,
   actor: &dyn ActorType,
   activity: String,
 ) -> Result<DigestClient<String>, LemmyError> {
-  let signing_key_id = format!("{}#main-key", actor.actor_id());
+  let signing_key_id = format!("{}#main-key", actor.actor_id()?);
   let private_key = actor.private_key();
 
   let digest_client = request
@@ -116,4 +99,20 @@ impl PublicKey {
   }
 }
 
-impl<T> Extension<T> for PublicKeyExtension where T: activitystreams::Actor {}
+impl<U> UnparsedExtension<U> for PublicKeyExtension
+where
+  U: UnparsedMutExt,
+{
+  type Error = serde_json::Error;
+
+  fn try_from_unparsed(unparsed_mut: &mut U) -> Result<Self, Self::Error> {
+    Ok(PublicKeyExtension {
+      public_key: unparsed_mut.remove("publicKey")?,
+    })
+  }
+
+  fn try_into_unparsed(self, unparsed_mut: &mut U) -> Result<(), Self::Error> {
+    unparsed_mut.insert("publicKey", self.public_key)?;
+    Ok(())
+  }
+}

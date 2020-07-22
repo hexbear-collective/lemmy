@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::{
-  api::{comment::*, community::*, community_settings::*, post::*, site::*, user::*, *},
+  api::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, *},
   rate_limit::RateLimit,
   websocket::UserOperation,
   CommunityId,
@@ -479,8 +479,13 @@ impl ChatServer {
         }
         UserOperation::BanFromCommunity => do_user_operation::<BanFromCommunity>(args).await,
         UserOperation::AddModToCommunity => do_user_operation::<AddModToCommunity>(args).await,
-        UserOperation::GetCommunitySettings => do_user_operation::<GetCommunitySettings>(args).await,
-        UserOperation::EditCommunitySettings => do_user_operation::<GetCommunitySettings>(args).await,
+        UserOperation::GetCommunitySettings => {
+          do_user_operation::<GetCommunitySettings>(args).await
+        }
+        UserOperation::EditCommunitySettings => {
+          do_user_operation::<EditCommunitySettings>(args).await
+        }
+        UserOperation::GetReportCount => do_user_operation::<GetReportCount>(args).await,
 
         // Post ops
         UserOperation::CreatePost => do_user_operation::<CreatePost>(args).await,
@@ -489,6 +494,9 @@ impl ChatServer {
         UserOperation::EditPost => do_user_operation::<EditPost>(args).await,
         UserOperation::CreatePostLike => do_user_operation::<CreatePostLike>(args).await,
         UserOperation::SavePost => do_user_operation::<SavePost>(args).await,
+        UserOperation::CreatePostReport => do_user_operation::<CreatePostReport>(args).await,
+        UserOperation::ListPostReports => do_user_operation::<ListPostReports>(args).await,
+        UserOperation::ResolvePostReport => do_user_operation::<ResolvePostReport>(args).await,
 
         // Comment ops
         UserOperation::CreateComment => do_user_operation::<CreateComment>(args).await,
@@ -496,6 +504,11 @@ impl ChatServer {
         UserOperation::SaveComment => do_user_operation::<SaveComment>(args).await,
         UserOperation::GetComments => do_user_operation::<GetComments>(args).await,
         UserOperation::CreateCommentLike => do_user_operation::<CreateCommentLike>(args).await,
+        UserOperation::CreateCommentReport => do_user_operation::<CreateCommentReport>(args).await,
+        UserOperation::ListCommentReports => do_user_operation::<ListCommentReports>(args).await,
+        UserOperation::ResolveCommentReport => {
+          do_user_operation::<ResolveCommentReport>(args).await
+        }
       }
     }
   }

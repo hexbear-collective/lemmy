@@ -16,40 +16,33 @@ use crate::{
     page_extension::PageExtension,
     signatures::{PublicKey, PublicKeyExtension},
   },
-  convert_datetime,
-  db::user::User_,
+  blocking,
   request::{retry, RecvError},
   routes::webfinger::WebFingerResponse,
   DbPool,
   LemmyError,
-  MentionData,
-  Settings,
 };
-use activitystreams::{
-  actor::{properties::ApActorProperties, Group, Person},
-  object::Page,
+use activitystreams_ext::{Ext1, Ext2};
+use activitystreams_new::{
+  activity::Follow,
+  actor::{ApActor, Group, Person},
+  object::{Page, Tombstone},
+  prelude::*,
 };
-use activitystreams_ext::{Ext1, Ext2, Ext3};
-use activitystreams_new::{activity::Follow, object::Tombstone, prelude::*};
 use actix_web::{body::Body, client::Client, HttpResponse};
 use chrono::NaiveDateTime;
+use failure::_core::fmt::Debug;
+use lemmy_db::{activity::do_insert_activity, user::User_};
+use lemmy_utils::{convert_datetime, get_apub_protocol_string, settings::Settings, MentionData};
 use log::debug;
 use serde::Serialize;
-use url::Url;
+use url::{ParseError, Url};
 
-type GroupExt = Ext3<Group, GroupExtension, ApActorProperties, PublicKeyExtension>;
-type PersonExt = Ext2<Person, ApActorProperties, PublicKeyExtension>;
+type GroupExt = Ext2<ApActor<Group>, GroupExtension, PublicKeyExtension>;
+type PersonExt = Ext1<ApActor<Person>, PublicKeyExtension>;
 type PageExt = Ext1<Page, PageExtension>;
 
 pub static APUB_JSON_CONTENT_TYPE: &str = "application/activity+json";
-
-pub enum EndpointType {
-  Community,
-  User,
-  Post,
-  Comment,
-  PrivateMessage,
-}
 
 /// Convert the data to json and turn it into an HTTP Response with the correct ActivityPub
 /// headers.
@@ -69,34 +62,6 @@ where
   HttpResponse::Gone()
     .content_type(APUB_JSON_CONTENT_TYPE)
     .json(data)
-}
-
-/// Generates the ActivityPub ID for a given object type and ID.
-pub fn make_apub_endpoint(endpoint_type: EndpointType, name: &str) -> Url {
-  let point = match endpoint_type {
-    EndpointType::Community => "c",
-    EndpointType::User => "u",
-    EndpointType::Post => "post",
-    EndpointType::Comment => "comment",
-    EndpointType::PrivateMessage => "private_message",
-  };
-
-  Url::parse(&format!(
-    "{}://{}/{}/{}",
-    get_apub_protocol_string(),
-    Settings::get().hostname,
-    point,
-    name
-  ))
-  .unwrap()
-}
-
-pub fn get_apub_protocol_string() -> &'static str {
-  if Settings::get().federation.tls_enabled {
-    "https"
-  } else {
-    "http"
-  }
 }
 
 // Checks if the ID has a valid format, correct scheme, and is in the allowed instance list.
@@ -149,7 +114,7 @@ fn create_tombstone(
       let mut tombstone = Tombstone::new();
       tombstone.set_id(object_id.parse()?);
       tombstone.set_former_type(former_type);
-      tombstone.set_deleted(convert_datetime(updated).into());
+      tombstone.set_deleted(convert_datetime(updated));
       Ok(tombstone)
     } else {
       Err(format_err!("Cant convert to tombstone because updated time was None.").into())
@@ -166,6 +131,7 @@ pub trait FromApub {
     apub: &Self::ApubType,
     client: &Client,
     pool: &DbPool,
+    actor_id: &Url,
   ) -> Result<Self, LemmyError>
   where
     Self: Sized;
@@ -233,13 +199,12 @@ pub trait ApubLikeableType {
   ) -> Result<(), LemmyError>;
 }
 
-pub fn get_shared_inbox(actor_id: &str) -> String {
-  let url = Url::parse(actor_id).unwrap();
+pub fn get_shared_inbox(actor_id: &Url) -> String {
   format!(
     "{}://{}{}/inbox",
-    &url.scheme(),
-    &url.host_str().unwrap(),
-    if let Some(port) = url.port() {
+    &actor_id.scheme(),
+    &actor_id.host_str().unwrap(),
+    if let Some(port) = actor_id.port() {
       format!(":{}", port)
     } else {
       "".to_string()
@@ -249,7 +214,7 @@ pub fn get_shared_inbox(actor_id: &str) -> String {
 
 #[async_trait::async_trait(?Send)]
 pub trait ActorType {
-  fn actor_id(&self) -> String;
+  fn actor_id_str(&self) -> String;
 
   fn public_key(&self) -> String;
   fn private_key(&self) -> String;
@@ -273,7 +238,7 @@ pub trait ActorType {
   #[allow(unused_variables)]
   async fn send_accept_follow(
     &self,
-    follow: &Follow,
+    follow: Follow,
     client: &Client,
     pool: &DbPool,
   ) -> Result<(), LemmyError>;
@@ -307,35 +272,40 @@ pub trait ActorType {
   /// For a given community, returns the inboxes of all followers.
   async fn get_follower_inboxes(&self, pool: &DbPool) -> Result<Vec<String>, LemmyError>;
 
-  // TODO move these to the db rows
-  fn get_inbox_url(&self) -> String {
-    format!("{}/inbox", &self.actor_id())
+  fn actor_id(&self) -> Result<Url, ParseError> {
+    Url::parse(&self.actor_id_str())
   }
 
+  // TODO move these to the db rows
+  fn get_inbox_url(&self) -> String {
+    format!("{}/inbox", &self.actor_id_str())
+  }
+
+  // TODO: make this return `Result<Url, ParseError>
   fn get_shared_inbox_url(&self) -> String {
-    get_shared_inbox(&self.actor_id())
+    get_shared_inbox(&self.actor_id().unwrap())
   }
 
   fn get_outbox_url(&self) -> String {
-    format!("{}/outbox", &self.actor_id())
+    format!("{}/outbox", &self.actor_id_str())
   }
 
   fn get_followers_url(&self) -> String {
-    format!("{}/followers", &self.actor_id())
+    format!("{}/followers", &self.actor_id_str())
   }
 
   fn get_following_url(&self) -> String {
-    format!("{}/following", &self.actor_id())
+    format!("{}/following", &self.actor_id_str())
   }
 
   fn get_liked_url(&self) -> String {
-    format!("{}/liked", &self.actor_id())
+    format!("{}/liked", &self.actor_id_str())
   }
 
   fn get_public_key_ext(&self) -> PublicKeyExtension {
     PublicKey {
-      id: format!("{}#main-key", self.actor_id()),
-      owner: self.actor_id(),
+      id: format!("{}#main-key", self.actor_id_str()),
+      owner: self.actor_id_str(),
       public_key_pem: self.public_key(),
     }
     .to_ext()
@@ -345,7 +315,7 @@ pub trait ActorType {
 pub async fn fetch_webfinger_url(
   mention: &MentionData,
   client: &Client,
-) -> Result<String, LemmyError> {
+) -> Result<Url, LemmyError> {
   let fetch_url = format!(
     "{}://{}/.well-known/webfinger?resource=acct:{}@{}",
     get_apub_protocol_string(),
@@ -370,5 +340,23 @@ pub async fn fetch_webfinger_url(
   link
     .href
     .to_owned()
+    .map(|u| Url::parse(&u))
+    .transpose()?
     .ok_or_else(|| format_err!("No href found.").into())
+}
+
+pub async fn insert_activity<T>(
+  user_id: i32,
+  data: T,
+  local: bool,
+  pool: &DbPool,
+) -> Result<(), LemmyError>
+where
+  T: Serialize + Debug + Send + 'static,
+{
+  blocking(pool, move |conn| {
+    do_insert_activity(conn, user_id, &data, local)
+  })
+  .await??;
+  Ok(())
 }

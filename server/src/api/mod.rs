@@ -1,15 +1,13 @@
-use crate::{
-  db::{community::*, community_view::*, moderator::*, site::*, user::*, user_view::*},
-  websocket::WebsocketInfo,
-  DbPool,
-  LemmyError,
-};
+use crate::{websocket::WebsocketInfo, DbPool, LemmyError};
 use actix_web::client::Client;
+use lemmy_db::{community::*, community_view::*, moderator::*, site::*, user::*, user_view::*};
 
+pub mod claims;
 pub mod comment;
 pub mod community;
 pub mod community_settings;
 pub mod post;
+pub mod report;
 pub mod site;
 pub mod user;
 
