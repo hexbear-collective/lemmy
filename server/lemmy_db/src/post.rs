@@ -1,9 +1,10 @@
 use crate::{
   naive_now,
-  schema::{post, post_like, post_read, post_saved},
+  schema::{post, post_like, post_read, post_report, post_saved},
   Crud,
   Likeable,
   Readable,
+  Reportable,
   Saveable,
 };
 use diesel::{dsl::*, result::Error, *};
@@ -174,6 +175,52 @@ impl Likeable<PostLikeForm> for PostLike {
         .filter(user_id.eq(post_like_form.user_id)),
     )
     .execute(conn)
+  }
+}
+
+#[derive(Identifiable, Queryable, Associations, PartialEq, Serialize, Deserialize, Debug)]
+#[belongs_to(Post)]
+#[table_name = "post_report"]
+pub struct PostReport {
+  pub id: uuid::Uuid,
+  pub time: chrono::NaiveDateTime,
+  pub reason: Option<String>,
+  pub resolved: bool,
+  pub user_id: i32,
+  pub post_id: i32,
+  pub post_name: String,
+  pub post_url: Option<String>,
+  pub post_body: Option<String>,
+  pub post_time: chrono::NaiveDateTime,
+}
+
+#[derive(Insertable, AsChangeset, Clone)]
+#[table_name = "post_report"]
+pub struct PostReportForm {
+  pub time: Option<chrono::NaiveDateTime>,
+  pub reason: Option<String>,
+  pub resolved: Option<bool>,
+  pub user_id: i32,
+  pub post_id: i32,
+  pub post_name: String,
+  pub post_url: Option<String>,
+  pub post_body: Option<String>,
+  pub post_time: chrono::NaiveDateTime,
+}
+
+impl Reportable<PostReportForm> for PostReport {
+  fn report(conn: &PgConnection, post_report_form: &PostReportForm) -> Result<Self, Error> {
+    use crate::schema::post_report::dsl::*;
+    insert_into(post_report)
+      .values(post_report_form)
+      .get_result::<Self>(conn)
+  }
+
+  fn resolve(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<usize, Error> {
+    use crate::schema::post_report::dsl::*;
+    update(post_report.find(report_id))
+      .set(resolved.eq(true))
+      .execute(conn)
   }
 }
 

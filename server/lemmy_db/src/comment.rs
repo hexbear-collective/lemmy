@@ -1,5 +1,5 @@
 use super::{post::Post, *};
-use crate::schema::{comment, comment_like, comment_saved};
+use crate::schema::{comment, comment_like, comment_report, comment_saved};
 use url::{ParseError, Url};
 
 // WITH RECURSIVE MyTree AS (
@@ -170,6 +170,48 @@ impl CommentLike {
     comment_like
       .filter(post_id.eq(post_id_from))
       .load::<Self>(conn)
+  }
+}
+
+#[derive(Identifiable, Queryable, Associations, PartialEq, Debug)]
+#[belongs_to(Comment)]
+#[table_name = "comment_report"]
+pub struct CommentReport {
+  pub id: uuid::Uuid,
+  pub time: chrono::NaiveDateTime,
+  pub reason: Option<String>,
+  pub resolved: bool,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
+}
+
+#[derive(Insertable, AsChangeset, Clone)]
+#[table_name = "comment_report"]
+pub struct CommentReportForm {
+  pub time: Option<chrono::NaiveDateTime>,
+  pub reason: Option<String>,
+  pub resolved: Option<bool>,
+  pub user_id: i32,
+  pub comment_id: i32,
+  pub comment_text: String,
+  pub comment_time: chrono::NaiveDateTime,
+}
+
+impl Reportable<CommentReportForm> for CommentReport {
+  fn report(conn: &PgConnection, comment_report_form: &CommentReportForm) -> Result<Self, Error> {
+    use crate::schema::comment_report::dsl::*;
+    insert_into(comment_report)
+      .values(comment_report_form)
+      .get_result::<Self>(conn)
+  }
+
+  fn resolve(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<usize, Error> {
+    use crate::schema::comment_report::dsl::*;
+    update(comment_report.find(report_id))
+      .set(resolved.eq(true))
+      .execute(conn)
   }
 }
 

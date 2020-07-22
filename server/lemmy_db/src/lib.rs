@@ -28,6 +28,7 @@ pub mod post;
 pub mod post_view;
 pub mod private_message;
 pub mod private_message_view;
+pub mod report_views;
 pub mod schema;
 pub mod site;
 pub mod site_view;
@@ -77,6 +78,15 @@ pub trait Likeable<T> {
   where
     Self: Sized;
   fn remove(conn: &PgConnection, form: &T) -> Result<usize, Error>
+  where
+    Self: Sized;
+}
+
+pub trait Reportable<T> {
+  fn report(conn: &PgConnection, form: &T) -> Result<Self, Error>
+  where
+    Self: Sized;
+  fn resolve(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<usize, Error>
   where
     Self: Sized;
 }
