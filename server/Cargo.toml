@@ -18,9 +18,8 @@ lemmy_utils = { path = "./lemmy_utils" }
 lemmy_db = { path = "./lemmy_db" }
 
 # External deps
-activitystreams = "0.6.2"
-activitystreams-ext = { git = "https://git.asonix.dog/asonix/activitystreams-ext" }
-activitystreams-new = { git = "https://git.asonix.dog/asonix/activitystreams-sketch" }
+activitystreams-new = { git = "https://yerbamate.dev/asonix/activitystreams-new", branch = "main" }
+activitystreams-ext = { git = "https://yerbamate.dev/asonix/activitystreams-ext", branch = "main" }
 actix = "0.10.0-alpha.2"
 actix-files = "0.3.0-alpha.1"
 actix-rt = "1.1.1"

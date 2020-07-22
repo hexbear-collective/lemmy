@@ -68,7 +68,6 @@ pub struct PostReportView {
   pub community_id: i32,
 }
 
-
 pub struct CommentReportQueryBuilder<'a> {
   conn: &'a PgConnection,
   query: comment_report_view::BoxedQuery<'a, Pg>,
@@ -81,7 +80,9 @@ pub struct CommentReportQueryBuilder<'a> {
 impl CommentReportView {
   pub fn read(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<Self, Error> {
     use super::report_views::comment_report_view::dsl::*;
-    comment_report_view.filter(id.eq(report_id)).first::<Self>(conn)
+    comment_report_view
+      .filter(id.eq(report_id))
+      .first::<Self>(conn)
   }
 }
 
@@ -142,7 +143,7 @@ impl<'a> CommentReportQueryBuilder<'a> {
       .offset(offset)
       .load::<CommentReportView>(self.conn)
   }
-  
+
   pub fn count(self) -> Result<usize, Error> {
     use super::report_views::comment_report_view::dsl::*;
     let mut query = self.query;
@@ -162,10 +163,11 @@ impl<'a> CommentReportQueryBuilder<'a> {
 impl PostReportView {
   pub fn read(conn: &PgConnection, report_id: &uuid::Uuid) -> Result<Self, Error> {
     use super::report_views::post_report_view::dsl::*;
-    post_report_view.filter(id.eq(report_id)).first::<Self>(conn)
+    post_report_view
+      .filter(id.eq(report_id))
+      .first::<Self>(conn)
   }
 }
-
 
 pub struct PostReportQueryBuilder<'a> {
   conn: &'a PgConnection,
@@ -237,7 +239,7 @@ impl<'a> PostReportQueryBuilder<'a> {
   pub fn count(self) -> Result<usize, Error> {
     use super::report_views::post_report_view::dsl::*;
     let mut query = self.query;
-    
+
     if let Some(comm_id) = self.for_community_id {
       query = query.filter(community_id.eq(comm_id));
     }

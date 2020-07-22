@@ -2,7 +2,8 @@ use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   blocking,
   websocket::WebsocketInfo,
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
   comment::*,
@@ -11,11 +12,15 @@ use lemmy_db::{
   post::*,
   post_view::*,
   report_views::{
-    CommentReportQueryBuilder, CommentReportView, PostReportQueryBuilder, PostReportView,
+    CommentReportQueryBuilder,
+    CommentReportView,
+    PostReportQueryBuilder,
+    PostReportView,
   },
   user::*,
   user_view::UserView,
-  Crud, Reportable,
+  Crud,
+  Reportable,
 };
 
 use serde::{Deserialize, Serialize};
