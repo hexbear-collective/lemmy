@@ -483,7 +483,7 @@ impl ChatServer {
           do_user_operation::<GetCommunitySettings>(args).await
         }
         UserOperation::EditCommunitySettings => {
-          do_user_operation::<GetCommunitySettings>(args).await
+          do_user_operation::<EditCommunitySettings>(args).await
         }
         UserOperation::GetReportCount => do_user_operation::<GetReportCount>(args).await,
 

@@ -11,6 +11,7 @@ use lemmy_db::{
   naive_now,
   Crud,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -35,7 +36,6 @@ pub struct EditCommunitySettings {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub published: chrono::NaiveDateTime,
   auth: String,
 }
 
