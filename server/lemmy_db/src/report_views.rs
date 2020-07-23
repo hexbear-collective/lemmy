@@ -14,6 +14,7 @@ table! {
       comment_id -> Int4,
       comment_text -> Text,
       comment_time -> Timestamp,
+      post_id -> Int4,
       community_id -> Int4,
     }
 }
@@ -47,6 +48,7 @@ pub struct CommentReportView {
   pub comment_id: i32,
   pub comment_text: String,
   pub comment_time: chrono::NaiveDateTime,
+  pub post_id: i32,
   pub community_id: i32,
 }
 
