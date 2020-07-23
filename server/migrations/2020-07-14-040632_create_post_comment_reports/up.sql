@@ -30,16 +30,22 @@ create view comment_report_view as
 select cr.*,
 c.post_id,
 p.community_id,
-u.name as user_name
+f.name as user_name,
+u.id as creator_id,
+u.name as creator_name
 from comment_report cr
 left join comment c on c.id = cr.comment_id
 left join post p on p.id = c.post_id
-left join user_ u on u.id = cr.user_id;
+left join user_ u on u.id = c.creator_id
+left join user_ f on f.id = cr.user_id;
 
 create view post_report_view as
 select pr.*,
 p.community_id,
-u.name as user_name
+f.name as user_name,
+u.id as creator_id,
+u.name as creator_name
 from post_report pr
 left join post p on p.id = pr.post_id
-left join user_ u on u.id = cr.user_id;
+left join user_ u on u.id = p.creator_id
+left join user_ f on f.id = pr.user_id;
