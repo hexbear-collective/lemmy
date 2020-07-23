@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::{
-  api::{comment::*, community::*, post::*, report::*, site::*, user::*, *},
+  api::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, *},
   rate_limit::RateLimit,
   websocket::UserOperation,
   CommunityId,
@@ -479,6 +479,12 @@ impl ChatServer {
         }
         UserOperation::BanFromCommunity => do_user_operation::<BanFromCommunity>(args).await,
         UserOperation::AddModToCommunity => do_user_operation::<AddModToCommunity>(args).await,
+        UserOperation::GetCommunitySettings => {
+          do_user_operation::<GetCommunitySettings>(args).await
+        }
+        UserOperation::EditCommunitySettings => {
+          do_user_operation::<EditCommunitySettings>(args).await
+        }
         UserOperation::GetReportCount => do_user_operation::<GetReportCount>(args).await,
 
         // Post ops

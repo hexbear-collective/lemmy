@@ -10,7 +10,15 @@ use crate::{
   },
   DbPool,
 };
-use lemmy_db::{naive_now, Bannable, Crud, Followable, Joinable, SortType};
+use lemmy_db::{
+  community_settings::{CommunitySettings, CommunitySettingsForm},
+  naive_now,
+  Bannable,
+  Crud,
+  Followable,
+  Joinable,
+  SortType,
+};
 use lemmy_utils::{
   generate_actor_keypair,
   is_valid_community_name,
@@ -304,6 +312,21 @@ impl Perform for Oper<CreateCommunity> {
         Err(_e) => return Err(APIError::err("community_already_exists").into()),
       };
 
+    // Initialize community settings
+    let community_id = inserted_community.id;
+    let community_settings_form = CommunitySettingsForm {
+      id: community_id,
+      read_only: false,
+      private: false,
+      post_links: true,
+      comment_images: 1,
+    };
+
+    let _inserted_settings = blocking(pool, move |conn| {
+      CommunitySettings::create(conn, &community_settings_form)
+    })
+    .await??;
+
     let community_moderator_form = CommunityModeratorForm {
       community_id: inserted_community.id,
       user_id,
@@ -371,25 +394,16 @@ impl Perform for Oper<EditCommunity> {
       return Err(APIError::err("site_ban").into());
     }
 
-    // Verify its a mod
+    // Verify it's a mod or admin
     let edit_id = data.edit_id;
-    let mut editors: Vec<i32> = Vec::new();
-    editors.append(
-      &mut blocking(pool, move |conn| {
-        CommunityModeratorView::for_community(conn, edit_id)
-          .map(|v| v.into_iter().map(|m| m.user_id).collect())
-      })
-      .await??,
-    );
-    editors.append(
-      &mut blocking(pool, move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
-      })
-      .await??,
-    );
-    if !editors.contains(&user_id) {
-      return Err(APIError::err("no_community_edit_allowed").into());
-    }
+    let _: Result<(), LemmyError> = blocking(pool, move |conn| {
+      if !User_::read(&conn, user_id)?.is_moderator(&conn, edit_id)? {
+        Ok(())
+      } else {
+        Err(APIError::err("no_community_edit_allowed").into())
+      }
+    })
+    .await?;
 
     let edit_id = data.edit_id;
     let read_community = blocking(pool, move |conn| Community::read(conn, edit_id)).await??;
@@ -953,5 +967,4 @@ impl Perform for Oper<TransferCommunity> {
 }
 
 // Hardcoded NSFW categories until category system is more fleshed out
-// not sure if this is the right number?
 const NSFW_CATEGORY_IDS: [i32; 1] = [23];

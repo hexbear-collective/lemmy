@@ -14,10 +14,12 @@ use crate::{
 use lemmy_db::{
   comment::*,
   comment_view::*,
+  community_settings::*,
   community_view::*,
   moderator::*,
   naive_now,
   post::*,
+  post_view::*,
   site_view::*,
   user::*,
   user_mention::*,
@@ -30,6 +32,7 @@ use lemmy_db::{
 };
 use lemmy_utils::{
   make_apub_endpoint,
+  num_md_images,
   remove_pii,
   remove_slurs,
   scrape_text_for_mentions,
@@ -127,7 +130,7 @@ impl Perform for Oper<CreateComment> {
     }
 
     let comment_form = CommentForm {
-      content: content_pii_removed,
+      content: (&content_pii_removed).to_string(),
       parent_id: data.parent_id.to_owned(),
       post_id: data.post_id,
       creator_id: user_id,
@@ -139,6 +142,37 @@ impl Perform for Oper<CreateComment> {
       ap_id: "http://fake.com".into(),
       local: true,
     };
+
+    let user_id = claims.id;
+    let post_id = data.post_id;
+    let post = blocking(pool, move |conn| {
+      PostView::read(conn, post_id, Some(user_id))
+    })
+    .await??;
+
+    // Check community settings
+    let community_id = post.community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = post.community_id;
+    let privileged = blocking(pool, move |conn| {
+      let user = User_::read(conn, user_id)?;
+      user.is_moderator(conn, community_id)
+    })
+    .await??;
+    if settings.private && !privileged {
+      return Err(APIError::err("community_is_private").into());
+    }
+    if settings.read_only && !privileged {
+      return Err(APIError::err("community_is_read_only").into());
+    }
+    let num_images: i32 = num_md_images(&content_pii_removed);
+    if !privileged && settings.comment_images < num_images {
+      return Err(APIError::err("community_too_many_images").into());
+    }
 
     // Check for a community ban
     let post_id = data.post_id;
@@ -249,6 +283,7 @@ impl Perform for Oper<EditComment> {
     let edit_id = data.edit_id;
     let orig_comment =
       blocking(pool, move |conn| CommentView::read(&conn, edit_id, None)).await??;
+    let orig_community_id = orig_comment.community_id;
 
     let mut editors: Vec<i32> = vec![orig_comment.creator_id];
     let mut moderators: Vec<i32> = vec![];
@@ -315,6 +350,23 @@ impl Perform for Oper<EditComment> {
 
     if !is_within_comment_char_limit(&data.content) {
       return Err(APIError::err("comment_too_long").into());
+    }
+
+    let community_id = orig_community_id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+
+    let community_id = orig_community_id;
+    let privileged = blocking(pool, move |conn| {
+      let user = User_::read(conn, user_id)?;
+      user.is_moderator(conn, community_id)
+    })
+    .await??;
+    let num_images: i32 = num_md_images(&content_pii_removed);
+    if !privileged && settings.comment_images < num_images {
+      return Err(APIError::err("community_too_many_images").into());
     }
 
     let edit_id = data.edit_id;
@@ -640,6 +692,29 @@ impl Perform for Oper<GetComments> {
       Some(claims) => Some(claims.id),
       None => None,
     };
+
+    // Check community settings
+    if let Some(community_id) = data.community_id {
+      let settings = blocking(pool, move |conn| {
+        CommunitySettings::read_from_community_id(conn, community_id)
+      })
+      .await??;
+
+      let privileged = {
+        if let Some(id) = user_id {
+          blocking(pool, move |conn| {
+            let user = User_::read(conn, id)?;
+            user.is_moderator(conn, community_id)
+          })
+          .await??
+        } else {
+          false
+        }
+      };
+      if settings.private && !privileged {
+        return Err(APIError::err("community_is_private").into());
+      }
+    }
 
     let type_ = ListingType::from_str(&data.type_)?;
     let sort = SortType::from_str(&data.sort)?;

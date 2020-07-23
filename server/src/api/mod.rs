@@ -5,6 +5,7 @@ use lemmy_db::{community::*, community_view::*, moderator::*, site::*, user::*, 
 pub mod claims;
 pub mod comment;
 pub mod community;
+pub mod community_settings;
 pub mod post;
 pub mod report;
 pub mod site;
