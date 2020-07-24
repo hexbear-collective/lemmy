@@ -1,5 +1,15 @@
 use crate::{
-  api::{comment::*, community::*, post::*, report::*, site::*, user::*, Oper, Perform},
+  api::{
+    comment::*,
+    community::*,
+    community_settings::*,
+    post::*,
+    report::*,
+    site::*,
+    user::*,
+    Oper,
+    Perform,
+  },
   rate_limit::RateLimit,
   routes::{ChatServerParam, DbPoolParam},
   websocket::WebsocketInfo,
@@ -57,6 +67,14 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/transfer", web::post().to(route_post::<TransferCommunity>))
           .route("/ban_user", web::post().to(route_post::<BanFromCommunity>))
           .route("/mod", web::post().to(route_post::<AddModToCommunity>))
+          .route(
+            "/settings",
+            web::get().to(route_get::<GetCommunitySettings>),
+          )
+          .route(
+            "/settings",
+            web::put().to(route_post::<EditCommunitySettings>),
+          )
           .route(
             "/comment_reports",
             web::get().to(route_get::<ListCommentReports>),

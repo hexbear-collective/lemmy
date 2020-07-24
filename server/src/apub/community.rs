@@ -33,6 +33,7 @@ use actix_web::{body::Body, client::Client, web, HttpResponse};
 use itertools::Itertools;
 use lemmy_db::{
   community::{Community, CommunityForm},
+  community_settings::CommunitySettings,
   community_view::{CommunityFollowerView, CommunityModeratorView},
   naive_now,
   user::User_,
@@ -52,6 +53,15 @@ impl ToApub for Community {
 
   // Turn a Lemmy Community into an ActivityPub group that can be sent out over the network.
   async fn to_apub(&self, pool: &DbPool) -> Result<GroupExt, LemmyError> {
+    let id = self.id;
+    let settings = blocking(pool, move |conn| {
+      CommunitySettings::read_from_community_id(&conn, id)
+    })
+    .await??;
+    if settings.private {
+      return Err(format_err!("Community is private").into());
+    }
+
     // The attributed to, is an ordered vector with the creator actor_ids first,
     // then the rest of the moderators
     // TODO Technically the instance admins can mod the community, but lets
