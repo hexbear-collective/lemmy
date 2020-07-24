@@ -691,6 +691,10 @@ impl Perform for Oper<BanFromCommunity> {
       return Err(APIError::err("couldnt_update_community").into());
     }
 
+    if community_moderators.contains(&data.user_id) {
+      return Err(APIError::err("couldnt_ban_privilaged_user").into());
+    }
+
     let community_user_ban_form = CommunityUserBanForm {
       community_id: data.community_id,
       user_id: data.user_id,
