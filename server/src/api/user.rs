@@ -1,52 +1,23 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::ApubObjectType,
-  blocking,
-  is_within_message_char_limit,
+  blocking, is_within_message_char_limit,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  password_reset_request::*,
-  post::*,
-  post_view::*,
-  private_message::*,
-  private_message_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  user_mention_view::*,
-  user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  comment::*, comment_view::*, community::*, community_view::*, moderator::*, naive_now,
+  password_reset_request::*, post::*, post_view::*, private_message::*, private_message_view::*,
+  site::*, site_view::*, user::*, user_mention::*, user_mention_view::*, user_view::*, Crud,
+  Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, slur_check, slurs_vec_to_str,
   EndpointType,
 };
 use log::{error, info};
@@ -524,10 +495,14 @@ impl Perform for Oper<SaveUserSettings> {
       None => read_user.email,
     };
 
+    // temporarily disable avitars
+    let avatar = None;
+    /*
     let avatar = match &data.avatar {
       Some(avatar) => Some(avatar.to_owned()),
       None => read_user.avatar,
     };
+    */
 
     let password_encrypted = match &data.new_password {
       Some(new_password) => {
@@ -716,6 +691,9 @@ impl Perform for Oper<GetUserDetails> {
     if user_id.is_none() || user_details_id != user_id.unwrap_or(0) {
       user_view.email = None;
     }
+
+    // temporarily disable avitars
+    user_view.avatar = None;
 
     // Return the jwt
     Ok(GetUserDetailsResponse {
