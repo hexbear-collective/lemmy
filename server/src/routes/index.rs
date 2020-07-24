@@ -44,7 +44,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     .route("/password_change/{token}", web::get().to(index))
     .route("/welcome", web::get().to(index))
     .route("/about", web::get().to(index))
-    .route("/ppb", web::get().to(index));
+    .route("/ppb", web::get().to(index))
+    .route("/reports", web::get().to(index));
 }
 
 async fn index() -> Result<NamedFile, Error> {
