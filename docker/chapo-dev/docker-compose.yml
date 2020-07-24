@@ -32,7 +32,7 @@ services:
     container_name: postgres-dev
     environment:
       - POSTGRES_USER=lemmy
-      - POSTGRES_PASSWORD="${LEMMYDEV_POSTGRES_PW}"
+      - POSTGRES_PASSWORD=${LEMMYDEV_POSTGRES_PW}
       - POSTGRES_DB=lemmy
     volumes:
       - ./volumes/postgres:/var/lib/postgresql/data

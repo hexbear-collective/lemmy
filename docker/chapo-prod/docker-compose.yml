@@ -11,6 +11,7 @@ services:
       - RUST_LOG=error
       - LEMMY_DATABASE__PASSWORD=${LEMMYPROD_POSTGRES_PW}
       - LEMMY_DATABASE__HOST=postgres-prod
+      - LEMMY_DATABASE__PORT=5433
       - LEMMY_HOSTNAME=www.chapo.chat
       - LEMMY_PORT=8546
       - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
@@ -19,6 +20,7 @@ services:
       - LEMMY_EMAIL__SMTP_PASSWORD=${LEMMYPROD_SMTP_PASSWORD}
       - LEMMY_EMAIL__USE_TLS=true
       - LEMMY_JWT_SECRET=${LEMMYPROD_JWT_SECRET}
+      - HCAPTCHA_SECRET_KEY=${LEMMYPROD_HCAPTCHA_SECRET_KEY}
     volumes:
       - ./lemmy.hjson:/config/config.hjson:ro
     depends_on:
@@ -31,7 +33,7 @@ services:
     container_name: postgres-prod
     environment:
       - POSTGRES_USER=lemmy
-      - POSTGRES_PASSWORD="${LEMMYPROD_POSTGRES_PW}"
+      - POSTGRES_PASSWORD=${LEMMYPROD_POSTGRES_PW}
       - POSTGRES_DB=lemmy
     ports:
       - "127.0.0.1:5433:5433"
@@ -62,28 +64,26 @@ services:
       - ./iframely.config.local.js:/iframely/config.local.js:ro
     restart: always
 
-### Uncomment once purgebot is stable ###
-#
-#   purgebot:
-#     image: registry.gitlab.com/chapo-sandbox/purgebot:latest-prod
-#     container_name: purgebot-prod
-#     restart: always
-#     environment:
-#       - POSTGRES_PASSWORD=${LEMMYDEV_POSTGRES_PW}
-#       - POSTGRES_HOST=postgres-prod
-#       - POSTGRES_PORT=5433
-#       - LEMMY_HOST=www.chapo.chat
-#       - LEMMY_PORT=8536
-#       - PUID=991
-#       - PGID=991
-#     volumes:
-#       - /opt/app/lemmy-prod/volumes/pictrs:/pictrs
-#     secrets:
-#       - discord_token
-#       - cloudflare_token
-#
-# secrets:
-#   discord_token:
-#     file: /opt/app/lemmy-prod/secrets/discord_token.txt
-#   cloudflare_token:
-#     file: /opt/app/lemmy-prod/secrets/cloudflare_token.txt
+  purgebot:
+    image: registry.gitlab.com/chapo-sandbox/purgebot:latest-prod
+    container_name: purgebot-prod
+    restart: always
+    environment:
+      - POSTGRES_HOST=postgres-prod
+      - POSTGRES_PORT=5433
+    volumes:
+      - /opt/app/lemmy-prod/volumes/pictrs:/pictrs
+    secrets:
+      - discord_token
+      - cloudflare_token
+      - postgres_pw
+    depends_on:
+      - postgres
+
+secrets:
+  discord_token:
+    file: /opt/app/lemmy-prod/secrets/discord_token.txt
+  cloudflare_token:
+    file: /opt/app/lemmy-prod/secrets/cloudflare_token.txt
+  postgres_pw:
+    file: /opt/app/lemmy-prod/secrets/postgres_pw
