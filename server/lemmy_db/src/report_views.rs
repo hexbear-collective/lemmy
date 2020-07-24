@@ -14,7 +14,11 @@ table! {
       comment_id -> Int4,
       comment_text -> Text,
       comment_time -> Timestamp,
+      post_id -> Int4,
       community_id -> Int4,
+      user_name -> Varchar,
+      creator_id -> Int4,
+      creator_name -> Varchar,
     }
 }
 
@@ -31,6 +35,9 @@ table! {
       post_body -> Nullable<Text>,
       post_time -> Timestamp,
       community_id -> Int4,
+      user_name -> Varchar,
+      creator_id -> Int4,
+      creator_name -> Varchar,
     }
 }
 
@@ -47,7 +54,11 @@ pub struct CommentReportView {
   pub comment_id: i32,
   pub comment_text: String,
   pub comment_time: chrono::NaiveDateTime,
+  pub post_id: i32,
   pub community_id: i32,
+  pub user_name: String,
+  pub creator_id: i32,
+  pub creator_name: String,
 }
 
 #[derive(
@@ -66,6 +77,9 @@ pub struct PostReportView {
   pub post_body: Option<String>,
   pub post_time: chrono::NaiveDateTime,
   pub community_id: i32,
+  pub user_name: String,
+  pub creator_id: i32,
+  pub creator_name: String,
 }
 
 pub struct CommentReportQueryBuilder<'a> {
