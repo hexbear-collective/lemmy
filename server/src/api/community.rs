@@ -5,28 +5,17 @@ use crate::{
   blocking,
   websocket::{
     server::{JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
   DbPool,
 };
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now,
-  Bannable,
-  Crud,
-  Followable,
-  Joinable,
-  SortType,
+  naive_now, Bannable, Crud, Followable, Joinable, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  is_valid_community_name,
-  make_apub_endpoint,
-  naive_from_unix,
-  slur_check,
-  slurs_vec_to_str,
-  EndpointType,
+  generate_actor_keypair, is_valid_community_name, make_apub_endpoint, naive_from_unix, slur_check,
+  slurs_vec_to_str, EndpointType,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -394,6 +383,13 @@ impl Perform for Oper<EditCommunity> {
       return Err(APIError::err("site_ban").into());
     }
 
+    // Check for a community ban
+    let edit_id = data.edit_id;
+    let is_banned = move |conn: &'_ _| CommunityUserBanView::get(conn, user_id, edit_id).is_ok();
+    if blocking(pool, is_banned).await? {
+      return Err(APIError::err("community_ban").into());
+    }
+
     // Verify it's a mod or admin
     let edit_id = data.edit_id;
     let _: Result<(), LemmyError> = blocking(pool, move |conn| {
@@ -693,6 +689,10 @@ impl Perform for Oper<BanFromCommunity> {
 
     if !community_moderators.contains(&user_id) {
       return Err(APIError::err("couldnt_update_community").into());
+    }
+
+    if community_moderators.contains(&data.user_id) {
+      return Err(APIError::err("couldnt_ban_privilaged_user").into());
     }
 
     let community_user_ban_form = CommunityUserBanForm {

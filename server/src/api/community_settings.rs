@@ -3,15 +3,13 @@ use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   blocking,
   websocket::{server::SendCommunityRoomMessage, UserOperation, WebsocketInfo},
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now,
-  Crud,
+  naive_now, Crud,
 };
-use log::info;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
