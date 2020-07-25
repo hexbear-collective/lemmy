@@ -262,11 +262,21 @@ impl Perform for Oper<CreateCommunity> {
     if user_view.banned {
       return Err(APIError::err("site_ban").into());
     }
-
-    // Check if site settings allow for communities to be created
+    // Check if site settings allow for communities to be created...
     let site: Site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
     if !site.enable_create_communities {
-      return Err(APIError::err("create_community_disabled").into());
+      let mut admins: Vec<i32> = vec![];
+      admins.append(
+        &mut blocking(pool, move |conn| {
+          UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        })
+        .await??,
+      );
+
+      // ...but let admins create them anyway
+      if !admins.contains(&user_id) {
+        return Err(APIError::err("create_community_disabled").into());
+      }
     }
 
     // Double check for duplicate community actor_ids
