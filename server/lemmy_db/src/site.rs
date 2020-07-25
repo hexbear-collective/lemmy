@@ -14,6 +14,7 @@ pub struct Site {
   pub enable_downvotes: bool,
   pub open_registration: bool,
   pub enable_nsfw: bool,
+  pub enable_create_communities: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize)]
@@ -26,6 +27,7 @@ pub struct SiteForm {
   pub enable_downvotes: bool,
   pub open_registration: bool,
   pub enable_nsfw: bool,
+  pub enable_create_communities: bool,
 }
 
 impl Crud<SiteForm> for Site {

@@ -263,6 +263,12 @@ impl Perform for Oper<CreateCommunity> {
       return Err(APIError::err("site_ban").into());
     }
 
+    // Check if site settings allow for communities to be created
+    let site: Site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
+    if !site.enable_create_communities {
+      return Err(APIError::err("create_community_disabled").into());
+    }
+
     // Double check for duplicate community actor_ids
     let actor_id = make_apub_endpoint(EndpointType::Community, &data.name).to_string();
     let actor_id_cloned = actor_id.to_owned();
