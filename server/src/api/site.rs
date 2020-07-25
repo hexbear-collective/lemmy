@@ -81,7 +81,7 @@ pub struct EditSite {
   enable_downvotes: bool,
   open_registration: bool,
   enable_nsfw: bool,
-  enable_create_communities: bool,
+  enable_create_communities: Option<bool>,
   auth: String,
 }
 
@@ -314,7 +314,9 @@ impl Perform for Oper<EditSite> {
       enable_downvotes: data.enable_downvotes,
       open_registration: data.open_registration,
       enable_nsfw: data.enable_nsfw,
-      enable_create_communities: data.enable_create_communities,
+      enable_create_communities: data
+        .enable_create_communities
+        .unwrap_or(found_site.enable_create_communities),
     };
 
     let update_site = move |conn: &'_ _| Site::update(conn, 1, &site_form);
