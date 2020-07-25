@@ -5,17 +5,28 @@ use crate::{
   blocking,
   websocket::{
     server::{JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
   DbPool,
 };
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now, Bannable, Crud, Followable, Joinable, SortType,
+  naive_now,
+  Bannable,
+  Crud,
+  Followable,
+  Joinable,
+  SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair, is_valid_community_name, make_apub_endpoint, naive_from_unix, slur_check,
-  slurs_vec_to_str, EndpointType,
+  generate_actor_keypair,
+  is_valid_community_name,
+  make_apub_endpoint,
+  naive_from_unix,
+  slur_check,
+  slurs_vec_to_str,
+  EndpointType,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -261,6 +272,22 @@ impl Perform for Oper<CreateCommunity> {
     let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
     if user_view.banned {
       return Err(APIError::err("site_ban").into());
+    }
+    // Check if site settings allow for communities to be created...
+    let site: Site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
+    if !site.enable_create_communities {
+      let mut admins: Vec<i32> = vec![];
+      admins.append(
+        &mut blocking(pool, move |conn| {
+          UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        })
+        .await??,
+      );
+
+      // ...but let admins create them anyway
+      if !admins.contains(&user_id) {
+        return Err(APIError::err("create_community_disabled").into());
+      }
     }
 
     // Double check for duplicate community actor_ids

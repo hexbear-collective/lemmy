@@ -431,6 +431,7 @@ table! {
         enable_downvotes -> Bool,
         open_registration -> Bool,
         enable_nsfw -> Bool,
+        enable_create_communities -> Bool,
     }
 }
 

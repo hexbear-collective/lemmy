@@ -93,6 +93,7 @@ pub struct EditSite {
   enable_downvotes: bool,
   open_registration: bool,
   enable_nsfw: bool,
+  enable_create_communities: bool,
   auth: String,
 }
 
@@ -267,6 +268,7 @@ impl Perform for Oper<CreateSite> {
       enable_downvotes: data.enable_downvotes,
       open_registration: data.open_registration,
       enable_nsfw: data.enable_nsfw,
+      enable_create_communities: true,
       updated: None,
     };
 
@@ -324,6 +326,7 @@ impl Perform for Oper<EditSite> {
       enable_downvotes: data.enable_downvotes,
       open_registration: data.open_registration,
       enable_nsfw: data.enable_nsfw,
+      enable_create_communities: data.enable_create_communities,
     };
 
     let update_site = move |conn: &'_ _| Site::update(conn, 1, &site_form);
@@ -634,6 +637,7 @@ impl Perform for Oper<TransferSite> {
       enable_downvotes: read_site.enable_downvotes,
       open_registration: read_site.open_registration,
       enable_nsfw: read_site.enable_nsfw,
+      enable_create_communities: read_site.enable_create_communities,
     };
 
     let update_site = move |conn: &'_ _| Site::update(conn, 1, &site_form);
