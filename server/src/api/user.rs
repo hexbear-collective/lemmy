@@ -16,6 +16,7 @@ use lemmy_db::{
   comment::*,
   comment_view::*,
   community::*,
+  community_settings::{CommunitySettings, CommunitySettingsForm},
   community_view::*,
   moderator::*,
   naive_now,
@@ -464,7 +465,24 @@ impl Perform for Oper<Register> {
           last_refreshed_at: None,
           published: None,
         };
-        blocking(pool, move |conn| Community::create(conn, &community_form)).await??
+        let main_community =
+          blocking(pool, move |conn| Community::create(conn, &community_form)).await??;
+        // Initialize community settings
+        let community_id = main_community.id;
+        let community_settings_form = CommunitySettingsForm {
+          id: community_id,
+          read_only: false,
+          private: false,
+          post_links: true,
+          comment_images: 1,
+        };
+
+        let _inserted_settings = blocking(pool, move |conn| {
+          CommunitySettings::create(conn, &community_settings_form)
+        })
+        .await??;
+
+        main_community
       }
     };
 
