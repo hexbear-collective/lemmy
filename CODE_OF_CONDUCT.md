@@ -9,10 +9,6 @@
 - Private harassment is also unacceptable. No matter who you are, if you feel you have been or are being harassed or made uncomfortable by a community member, please contact one of the channel ops or any of the Chapo moderation team immediately. Whether you’re a regular contributor or a newcomer, we care about making this community a safe place for you and we’ve got your back.
 - Likewise any spamming, trolling, flaming, baiting or other attention-stealing behavior is not welcome.
 
-[**Message the Moderation Team on Mastodon**](https://mastodon.social/@LemmyDev)
-
-[**Email The Moderation Team**](mailto:contact@lemmy.ml)
-
 ## Moderation
 
 These are the policies for upholding our community’s standards of conduct. If you feel that a thread needs moderation, please contact the Chapo moderation team .
@@ -30,6 +26,6 @@ In the Chapo community we strive to go the extra step to look out for each other
 
 And if someone takes issue with something you said or did, resist the urge to be defensive. Just stop doing what it was they complained about and apologize. Even if you feel you were misinterpreted or unfairly accused, chances are good there was something you could’ve communicated better — remember that it’s your responsibility to make others comfortable. Everyone wants to get along and we are all here first and foremost because we want to talk about cool technology. You will find that people will be eager to assume good intent and forgive as long as you earn their trust.
 
-The enforcement policies listed above apply to all official Chapo venues; including git repositories under [our gitlab project](https://gitlab.com) and all instances under [chapo.chat](https://chapo.chat). For other projects adopting the Rust Code of Conduct, please contact the maintainers of those projects for enforcement. If you wish to use this code of conduct for your own project, consider explicitly mentioning your moderation policy or making a copy with your own moderation policy so as to avoid confusion.
+The enforcement policies listed above apply to all official Chapo venues; including git repositories under [our gitlab project](https://gitlab.com/chapo-sandbox/production) and all instances under [chapo.chat](https://chapo.chat). For other projects adopting the Rust Code of Conduct, please contact the maintainers of those projects for enforcement. If you wish to use this code of conduct for your own project, consider explicitly mentioning your moderation policy or making a copy with your own moderation policy so as to avoid confusion.
 
 Adapted from the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct), which is based on the [Node.js Policy on Trolling](http://blog.izs.me/post/30036893703/policy-on-trolling) as well as the [Contributor Covenant v1.3.0](https://www.contributor-covenant.org/version/1/3/0/).
