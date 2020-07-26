@@ -142,9 +142,9 @@ impl Perform for Oper<CreatePost> {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
 
-    if let Err(pii) = pii_check(&data.name) {
-      return Err(APIError::err(&pii_vec_to_str(pii)).into());
-    }
+    // if let Err(pii) = pii_check(&data.name) {
+    //   return Err(APIError::err(&pii_vec_to_str(pii)).into());
+    // }
 
     if let Some(body) = &data.body {
       if let Err(slurs) = slur_check(body) {
@@ -152,11 +152,11 @@ impl Perform for Oper<CreatePost> {
       }
     }
 
-    if let Some(body) = &data.body {
-      if let Err(pii) = pii_check(body) {
-        return Err(APIError::err(&pii_vec_to_str(pii)).into());
-      }
-    }
+    // if let Some(body) = &data.body {
+    //   if let Err(pii) = pii_check(body) {
+    //     return Err(APIError::err(&pii_vec_to_str(pii)).into());
+    //   }
+    // }
 
     if !is_within_post_title_char_limit(&data.name) {
       return Err(APIError::err("post_title_too_long").into());
@@ -645,9 +645,9 @@ impl Perform for Oper<EditPost> {
       return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
     }
 
-    if let Err(pii) = pii_check(&data.name) {
-      return Err(APIError::err(&pii_vec_to_str(pii)).into());
-    }
+    // if let Err(pii) = pii_check(&data.name) {
+    //   return Err(APIError::err(&pii_vec_to_str(pii)).into());
+    // }
 
     if let Some(body) = &data.body {
       if let Err(slurs) = slur_check(body) {
@@ -655,11 +655,11 @@ impl Perform for Oper<EditPost> {
       }
     }
 
-    if let Some(body) = &data.body {
-      if let Err(pii) = pii_check(body) {
-        return Err(APIError::err(&pii_vec_to_str(pii)).into());
-      }
-    }
+    // if let Some(body) = &data.body {
+    //   if let Err(pii) = pii_check(body) {
+    //     return Err(APIError::err(&pii_vec_to_str(pii)).into());
+    //   }
+    // }
 
     if !is_valid_post_title(&data.name) {
       return Err(APIError::err("invalid_post_title").into());
