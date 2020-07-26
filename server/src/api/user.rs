@@ -399,10 +399,21 @@ impl Perform for Oper<Register> {
       return Err(APIError::err("invalid_username").into());
     }
 
+    let email = match &data.email {
+      Some(email) => {
+        if email.trim().is_empty() {
+          None
+        } else {
+          Some(email.trim().to_lowercase())
+        }
+      }
+      None => None,
+    };
+
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
-      email: data.email.to_owned().map(|email| email.to_lowercase()),
+      email: email,
       matrix_user_id: None,
       avatar: None,
       password_encrypted: data.password.to_owned(),
@@ -538,7 +549,13 @@ impl Perform for Oper<SaveUserSettings> {
     let read_user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
 
     let email = match &data.email {
-      Some(email) => Some(email.to_owned()),
+      Some(email) => {
+        if email.trim().is_empty() {
+          None
+        } else {
+          Some(email.trim().to_lowercase())
+        }
+      }
       None => read_user.email,
     };
 
