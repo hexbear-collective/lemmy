@@ -8,6 +8,7 @@
 - We will exclude you from interaction if you insult, demean or harass anyone. That is not welcome behavior. We interpret the term “harassment” as including the definition in the Citizen Code of Conduct; if you have any lack of clarity about what might be included in that concept, please read their definition. In particular, we don’t tolerate behavior that excludes people in socially marginalized groups.
 - Private harassment is also unacceptable. No matter who you are, if you feel you have been or are being harassed or made uncomfortable by a community member, please contact one of the channel ops or any of the Chapo moderation team immediately. Whether you’re a regular contributor or a newcomer, we care about making this community a safe place for you and we’ve got your back.
 - Likewise any spamming, trolling, flaming, baiting or other attention-stealing behavior is not welcome.
+- Direct calls or claims to violence that target _specific living_ individuals is not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the insitituion they represent. 
 
 ## Moderation
 
