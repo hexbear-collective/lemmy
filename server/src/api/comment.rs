@@ -123,14 +123,14 @@ impl Perform for Oper<CreateComment> {
     let user_id = claims.id;
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
-    let content_pii_removed = remove_pii(&content_slurs_removed);
+    // let content_pii_removed = remove_pii(&content_slurs_removed);
 
     if !is_within_comment_char_limit(&data.content) {
       return Err(APIError::err("comment_too_long").into());
     }
 
     let comment_form = CommentForm {
-      content: (&content_pii_removed).to_string(),
+      content: (&content_slurs_removed).to_string(),
       parent_id: data.parent_id.to_owned(),
       post_id: data.post_id,
       creator_id: user_id,
@@ -169,7 +169,7 @@ impl Perform for Oper<CreateComment> {
     if settings.read_only && !privileged {
       return Err(APIError::err("community_is_read_only").into());
     }
-    let num_images: i32 = num_md_images(&content_pii_removed);
+    let num_images: i32 = num_md_images(&content_slurs_removed); // replaced content_pii_removed
     if !privileged && settings.comment_images < num_images {
       return Err(APIError::err("community_too_many_images").into());
     }
@@ -346,7 +346,7 @@ impl Perform for Oper<EditComment> {
     }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
-    let content_pii_removed = remove_pii(&content_slurs_removed);
+    // let content_pii_removed = remove_pii(&content_slurs_removed);
 
     if !is_within_comment_char_limit(&data.content) {
       return Err(APIError::err("comment_too_long").into());
@@ -364,7 +364,7 @@ impl Perform for Oper<EditComment> {
       user.is_moderator(conn, community_id)
     })
     .await??;
-    let num_images: i32 = num_md_images(&content_pii_removed);
+    let num_images: i32 = num_md_images(&content_slurs_removed); // replaced content_pii_removed
     if !privileged && settings.comment_images < num_images {
       return Err(APIError::err("community_too_many_images").into());
     }
@@ -383,7 +383,7 @@ impl Perform for Oper<EditComment> {
         };
 
         CommentForm {
-          content: content_pii_removed,
+          content: content_slurs_removed, // replaced content_pii_removed
           parent_id: read_comment.parent_id,
           post_id: read_comment.post_id,
           creator_id: read_comment.creator_id,
