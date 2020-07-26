@@ -41,6 +41,7 @@ impl ModRemovePostView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_remove_post_view::dsl::*;
     let mut query = mod_remove_post_view.into_boxed();
@@ -54,6 +55,22 @@ impl ModRemovePostView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        post_id,
+        reason,
+        removed,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        post_name,
+        community_id,
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -100,6 +117,7 @@ impl ModLockPostView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_lock_post_view::dsl::*;
     let mut query = mod_lock_post_view.into_boxed();
@@ -113,6 +131,21 @@ impl ModLockPostView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        post_id,
+        locked,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        post_name,
+        community_id,
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -159,6 +192,7 @@ impl ModStickyPostView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_sticky_post_view::dsl::*;
     let mut query = mod_sticky_post_view.into_boxed();
@@ -172,6 +206,21 @@ impl ModStickyPostView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        post_id,
+        stickied,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        post_name,
+        community_id,
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -228,6 +277,7 @@ impl ModRemoveCommentView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_remove_comment_view::dsl::*;
     let mut query = mod_remove_comment_view.into_boxed();
@@ -241,6 +291,26 @@ impl ModRemoveCommentView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        comment_id,
+        reason,
+        removed,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        comment_user_id,
+        comment_user_name,
+        comment_content,
+        post_id,
+        post_name,
+        community_id,
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -286,6 +356,7 @@ impl ModRemoveCommunityView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_remove_community_view::dsl::*;
     let mut query = mod_remove_community_view.into_boxed();
@@ -295,6 +366,21 @@ impl ModRemoveCommunityView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        community_id,
+        reason,
+        removed,
+        expires,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -345,6 +431,7 @@ impl ModBanFromCommunityView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_ban_from_community_view::dsl::*;
     let mut query = mod_ban_from_community_view.into_boxed();
@@ -358,6 +445,23 @@ impl ModBanFromCommunityView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        other_user_id,
+        community_id,
+        reason,
+        banned,
+        expires,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -403,6 +507,7 @@ impl ModBanView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_ban_view::dsl::*;
     let mut query = mod_ban_view.into_boxed();
@@ -412,6 +517,21 @@ impl ModBanView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        other_user_id,
+        reason,
+        banned,
+        expires,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -458,6 +578,7 @@ impl ModAddCommunityView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_add_community_view::dsl::*;
     let mut query = mod_add_community_view.into_boxed();
@@ -471,6 +592,21 @@ impl ModAddCommunityView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        other_user_id,
+        community_id,
+        removed,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
+        community_name,
+      ));
+    }
 
     query
       .limit(limit)
@@ -512,6 +648,7 @@ impl ModAddView {
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
+    anon: bool,
   ) -> Result<Vec<Self>, Error> {
     use super::moderator_views::mod_add_view::dsl::*;
     let mut query = mod_add_view.into_boxed();
@@ -521,6 +658,19 @@ impl ModAddView {
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
+
+    if anon {
+      use diesel::sql_types::{Int4, Text};
+      query = query.select((
+        id,
+        0.into_sql::<Int4>(),
+        other_user_id,
+        removed,
+        when_,
+        "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
+      ));
+    }
 
     query
       .limit(limit)
