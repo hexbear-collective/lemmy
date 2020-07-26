@@ -61,6 +61,7 @@ pub struct GetModlog {
   community_id: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
+  auth: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -165,36 +166,66 @@ impl Perform for Oper<GetModlog> {
     let data: &GetModlog = &self.data;
 
     let community_id = data.community_id;
+
+    let anon_log: bool = match &data.auth {
+      Some(auth) => match Claims::decode(&auth) {
+        Ok(claims) => {
+          let user_id = claims.claims.id;
+          let mut log_viewers: Vec<i32> = vec![];
+          if let Some(c_id) = community_id {
+            log_viewers.append(
+              &mut blocking(pool, move |conn| {
+                CommunityModeratorView::for_community(conn, c_id)
+                  .map(|v| v.into_iter().map(|m| m.user_id).collect())
+              })
+              .await??,
+            );
+          }
+
+          log_viewers.append(
+            &mut blocking(pool, move |conn| {
+              UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+            })
+            .await??,
+          );
+
+          log_viewers.contains(&user_id)
+        }
+        Err(_e) => true,
+      },
+      None => true,
+    };
+
     let mod_user_id = data.mod_user_id;
     let page = data.page;
     let limit = data.limit;
     let removed_posts = blocking(pool, move |conn| {
-      ModRemovePostView::list(conn, community_id, mod_user_id, page, limit)
+      ModRemovePostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
     let locked_posts = blocking(pool, move |conn| {
-      ModLockPostView::list(conn, community_id, mod_user_id, page, limit)
+      ModLockPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
     let stickied_posts = blocking(pool, move |conn| {
-      ModStickyPostView::list(conn, community_id, mod_user_id, page, limit)
+      ModStickyPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
     let removed_comments = blocking(pool, move |conn| {
-      ModRemoveCommentView::list(conn, community_id, mod_user_id, page, limit)
+      ModRemoveCommentView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
     let banned_from_community = blocking(pool, move |conn| {
-      ModBanFromCommunityView::list(conn, community_id, mod_user_id, page, limit)
+      ModBanFromCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
     let added_to_community = blocking(pool, move |conn| {
-      ModAddCommunityView::list(conn, community_id, mod_user_id, page, limit)
+      ModAddCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
@@ -202,9 +233,9 @@ impl Perform for Oper<GetModlog> {
     let (removed_communities, banned, added) = if data.community_id.is_none() {
       blocking(pool, move |conn| {
         Ok((
-          ModRemoveCommunityView::list(conn, mod_user_id, page, limit)?,
-          ModBanView::list(conn, mod_user_id, page, limit)?,
-          ModAddView::list(conn, mod_user_id, page, limit)?,
+          ModRemoveCommunityView::list(conn, mod_user_id, page, limit, anon_log)?,
+          ModBanView::list(conn, mod_user_id, page, limit, anon_log)?,
+          ModAddView::list(conn, mod_user_id, page, limit, anon_log)?,
         )) as Result<_, LemmyError>
       })
       .await??
