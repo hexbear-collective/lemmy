@@ -34,8 +34,6 @@ use lemmy_db::{
 use lemmy_utils::{
   is_valid_post_title,
   make_apub_endpoint,
-  pii_check,
-  pii_vec_to_str,
   slur_check,
   slurs_vec_to_str,
   EndpointType,

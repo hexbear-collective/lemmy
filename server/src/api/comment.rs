@@ -33,7 +33,6 @@ use lemmy_db::{
 use lemmy_utils::{
   make_apub_endpoint,
   num_md_images,
-  remove_pii,
   remove_slurs,
   scrape_text_for_mentions,
   send_email,

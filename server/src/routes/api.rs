@@ -91,6 +91,12 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route(web::post().to(route_post::<CreatePost>)),
       )
       .service(
+        // Handle POST to /post/report separately to add the post() rate limitter
+        web::scope("/post")
+          .wrap(rate_limit.post())
+          .route("/report", web::post().to(route_post::<CreatePostReport>)),
+      )
+      .service(
         web::scope("/post")
           .wrap(rate_limit.message())
           .route("", web::get().to(route_get::<GetPost>))
@@ -98,7 +104,6 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/list", web::get().to(route_get::<GetPosts>))
           .route("/like", web::post().to(route_post::<CreatePostLike>))
           .route("/save", web::put().to(route_post::<SavePost>))
-          .route("/report", web::put().to(route_post::<CreatePostReport>))
           .route(
             "/resolve_report",
             web::post().to(route_post::<ResolvePostReport>),
@@ -106,13 +111,24 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       )
       // Comment
       .service(
+        // Handle POST to /comment separately to add the post() rate limitter
+        web::resource("/comment")
+          .guard(guard::Post())
+          .wrap(rate_limit.post())
+          .route(web::post().to(route_post::<CreateComment>)),
+      )
+      .service(
+        // Handle POST to /comment/report separately to add the post() rate limitter
+        web::scope("/comment")
+          .wrap(rate_limit.post())
+          .route("/report", web::post().to(route_post::<CreateCommentReport>)),
+      )
+      .service(
         web::scope("/comment")
           .wrap(rate_limit.message())
-          .route("", web::post().to(route_post::<CreateComment>))
           .route("", web::put().to(route_post::<EditComment>))
           .route("/like", web::post().to(route_post::<CreateCommentLike>))
           .route("/save", web::put().to(route_post::<SaveComment>))
-          .route("/report", web::post().to(route_post::<CreateCommentReport>))
           .route(
             "/resolve_report",
             web::post().to(route_post::<ResolveCommentReport>),
@@ -120,10 +136,15 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       )
       // Private Message
       .service(
+        web::resource("/private_message")
+          .guard(guard::Post())
+          .wrap(rate_limit.post())
+          .route(web::post().to(route_post::<CreatePrivateMessage>)),
+      )
+      .service(
         web::scope("/private_message")
           .wrap(rate_limit.message())
           .route("/list", web::get().to(route_get::<GetPrivateMessages>))
-          .route("", web::post().to(route_post::<CreatePrivateMessage>))
           .route("", web::put().to(route_post::<EditPrivateMessage>)),
       )
       // User
