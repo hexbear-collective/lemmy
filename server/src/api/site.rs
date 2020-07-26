@@ -4,23 +4,11 @@ use crate::{
   apub::fetcher::search_by_apub_id,
   blocking,
   websocket::{server::SendAllMessage, UserOperation, WebsocketInfo},
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
-  category::*,
-  comment_view::*,
-  community_view::*,
-  moderator::*,
-  moderator_views::*,
-  naive_now,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user_view::*,
-  Crud,
-  SearchType,
-  SortType,
+  category::*, comment_view::*, community_view::*, moderator::*, moderator_views::*, naive_now,
+  post_view::*, site::*, site_view::*, user_view::*, Crud, SearchType, SortType,
 };
 use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str};
 use log::{debug, info};
@@ -134,6 +122,23 @@ pub struct GetSiteConfigResponse {
 pub struct SaveSiteConfig {
   config_hjson: String,
   auth: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct CommunityModerators {
+  community: CommunityView,
+  moderators: Vec<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetSiteModerators {
+  page: Option<i64>,
+  limit: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetSiteModeratorsResponse {
+  communities: Vec<CommunityModerators>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -773,5 +778,44 @@ impl Perform for Oper<SaveSiteConfig> {
     };
 
     Ok(GetSiteConfigResponse { config_hjson })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetSiteModerators> {
+  type Response = GetSiteModeratorsResponse;
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<GetSiteModeratorsResponse, LemmyError> {
+    let data: &GetSiteModerators = &self.data;
+    let page = data.page;
+    let limit = data.limit;
+
+    let communities = blocking(pool, move |conn| {
+      CommunityQueryBuilder::create(conn)
+        .page(page)
+        .limit(limit)
+        .list()
+    })
+    .await??;
+
+    let mut community_mods: Vec<CommunityModerators> = Vec::with_capacity(communities.len());
+    for c in communities {
+      let id = c.id;
+      let mod_view = blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(conn, id)
+      })
+      .await??;
+      community_mods.push(CommunityModerators {
+        community: c,
+        moderators: mod_view.iter().map(|cmv| cmv.user_id).collect(),
+      });
+    }
+
+    Ok(GetSiteModeratorsResponse {
+      communities: community_mods,
+    })
   }
 }

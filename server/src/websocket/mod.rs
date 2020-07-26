@@ -73,6 +73,7 @@ pub enum UserOperation {
   GetSiteConfig,
   SaveSiteConfig,
   GetReportCount,
+  GetSiteModerators,
 }
 
 #[derive(Clone)]

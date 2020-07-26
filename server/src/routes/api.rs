@@ -1,13 +1,6 @@
 use crate::{
   api::{
-    comment::*,
-    community::*,
-    community_settings::*,
-    post::*,
-    report::*,
-    site::*,
-    user::*,
-    Oper,
+    comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, Oper,
     Perform,
   },
   rate_limit::RateLimit,
@@ -32,7 +25,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("", web::put().to(route_post::<EditSite>))
           .route("/transfer", web::post().to(route_post::<TransferSite>))
           .route("/config", web::get().to(route_get::<GetSiteConfig>))
-          .route("/config", web::put().to(route_post::<SaveSiteConfig>)),
+          .route("/config", web::put().to(route_post::<SaveSiteConfig>))
+          .route("/mods", web::get().to(route_get::<GetSiteModerators>)),
       )
       .service(
         web::resource("/categories")
