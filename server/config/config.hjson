@@ -1,4 +1,5 @@
 {
   hostname: "localhost:8536"
   federation_enabled: true
+  register_per_second: 1
 }
