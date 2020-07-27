@@ -1,20 +1,28 @@
 # Code of Conduct
 
+Note: This is based on lemmy's code of conduct. We will be adapting this further as we go. Yes, we know it's hella strict.
+
+Last updated: July 26th, 2020
+
+## Community Rules
+
 - We are committed to providing a friendly, safe and welcoming environment for all, regardless of gender identity and expression, sexual orientation, disability, personal appearance, body size, race, ethnicity, age, religion, nationality, or other similar characteristic.
 - Please avoid using overtly sexual aliases or other nicknames that might detract from a friendly, safe and welcoming environment for all.
-- Please be kind and courteous. There’s no need to be mean or rude.
-- Respect that people have differences of opinion and that every leftist has a place in our community.
-- Please keep unstructured critique to a minimum. If you have solid ideas you want to experiment with, make a fork and see how it works.
+- Please be kind and courteous to your fellow leftists. There’s no need to be mean or rude unless it's a chud.
+- Respect that people have differences of opinion and that every leftist has a place in our community. Discussing differences in theory is fine and encouraged, just don't make it personal. Remember: Sectarianism is liberalism.
+- Please keep unstructured critique to a minimum. If you have solid ideas you want to experiment with, our project is open source and you can make a fork of the project and see how it works.
 - We will exclude you from interaction if you insult, demean or harass anyone. That is not welcome behavior. We interpret the term “harassment” as including the definition in the Citizen Code of Conduct; if you have any lack of clarity about what might be included in that concept, please read their definition. In particular, we don’t tolerate behavior that excludes people in socially marginalized groups.
 - Private harassment is also unacceptable. No matter who you are, if you feel you have been or are being harassed or made uncomfortable by a community member, please contact one of the channel ops or any of the Chapo moderation team immediately. Whether you’re a regular contributor or a newcomer, we care about making this community a safe place for you and we’ve got your back.
 - Likewise any spamming, trolling, flaming, baiting or other attention-stealing behavior is not welcome.
-- Direct calls or claims to violence that target _specific living_ individuals is not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the insitituion they represent. 
+- We are a platform that welcomes anyone who wants to be here in good faith. With that said, we are also an intentionally leftist platform, conservative and reactionary idealogies will not be tolerated here. 
+- We do not platform fascists and refuse to engage in any form of debate with them on this platform. If you don't understand why engaging in debates with fascists is a terrible idea, go ask in one of the communities and/or use a search engine.
+- Direct calls or claims to violence that target _specific living_ individuals is not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the insitituion they represent. This policy also applies to any specific organizational bodies and groups such as the DNC or NRA.
 
 ## Moderation
 
 These are the policies for upholding our community’s standards of conduct. If you feel that a thread needs moderation, please contact the Chapo moderation team .
 
-1. Remarks that violate the Chapo standards of conduct, including hateful, hurtful, oppressive, or exclusionary remarks, are not allowed. (Cursing is allowed, but never targeting another user, and never in a hateful manner.)
+1. Remarks that violate the Chapo standards of conduct, including hateful, hurtful, oppressive, or exclusionary remarks, are not allowed. (Cursing is allowed, but never in a hateful manner.)
 2. Remarks that moderators find inappropriate, whether listed in the code of conduct or not, are also not allowed.
 3. Moderators will first respond to such remarks with a warning, at the same time the offending content will likely be removed whenever possible.
 4. If the warning is unheeded, the user will be “kicked,” i.e., kicked out of the communication channel to cool off.
@@ -31,3 +39,7 @@ And if someone takes issue with something you said or did, resist the urge to be
 The enforcement policies listed above apply to all official Chapo venues; including git repositories under [our gitlab project](https://gitlab.com/chapo-sandbox/production) and all instances under [chapo.chat](https://chapo.chat). For other projects adopting the Rust Code of Conduct, please contact the maintainers of those projects for enforcement. If you wish to use this code of conduct for your own project, consider explicitly mentioning your moderation policy or making a copy with your own moderation policy so as to avoid confusion.
 
 Adapted from the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct), which is based on the [Node.js Policy on Trolling](http://blog.izs.me/post/30036893703/policy-on-trolling) as well as the [Contributor Covenant v1.3.0](https://www.contributor-covenant.org/version/1/3/0/).
+
+ChapoChat reserves the right to update this Code of Conduct without prior notification or warning at any time. For major changes, we might post in announcements, but have no obligation to do so. Users should check back periodically to remain familiar with current conduct standards.
+
+That last paragraph is legal stuff that just restates we can update the code of conduct whenever we need to and adapt it as we go. 
