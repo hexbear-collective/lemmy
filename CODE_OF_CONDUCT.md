@@ -1,6 +1,6 @@
 # Code of Conduct
 
-**Note:** This is based on the Lemmy code of conduct. We will be adapting this further as we go. Yes, we know it was hella strict.
+**Note:** This was originally based on the Lemmy code of conduct. We will be adapting this further as we go. Yes, we know it was hella strict.
 
 Last updated: July 26th, 2020
 
