@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Note: This is based on lemmy's code of conduct. We will be adapting this further as we go. Yes, we know it's hella strict.
+**Note:** This is based on the Lemmy code of conduct. We will be adapting this further as we go. Yes, we know it was hella strict.
 
 Last updated: July 26th, 2020
 
@@ -14,9 +14,9 @@ Last updated: July 26th, 2020
 - We will exclude you from interaction if you insult, demean or harass anyone. That is not welcome behavior. We interpret the term “harassment” as including the definition in the Citizen Code of Conduct; if you have any lack of clarity about what might be included in that concept, please read their definition. In particular, we don’t tolerate behavior that excludes people in socially marginalized groups.
 - Private harassment is also unacceptable. No matter who you are, if you feel you have been or are being harassed or made uncomfortable by a community member, please contact one of the channel ops or any of the Chapo moderation team immediately. Whether you’re a regular contributor or a newcomer, we care about making this community a safe place for you and we’ve got your back.
 - Likewise any spamming, trolling, flaming, baiting or other attention-stealing behavior is not welcome.
-- We are a platform that welcomes anyone who wants to be here in good faith. With that said, we are also an intentionally leftist platform, conservative and reactionary idealogies will not be tolerated here. 
+- We are a platform that welcomes anyone who wants to be here in good faith. With that said, we are also an intentionally leftist platform, conservative and reactionary ideologies will not be tolerated here. 
 - We do not platform fascists and refuse to engage in any form of debate with them on this platform. If you don't understand why engaging in debates with fascists is a terrible idea, go ask in one of the communities and/or use a search engine.
-- Direct calls or claims to violence that target _specific living_ individuals is not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the insitituion they represent. This policy also applies to any specific organizational bodies and groups such as the DNC or NRA.
+- Direct calls or claims to violence that target _specific living_ individuals is not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the institution they represent. This policy also applies to any specific organizational bodies and groups (eg the DNC or NRA).
 
 ## Moderation
 
@@ -42,4 +42,4 @@ Adapted from the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-
 
 ChapoChat reserves the right to update this Code of Conduct without prior notification or warning at any time. For major changes, we might post in announcements, but have no obligation to do so. Users should check back periodically to remain familiar with current conduct standards.
 
-That last paragraph is legal stuff that just restates we can update the code of conduct whenever we need to and adapt it as we go. 
+That last paragraph is legal stuff and just means we can update the code of conduct and adapt as we go. 
