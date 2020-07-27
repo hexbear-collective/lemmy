@@ -1,15 +1,12 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::ApubObjectType,
-  blocking,
-  is_within_message_char_limit,
+  blocking, is_within_message_char_limit,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use lemmy_db::{
@@ -31,23 +28,11 @@ use lemmy_db::{
   user_mention::*,
   user_mention_view::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, slur_check, slurs_vec_to_str,
   EndpointType,
 };
 use log::{error, info};
@@ -413,7 +398,7 @@ impl Perform for Oper<Register> {
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
-      email: email,
+      email,
       matrix_user_id: None,
       avatar: None,
       password_encrypted: data.password.to_owned(),
