@@ -4,11 +4,23 @@ use crate::{
   apub::fetcher::search_by_apub_id,
   blocking,
   websocket::{server::SendAllMessage, UserOperation, WebsocketInfo},
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
-  category::*, comment_view::*, community_view::*, moderator::*, moderator_views::*, naive_now,
-  post_view::*, site::*, site_view::*, user_view::*, Crud, SearchType, SortType,
+  category::*,
+  comment_view::*,
+  community_view::*,
+  moderator::*,
+  moderator_views::*,
+  naive_now,
+  post_view::*,
+  site::*,
+  site_view::*,
+  user_view::*,
+  Crud,
+  SearchType,
+  SortType,
 };
 use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str};
 use log::{debug, info};
@@ -194,7 +206,7 @@ impl Perform for Oper<GetModlog> {
             .await??,
           );
 
-          log_viewers.contains(&user_id)
+          !log_viewers.contains(&user_id)
         }
         Err(_e) => true,
       },
