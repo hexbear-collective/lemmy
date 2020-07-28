@@ -5,26 +5,13 @@ use crate::{
   blocking,
   websocket::{
     server::{GetUsersOnline, SendAllMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
-  category::*,
-  comment_view::*,
-  community_view::*,
-  moderator::*,
-  moderator_views::*,
-  naive_now,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user_view::*,
-  Crud,
-  SearchType,
-  SortType,
+  category::*, comment_view::*, community_view::*, moderator::*, moderator_views::*, naive_now,
+  post_view::*, site::*, site_view::*, user_view::*, Crud, SearchType, SortType,
 };
 use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str};
 use log::{debug, info};
