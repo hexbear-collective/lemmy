@@ -75,6 +75,7 @@ pub enum UserOperation {
   GetReportCount,
   GetSiteModerators,
   GetUserTag,
+  SetUserTag,
 }
 
 #[derive(Clone)]

@@ -250,12 +250,12 @@ struct CaptchaResponse {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GetUserTag {
   user: i32,
+  community: Option<i32>,
   tag: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SetUserTag {
-  user_id: i32,
   tag: String,
   value: Option<String>,
   auth: String,
@@ -267,6 +267,45 @@ pub struct UserTagResponse {
   #[serde(skip_serializing_if = "Option::is_none")]
   community: Option<i32>,
   tags: HashMap<String, String>,
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<SetUserTag> {
+  type Response = UserTagResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<UserTagResponse, LemmyError> {
+    let data: &SetUserTag = &self.data;
+    let tag = data.tag.clone();
+    let value = data.value.clone();
+    let mut tags = HashMap::new();
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user = claims.id;
+
+    match value {
+      Some(v) => {
+        let tag = blocking(pool, move |conn| UserTag::set(conn, user, tag, v)).await??;
+        tags.insert(tag.tag_name, tag.tag_value);
+      }
+      None => {
+        blocking(pool, move |conn| UserTag::delete(conn, user, tag)).await??;
+      }
+    }
+
+    Ok(UserTagResponse {
+      user,
+      community: None,
+      tags,
+    })
+  }
 }
 
 #[async_trait::async_trait(?Send)]

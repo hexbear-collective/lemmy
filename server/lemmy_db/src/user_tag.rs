@@ -1,7 +1,7 @@
 use crate::schema::{user_tag, user_tag::dsl::*};
 use diesel::{dsl::*, result::Error, *};
 
-#[derive(Clone, Queryable, Identifiable, Insertable, PartialEq, Debug)]
+#[derive(Clone, Queryable, Identifiable, Insertable, PartialEq, AsChangeset, Debug)]
 #[primary_key(user_id, tag_name)]
 #[table_name = "user_tag"]
 pub struct UserTag {
@@ -34,6 +34,19 @@ impl UserTag {
       .set(tag_value.eq(value))
       .get_result::<Self>(conn)
   }
+
+  pub fn set(conn: &PgConnection, user: i32, tag: String, value: String) -> Result<Self, Error> {
+    insert_into(user_tag)
+      .values(UserTag {
+	user_id: user,
+	tag_name: tag,
+	tag_value: value.clone(),
+      })
+      .on_conflict((user_id, tag_name))
+      .do_update()
+      .set(tag_value.eq(value))
+      .get_result::<Self>(conn)
+  } 
 
   pub fn delete(conn: &PgConnection, user: i32, tag: String) -> Result<usize, Error> {
     diesel::delete(user_tag.find((user, tag))).execute(conn)
