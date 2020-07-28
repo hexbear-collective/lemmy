@@ -187,6 +187,15 @@ table! {
 }
 
 table! {
+    community_user_tag (user_id, community_id, tag_name) {
+        user_id -> Int4,
+        community_id -> Int4,
+        tag_name -> Varchar,
+        tag_value -> Varchar,
+    }
+}
+
+table! {
     mod_add (id) {
         id -> Int4,
         mod_user_id -> Int4,
@@ -504,6 +513,14 @@ table! {
     }
 }
 
+table! {
+    user_tag (user_id, tag_name) {
+        user_id -> Int4,
+        tag_name -> Varchar,
+        tag_value -> Varchar,
+    }
+}
+
 joinable!(activity -> user_ (user_id));
 joinable!(comment -> post (post_id));
 joinable!(comment -> user_ (creator_id));
@@ -523,6 +540,8 @@ joinable!(community_moderator -> user_ (user_id));
 joinable!(community_settings -> community (id));
 joinable!(community_user_ban -> community (community_id));
 joinable!(community_user_ban -> user_ (user_id));
+joinable!(community_user_tag -> community (community_id));
+joinable!(community_user_tag -> user_ (user_id));
 joinable!(mod_add_community -> community (community_id));
 joinable!(mod_ban_from_community -> community (community_id));
 joinable!(mod_lock_post -> post (post_id));
@@ -550,41 +569,44 @@ joinable!(site -> user_ (creator_id));
 joinable!(user_ban -> user_ (user_id));
 joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
+joinable!(user_tag -> user_ (user_id));
 
 allow_tables_to_appear_in_same_query!(
-  activity,
-  category,
-  comment,
-  comment_aggregates_fast,
-  comment_like,
-  comment_report,
-  comment_saved,
-  community,
-  community_aggregates_fast,
-  community_follower,
-  community_moderator,
-  community_settings,
-  community_user_ban,
-  mod_add,
-  mod_add_community,
-  mod_ban,
-  mod_ban_from_community,
-  mod_lock_post,
-  mod_remove_comment,
-  mod_remove_community,
-  mod_remove_post,
-  mod_sticky_post,
-  password_reset_request,
-  post,
-  post_aggregates_fast,
-  post_like,
-  post_read,
-  post_report,
-  post_saved,
-  private_message,
-  site,
-  user_,
-  user_ban,
-  user_fast,
-  user_mention,
+    activity,
+    category,
+    comment,
+    comment_aggregates_fast,
+    comment_like,
+    comment_report,
+    comment_saved,
+    community,
+    community_aggregates_fast,
+    community_follower,
+    community_moderator,
+    community_settings,
+    community_user_ban,
+    community_user_tag,
+    mod_add,
+    mod_add_community,
+    mod_ban,
+    mod_ban_from_community,
+    mod_lock_post,
+    mod_remove_comment,
+    mod_remove_community,
+    mod_remove_post,
+    mod_sticky_post,
+    password_reset_request,
+    post,
+    post_aggregates_fast,
+    post_like,
+    post_read,
+    post_report,
+    post_saved,
+    private_message,
+    site,
+    user_,
+    user_ban,
+    user_fast,
+    user_mention,
+    user_tag,
 );
