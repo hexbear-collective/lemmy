@@ -34,6 +34,7 @@ use actix_web::{client::Client, dev::ConnectionInfo};
 use log::error;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Deserialize;
+use std::net::{IpAddr, SocketAddr};
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 pub type ConnectionId = usize;
@@ -188,11 +189,13 @@ pub async fn is_image_content_type(client: &Client, test: &str) -> Result<(), Le
 pub fn get_ip(conn_info: &ConnectionInfo) -> String {
   conn_info
     .realip_remote_addr()
-    .unwrap_or("127.0.0.1:12345")
-    .split(':')
-    .next()
-    .unwrap_or("127.0.0.1")
-    .to_string()
+    .and_then(|real_ip| {
+      real_ip
+        .parse::<IpAddr>()
+        .or_else(|_| real_ip.parse::<SocketAddr>().map(|sa| sa.ip()))
+        .ok()
+    })
+    .map_or("0.0.0.0".to_string(), |ip_addr| ip_addr.to_string())
 }
 
 pub async fn blocking<F, T>(pool: &DbPool, f: F) -> Result<T, LemmyError>
