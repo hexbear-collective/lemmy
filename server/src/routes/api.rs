@@ -1,13 +1,6 @@
 use crate::{
   api::{
-    comment::*,
-    community::*,
-    community_settings::*,
-    post::*,
-    report::*,
-    site::*,
-    user::*,
-    Oper,
+    comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, Oper,
     Perform,
   },
   rate_limit::RateLimit,
@@ -193,7 +186,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route(
             "/save_user_settings",
             web::put().to(route_post::<SaveUserSettings>),
-          ),
+          )
+          .route("/tags", web::get().to(route_get::<GetUserTag>)),
       )
       // Admin Actions
       .service(

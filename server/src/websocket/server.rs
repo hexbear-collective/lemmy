@@ -7,13 +7,7 @@ use crate::{
   api::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, *},
   rate_limit::RateLimit,
   websocket::UserOperation,
-  CommunityId,
-  ConnectionId,
-  DbPool,
-  IPAddr,
-  LemmyError,
-  PostId,
-  UserId,
+  CommunityId, ConnectionId, DbPool, IPAddr, LemmyError, PostId, UserId,
 };
 use actix_web::client::Client;
 
@@ -455,6 +449,7 @@ impl ChatServer {
         UserOperation::GetPrivateMessages => do_user_operation::<GetPrivateMessages>(args).await,
         UserOperation::UserJoin => do_user_operation::<UserJoin>(args).await,
         UserOperation::SaveUserSettings => do_user_operation::<SaveUserSettings>(args).await,
+        UserOperation::GetUserTag => do_user_operation::<GetUserTag>(args).await,
 
         // Site ops
         UserOperation::GetModlog => do_user_operation::<GetModlog>(args).await,

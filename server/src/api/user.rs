@@ -1,15 +1,12 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::ApubObjectType,
-  blocking,
-  is_within_message_char_limit,
+  blocking, is_within_message_char_limit,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use lemmy_db::{
@@ -30,29 +27,18 @@ use lemmy_db::{
   user::*,
   user_mention::*,
   user_mention_view::*,
+  user_tag::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, slur_check, slurs_vec_to_str,
   EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{env, str::FromStr};
+use std::{collections::HashMap, env, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
@@ -259,6 +245,85 @@ struct CaptchaResponse {
   success: bool,
   #[serde(rename = "error-codes")]
   error_codes: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetUserTag {
+  user: i32,
+  tag: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SetUserTag {
+  user_id: i32,
+  tag: String,
+  value: Option<String>,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UserTagResponse {
+  user: i32,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  community: Option<i32>,
+  tags: HashMap<String, String>,
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetUserTag> {
+  type Response = UserTagResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<UserTagResponse, LemmyError> {
+    let data: &GetUserTag = &self.data;
+    let tag = data.tag.clone();
+    let user = data.user;
+    let mut tags = HashMap::new();
+
+    // Check if user exists
+    let user_exists = blocking(pool, move |conn| User_::read(conn, user))
+      .await?
+      .is_ok();
+    if !user_exists {
+      return Err(APIError::err("user_doesnt_exist").into());
+    }
+
+    match tag {
+      Some(tag) => {
+        // user requested a single tag
+        match blocking(pool, move |conn| UserTag::read_tag(conn, user, tag)).await? {
+          Ok(tag) => {
+            tags.insert(tag.tag_name, tag.tag_value);
+            Ok(UserTagResponse {
+              user,
+              community: None,
+              tags,
+            })
+          }
+          Err(_) => Ok(UserTagResponse {
+            user,
+            community: None,
+            tags,
+          }),
+        }
+      }
+      None => {
+        // user requested all tags
+        let tag_structs = blocking(pool, move |conn| UserTag::read(conn, user)).await??;
+        for t in tag_structs {
+          tags.insert(t.tag_name.to_owned(), t.tag_value.to_owned());
+        }
+        Ok(UserTagResponse {
+          user,
+          community: None,
+          tags,
+        })
+      }
+    }
+  }
 }
 
 #[async_trait::async_trait(?Send)]
