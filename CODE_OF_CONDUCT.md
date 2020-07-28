@@ -7,16 +7,16 @@ Last updated: July 26th, 2020
 ## Community Rules
 
 - We are committed to providing a friendly, safe and welcoming environment for all, regardless of gender identity and expression, sexual orientation, disability, personal appearance, body size, race, ethnicity, age, religion, nationality, or other similar characteristic.
-- Please avoid using overtly sexual aliases or other nicknames that might detract from a friendly, safe and welcoming environment for all.
+- Please avoid using homophobic, transphobic, racist, ableist, and other reactionary aliases or other nicknames that might detract from a friendly, safe and welcoming environment for all. "Ironic" prejudice is just prejudice.
 - Please be kind and courteous to your fellow leftists. There’s no need to be mean or rude unless it's a chud.
 - Respect that people have differences of opinion and that every leftist has a place in our community. Discussing differences in theory is fine and encouraged, just don't make it personal. Remember: Sectarianism is liberalism.
-- Please keep unstructured critique to a minimum. If you have solid ideas you want to experiment with, our project is open source and you can make a fork of the project and see how it works.
-- We will exclude you from interaction if you insult, demean or harass anyone. That is not welcome behavior. We interpret the term “harassment” as including the definition in the Citizen Code of Conduct; if you have any lack of clarity about what might be included in that concept, please read their definition. In particular, we don’t tolerate behavior that excludes people in socially marginalized groups.
+- Do not publish, comment, message, or post personally identifiable information about other users.
+- We will exclude you from interaction if you insult, demean or harass anyone. That is not welcome behavior. In particular, we don’t tolerate behavior that excludes people in socially marginalized groups.
 - Private harassment is also unacceptable. No matter who you are, if you feel you have been or are being harassed or made uncomfortable by a community member, please contact one of the channel ops or any of the Chapo moderation team immediately. Whether you’re a regular contributor or a newcomer, we care about making this community a safe place for you and we’ve got your back.
 - Likewise any spamming, trolling, flaming, baiting or other attention-stealing behavior is not welcome.
-- We are a platform that welcomes anyone who wants to be here in good faith. With that said, we are also an intentionally leftist platform, conservative and reactionary ideologies will not be tolerated here. 
+- We are a platform that welcomes anyone who wants to be here in good faith. With that said, we are also an intentionally leftist platform; conservative and reactionary ideologies will not be tolerated here. 
 - We do not platform fascists and refuse to engage in any form of debate with them on this platform. If you don't understand why engaging in debates with fascists is a terrible idea, go ask in one of the communities and/or use a search engine.
-- Direct calls or claims to violence that target _specific living_ individuals is not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the institution they represent. This policy also applies to any specific organizational bodies and groups (eg the DNC or NRA).
+- Direct calls or claims to violence that target _specific living_ individuals are not permitted on Chapo.Chat. You can express your anger over landlords, slaveowners, etc, but try to phrase it in a way that focuses on the institution they represent. This policy also applies to any specific organizational bodies and groups (eg the DNC or NRA).
 
 ## Moderation
 

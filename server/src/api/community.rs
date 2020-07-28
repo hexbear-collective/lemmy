@@ -4,30 +4,20 @@ use crate::{
   apub::ActorType,
   blocking,
   websocket::{
-    server::{JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    server::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},
+    UserOperation, WebsocketInfo,
   },
   DbPool,
 };
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now,
-  Bannable,
-  Crud,
-  Followable,
-  Joinable,
-  SortType,
+  naive_now, Bannable, Crud, Followable, Joinable, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  is_valid_community_name,
-  make_apub_endpoint,
-  naive_from_unix,
-  slur_check,
-  slurs_vec_to_str,
-  EndpointType,
+  generate_actor_keypair, is_valid_community_name, make_apub_endpoint, naive_from_unix, slur_check,
+  slurs_vec_to_str, EndpointType,
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -207,12 +197,19 @@ impl Perform for Oper<GetCommunity> {
         });
       }
 
-      // TODO
-      1
-    // let fut = async {
-    //   ws.chatserver.send(GetCommunityUsersOnline {community_id}).await.unwrap()
-    // };
-    // Runtime::new().unwrap().block_on(fut)
+      use std::time::Duration;
+      match ws
+        .chatserver
+        .send(GetCommunityUsersOnline { community_id })
+        .timeout(Duration::from_millis(10))
+        .await
+      {
+        Ok(count) => count,
+        Err(_e) => {
+          debug!("could not fetch online count");
+          1
+        }
+      }
     } else {
       0
     };
