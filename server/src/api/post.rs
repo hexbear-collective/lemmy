@@ -1,21 +1,42 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
-  blocking, fetch_iframely_and_pictrs_data, is_within_post_body_char_limit,
+  blocking,
+  fetch_iframely_and_pictrs_data,
+  is_within_post_body_char_limit,
   is_within_post_title_char_limit,
   websocket::{
     server::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
-  comment_view::*, community_settings::*, community_view::*, moderator::*, naive_now, post::*,
-  post_view::*, site::*, site_view::*, user::*, user_view::*, Crud, Likeable, ListingType,
-  Saveable, SortType,
+  comment_view::*,
+  community_settings::*,
+  community_view::*,
+  moderator::*,
+  naive_now,
+  post::*,
+  post_view::*,
+  site::*,
+  site_view::*,
+  user::*,
+  user_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  Saveable,
+  SortType,
 };
 use lemmy_utils::{
-  is_valid_post_title, make_apub_endpoint, slur_check, slurs_vec_to_str, EndpointType,
+  is_valid_post_title,
+  make_apub_endpoint,
+  slur_check,
+  slurs_vec_to_str,
+  EndpointType,
 };
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -187,20 +208,27 @@ impl Perform for Oper<CreatePost> {
       return Err(APIError::err("site_ban").into());
     }
 
-    if let Some(url) = data.url.as_ref() {
-      match Url::parse(url) {
-        Ok(_t) => (),
-        Err(_e) => return Err(APIError::err("invalid_url").into()),
+    let url = match data.url.to_owned() {
+      Some(url) => {
+        if url.trim().is_empty() {
+          None
+        } else {
+          match Url::parse(&url) {
+            Ok(_t) => Some(url),
+            Err(_e) => return Err(APIError::err("invalid_url").into()),
+          }
+        }
       }
-    }
+      None => None,
+    };
 
     // Fetch Iframely and pictrs cached image
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
-      fetch_iframely_and_pictrs_data(&self.client, data.url.to_owned()).await;
+      fetch_iframely_and_pictrs_data(&self.client, url.to_owned()).await;
 
     let post_form = PostForm {
       name: data.name.trim().to_owned(),
-      url: data.url.to_owned(),
+      url,
       body: data.body.to_owned(),
       community_id: data.community_id,
       creator_id: user_id,
