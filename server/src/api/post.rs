@@ -382,9 +382,6 @@ impl Perform for Oper<GetPost> {
       if settings.private && !privileged {
         return Err(APIError::err("community_is_private").into());
       }
-      if settings.read_only && !privileged {
-        return Err(APIError::err("community_is_read_only").into());
-      }
     }
 
     let site_creator_id =
