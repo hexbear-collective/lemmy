@@ -1,15 +1,12 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::ApubObjectType,
-  blocking,
-  is_within_message_char_limit,
+  blocking, is_within_message_char_limit,
   websocket::{
     server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use lemmy_db::{
@@ -31,23 +28,11 @@ use lemmy_db::{
   user_mention::*,
   user_mention_view::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, slur_check, slurs_vec_to_str,
   EndpointType,
 };
 use log::{error, info};
@@ -157,6 +142,15 @@ pub struct BanUser {
 pub struct BanUserResponse {
   user: UserView,
   banned: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RemoveUserContent {
+  user_id: i32,
+  time: i32,
+  community_id: Option<i32>,
+  reason: Option<String>,
+  auth: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -895,6 +889,146 @@ impl Perform for Oper<BanUser> {
         my_id: ws.id,
       });
     }
+
+    Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<RemoveUserContent> {
+  type Response = BanUserResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<BanUserResponse, LemmyError> {
+    let data: &RemoveUserContent = &self.data;
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user_id = claims.id;
+    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+
+    let user_id = claims.id;
+    let mod_communities = blocking(pool, move |conn| {
+      CommunityModeratorView::for_user(conn, user_id)
+    })
+    .await??
+    .iter()
+    .map(|c| c.id)
+    .collect::<Vec<i32>>();
+
+    let remove_communities = match data.community_id {
+      Some(community_id) => {
+        if mod_communities.contains(&community_id) {
+          Ok(vec![community_id])
+        } else {
+          Err(LemmyError::from(APIError::err("couldnt_update_user")))
+        }
+      }
+      None => {
+        if user_view.admin {
+          Ok(Vec::new())
+        } else {
+          Ok(mod_communities)
+        }
+      }
+    }?;
+
+    let mut post_id_list: Vec<i32> = Vec::new();
+    let mut comment_id_list: Vec<i32> = Vec::new();
+    let remove_user_id = data.user_id;
+    if remove_communities.is_empty() {
+      let _ = blocking(pool, move |conn| {
+        let posts_query = PostQueryBuilder::create(conn).for_creator_id(remove_user_id);
+        posts_query.list()
+      })
+      .await??
+      .iter()
+      .for_each(|pv| post_id_list.push(pv.id));
+
+      let _ = blocking(pool, move |conn| {
+        let comments_query = CommentQueryBuilder::create(conn).for_creator_id(remove_user_id);
+        comments_query.list()
+      })
+      .await??
+      .iter()
+      .for_each(|cv| comment_id_list.push(cv.id));
+    } else {
+      for community_id in remove_communities {
+        let _ = blocking(pool, move |conn| {
+          let posts_query = PostQueryBuilder::create(conn)
+            .for_creator_id(remove_user_id)
+            .for_community_id(community_id);
+          /*
+          let time = data.time;
+          if time != 0 {
+              posts_query.query.filter(published.gt(now - time.hours()))
+          }
+          */
+          posts_query.list()
+        })
+        .await??
+        .iter()
+        .for_each(|pv| post_id_list.push(pv.id));
+
+        let _ = blocking(pool, move |conn| {
+          let comments_query = CommentQueryBuilder::create(conn)
+            .for_creator_id(remove_user_id)
+            .for_community_id(community_id);
+
+          comments_query.list()
+        })
+        .await??
+        .iter()
+        .for_each(|cv| comment_id_list.push(cv.id));
+      }
+    }
+
+    for post_id in post_id_list {
+      let form = ModRemovePostForm {
+        mod_user_id: user_id,
+        post_id: post_id,
+        reason: data.reason.to_owned(),
+        removed: Some(true),
+      };
+
+      blocking(pool, move |conn| ModRemovePost::create(conn, &form)).await??;
+    }
+
+    for comment_id in comment_id_list {
+      let form = ModRemoveCommentForm {
+        mod_user_id: user_id,
+        comment_id: comment_id,
+        reason: data.reason.to_owned(),
+        removed: Some(true),
+      };
+
+      blocking(pool, move |conn| ModRemoveComment::create(conn, &form)).await??;
+    }
+
+    let user_id = data.user_id;
+    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+
+    let banned = user_view.banned;
+    let res = BanUserResponse {
+      user: user_view,
+      banned: banned,
+    };
+
+    /*
+    if let Some(ws) = websocket_info {
+      ws.chatserver.do_send(SendAllMessage {
+        op: UserOperation::BanUser,
+        response: res.clone(),
+        my_id: ws.id,
+      });
+    }
+    */
 
     Ok(res)
   }
