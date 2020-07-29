@@ -911,7 +911,10 @@ impl Perform for Oper<RemoveUserContent> {
     };
 
     let user_id = claims.id;
-    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+    let is_admin = blocking(pool, move |conn: &'_ _| {
+      UserView::read(conn, user_id).map(|u| u.admin)
+    })
+    .await??;
 
     let user_id = claims.id;
     let mod_communities = blocking(pool, move |conn| {
@@ -931,7 +934,7 @@ impl Perform for Oper<RemoveUserContent> {
         }
       }
       None => {
-        if user_view.admin {
+        if is_admin {
           Ok(Vec::new())
         } else {
           Ok(mod_communities)
@@ -992,7 +995,7 @@ impl Perform for Oper<RemoveUserContent> {
     for post_id in post_id_list {
       let form = ModRemovePostForm {
         mod_user_id: user_id,
-        post_id: post_id,
+        post_id,
         reason: data.reason.to_owned(),
         removed: Some(true),
       };
@@ -1003,7 +1006,7 @@ impl Perform for Oper<RemoveUserContent> {
     for comment_id in comment_id_list {
       let form = ModRemoveCommentForm {
         mod_user_id: user_id,
-        comment_id: comment_id,
+        comment_id,
         reason: data.reason.to_owned(),
         removed: Some(true),
       };
@@ -1017,7 +1020,7 @@ impl Perform for Oper<RemoveUserContent> {
     let banned = user_view.banned;
     let res = BanUserResponse {
       user: user_view,
-      banned: banned,
+      banned,
     };
 
     /*
