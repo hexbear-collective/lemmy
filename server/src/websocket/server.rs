@@ -728,7 +728,9 @@ impl Handler<GetUsersOnline> for ChatServer {
   type Result = usize;
 
   fn handle(&mut self, _msg: GetUsersOnline, _: &mut Context<Self>) -> Self::Result {
-    self.sessions.len()
+    use itertools::Itertools;
+    let infos: Vec<_> = self.sessions.values().unique_by(|info| &info.ip).collect();
+    infos.len()
   }
 }
 
