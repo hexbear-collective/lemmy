@@ -56,6 +56,7 @@ pub struct Register {
   pub admin: bool,
   pub show_nsfw: bool,
   pub captcha_id: String,
+  pub pronouns: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -619,6 +620,15 @@ impl Perform for Oper<Register> {
       if blocking(pool, join).await?.is_err() {
         return Err(APIError::err("community_moderator_already_exists").into());
       }
+    }
+
+    // Add their pronouns if they specified at account registration
+    if let Some(pronouns) = data.pronouns.clone() {
+      let user_id = inserted_user.id;
+      blocking(pool, move |conn| {
+        UserTag::set_key(conn, user_id, "pronouns".to_string(), Some(pronouns))
+      })
+      .await??;
     }
 
     // Return the jwt
