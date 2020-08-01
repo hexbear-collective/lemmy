@@ -187,11 +187,10 @@ table! {
 }
 
 table! {
-    community_user_tag (user_id, community_id, tag_name) {
+    community_user_tag (user_id) {
         user_id -> Int4,
-        community_id -> Int4,
-        tag_name -> Varchar,
-        tag_value -> Varchar,
+        community_id -> Nullable<Int4>,
+        tags -> Jsonb,
     }
 }
 
@@ -514,10 +513,9 @@ table! {
 }
 
 table! {
-    user_tag (user_id, tag_name) {
+    user_tag (user_id) {
         user_id -> Int4,
-        tag_name -> Varchar,
-        tag_value -> Varchar,
+        tags -> Jsonb,
     }
 }
 
