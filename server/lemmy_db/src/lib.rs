@@ -6,6 +6,7 @@ pub extern crate bcrypt;
 pub extern crate chrono;
 pub extern crate log;
 pub extern crate serde;
+#[macro_use]
 pub extern crate serde_json;
 pub extern crate sha2;
 pub extern crate strum;

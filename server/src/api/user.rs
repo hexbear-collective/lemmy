@@ -38,7 +38,7 @@ use lemmy_utils::{
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, str::FromStr};
+use std::{collections::BTreeMap, env, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
@@ -251,7 +251,6 @@ struct CaptchaResponse {
 pub struct GetUserTag {
   user: i32,
   community: Option<i32>,
-  tag: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -266,7 +265,19 @@ pub struct UserTagResponse {
   user: i32,
   #[serde(skip_serializing_if = "Option::is_none")]
   community: Option<i32>,
-  tags: HashMap<String, String>,
+  tags: UserTagsSchema,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct UserTagsSchema {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pronouns: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  tendency: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  favorite_food: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  flair: Option<String>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -279,9 +290,9 @@ impl Perform for Oper<SetUserTag> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<UserTagResponse, LemmyError> {
     let data: &SetUserTag = &self.data;
-    let tag = data.tag.clone();
+    let key = data.tag.clone();
     let value = data.value.clone();
-    let mut tags = HashMap::new();
+    let mut tags = BTreeMap::new();
 
     let claims = match Claims::decode(&data.auth) {
       Ok(claims) => claims.claims,
@@ -290,21 +301,18 @@ impl Perform for Oper<SetUserTag> {
 
     let user = claims.id;
 
-    match value {
-      Some(v) => {
-        let tag = blocking(pool, move |conn| UserTag::set(conn, user, tag, v)).await??;
-        tags.insert(tag.tag_name, tag.tag_value);
-      }
-      None => {
-        blocking(pool, move |conn| UserTag::delete(conn, user, tag)).await??;
-      }
+    if let Some(v) = data.value.clone() {
+      tags.insert(key.clone(), v);
     }
 
-    Ok(UserTagResponse {
-      user,
-      community: None,
-      tags,
-    })
+    match blocking(pool, move |conn| UserTag::set_key(conn, user, key, value)).await? {
+      Ok(usertag) => Ok(UserTagResponse {
+        user,
+        community: None,
+        tags: serde_json::from_value(usertag.tags)?,
+      }),
+      Err(e) => Err(LemmyError::from(e)),
+    }
   }
 }
 
@@ -318,9 +326,7 @@ impl Perform for Oper<GetUserTag> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<UserTagResponse, LemmyError> {
     let data: &GetUserTag = &self.data;
-    let tag = data.tag.clone();
     let user = data.user;
-    let mut tags = HashMap::new();
 
     // Check if user exists
     let user_exists = blocking(pool, move |conn| User_::read(conn, user))
@@ -330,37 +336,27 @@ impl Perform for Oper<GetUserTag> {
       return Err(APIError::err("user_doesnt_exist").into());
     }
 
-    match tag {
-      Some(tag) => {
-        // user requested a single tag
-        match blocking(pool, move |conn| UserTag::read_tag(conn, user, tag)).await? {
-          Ok(tag) => {
-            tags.insert(tag.tag_name, tag.tag_value);
-            Ok(UserTagResponse {
-              user,
-              community: None,
-              tags,
-            })
-          }
-          Err(_) => Ok(UserTagResponse {
-            user,
-            community: None,
-            tags,
-          }),
-        }
-      }
-      None => {
-        // user requested all tags
-        let tag_structs = blocking(pool, move |conn| UserTag::read(conn, user)).await??;
-        for t in tag_structs {
-          tags.insert(t.tag_name.to_owned(), t.tag_value.to_owned());
-        }
+    match blocking(pool, move |conn| UserTag::read(conn, user)).await? {
+      Ok(usertag) => Ok(UserTagResponse {
+        user,
+        community: None,
+        tags: serde_json::from_value(usertag.tags)?,
+      }),
+      Err(diesel::result::Error::NotFound) => {
+        let empty = UserTagsSchema {
+          // I hate this
+          pronouns: None,
+          tendency: None,
+          favorite_food: None,
+          flair: None,
+        };
         Ok(UserTagResponse {
           user,
           community: None,
-          tags,
+          tags: empty,
         })
       }
+      Err(e) => Err(LemmyError::from(e)),
     }
   }
 }
