@@ -341,7 +341,7 @@ impl Perform for Oper<GetPost> {
       Err(_e) => return Err(APIError::err("couldnt_find_post").into()),
     };
 
-    if post_view.removed || post_view.deleted {
+    if post_view.deleted {
       // Verify its the creator or a mod or admin
       let community_id = post_view.community_id;
       let mut editors: Vec<i32> = vec![post_view.creator_id];
