@@ -216,7 +216,7 @@ pub struct BanUserResponse {
 #[derive(Serialize, Deserialize)]
 pub struct RemoveUserContent {
   user_id: i32,
-  time: i32,
+  time: Option<i32>,
   community_id: Option<i32>,
   reason: Option<String>,
   auth: String,
@@ -1259,16 +1259,22 @@ impl Perform for Oper<RemoveUserContent> {
     let mut comment_id_list: Vec<i32> = Vec::new();
     let remove_user_id = data.user_id;
     if remove_communities.is_empty() {
+      let time = data.time;
       blocking(pool, move |conn| {
-        let posts_query = PostQueryBuilder::create(conn).for_creator_id(remove_user_id);
+        let posts_query = PostQueryBuilder::create(conn)
+          .for_creator_id(remove_user_id)
+          .max_age(time);
         posts_query.list()
       })
       .await??
       .iter()
       .for_each(|pv| post_id_list.push(pv.id));
 
+      let time = data.time;
       blocking(pool, move |conn| {
-        let comments_query = CommentQueryBuilder::create(conn).for_creator_id(remove_user_id);
+        let comments_query = CommentQueryBuilder::create(conn)
+          .for_creator_id(remove_user_id)
+          .max_age(time);
         comments_query.list()
       })
       .await??
