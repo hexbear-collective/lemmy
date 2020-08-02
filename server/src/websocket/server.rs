@@ -7,13 +7,7 @@ use crate::{
   api::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, *},
   rate_limit::RateLimit,
   websocket::UserOperation,
-  CommunityId,
-  ConnectionId,
-  DbPool,
-  IPAddr,
-  LemmyError,
-  PostId,
-  UserId,
+  CommunityId, ConnectionId, DbPool, IPAddr, LemmyError, PostId, UserId,
 };
 use actix_web::client::Client;
 use lemmy_db::naive_now;
@@ -467,6 +461,7 @@ impl ChatServer {
         UserOperation::AddAdmin => do_user_operation::<AddAdmin>(args).await,
         UserOperation::AddSitemod => do_user_operation::<AddSitemod>(args).await,
         UserOperation::BanUser => do_user_operation::<BanUser>(args).await,
+        UserOperation::RemoveUserContent => do_user_operation::<RemoveUserContent>(args).await,
         UserOperation::GetUserMentions => do_user_operation::<GetUserMentions>(args).await,
         UserOperation::MarkUserMentionAsRead => {
           do_user_operation::<MarkUserMentionAsRead>(args).await
