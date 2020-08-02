@@ -724,7 +724,11 @@ impl Handler<GetUsersOnline> for ChatServer {
   type Result = usize;
 
   fn handle(&mut self, _msg: GetUsersOnline, _: &mut Context<Self>) -> Self::Result {
-    self.sessions.len()
+    // Because itertools's unique_by uses a hash-set behind the scenes this cna cause a *lot* of expensive hash
+    // operations and *may* be a perforance drag later down the line if there are enough online users
+    use itertools::Itertools;
+    let infos: Vec<_> = self.sessions.values().unique_by(|info| &info.ip).collect();
+    infos.len()
   }
 }
 

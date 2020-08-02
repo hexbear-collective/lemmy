@@ -1,43 +1,23 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
-  blocking,
-  fetch_iframely_and_pictrs_data,
-  is_within_post_body_char_limit,
+  blocking, fetch_iframely_and_pictrs_data, is_within_post_body_char_limit,
   is_within_post_title_char_limit,
   websocket::{
-    server::{JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation,
-    WebsocketInfo,
+    server::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
-  comment_view::*,
-  community_settings::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  post::*,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_view::*,
-  Crud,
-  Likeable,
-  ListingType,
-  Saveable,
-  SortType,
+  comment_view::*, community_settings::*, community_view::*, moderator::*, naive_now, post::*,
+  post_view::*, site::*, site_view::*, user::*, user_view::*, Crud, Likeable, ListingType,
+  Saveable, SortType,
 };
 use lemmy_utils::{
-  is_valid_post_title,
-  make_apub_endpoint,
-  slur_check,
-  slurs_vec_to_str,
-  EndpointType,
+  is_valid_post_title, make_apub_endpoint, slur_check, slurs_vec_to_str, EndpointType,
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use url::Url;
@@ -207,20 +187,39 @@ impl Perform for Oper<CreatePost> {
       return Err(APIError::err("site_ban").into());
     }
 
-    if let Some(url) = data.url.as_ref() {
-      match Url::parse(url) {
-        Ok(_t) => (),
-        Err(_e) => return Err(APIError::err("invalid_url").into()),
-      }
+    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+    let score = user_view.post_score + user_view.comment_score;
+
+    // no upstream, dessalines wants to leverage rate limiting
+    if score < 0 {
+      return Err(APIError::err("score_too_low").into());
     }
+
+    let url = match data.url.to_owned() {
+      Some(url) => {
+        if url.trim().is_empty() {
+          None
+        } else {
+          // no upstream, dessalines wants to leverage rate limiting
+          if score < 5 {
+            return Err(APIError::err("score_too_low").into());
+          }
+          match Url::parse(&url) {
+            Ok(_t) => Some(url),
+            Err(_e) => return Err(APIError::err("invalid_url").into()),
+          }
+        }
+      }
+      None => None,
+    };
 
     // Fetch Iframely and pictrs cached image
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
-      fetch_iframely_and_pictrs_data(&self.client, data.url.to_owned()).await;
+      fetch_iframely_and_pictrs_data(&self.client, url.to_owned()).await;
 
     let post_form = PostForm {
       name: data.name.trim().to_owned(),
-      url: data.url.to_owned(),
+      url,
       body: data.body.to_owned(),
       community_id: data.community_id,
       creator_id: user_id,
@@ -333,7 +332,7 @@ impl Perform for Oper<GetPost> {
       Err(_e) => return Err(APIError::err("couldnt_find_post").into()),
     };
 
-    if post_view.removed || post_view.deleted {
+    if post_view.deleted {
       // Verify its the creator or a mod or admin
       let community_id = post_view.community_id;
       let mut editors: Vec<i32> = vec![post_view.creator_id];
@@ -402,9 +401,6 @@ impl Perform for Oper<GetPost> {
       if settings.private && !privileged {
         return Err(APIError::err("community_is_private").into());
       }
-      if settings.read_only && !privileged {
-        return Err(APIError::err("community_is_read_only").into());
-      }
     }
 
     let site_creator_id =
@@ -423,12 +419,19 @@ impl Perform for Oper<GetPost> {
         });
       }
 
-      // TODO
-      1
-    // let fut = async {
-    //   ws.chatserver.send(GetPostUsersOnline {post_id: data.id}).await.unwrap()
-    // };
-    // Runtime::new().unwrap().block_on(fut)
+      use std::time::Duration;
+      match ws
+        .chatserver
+        .send(GetPostUsersOnline { post_id: data.id })
+        .timeout(Duration::from_millis(10))
+        .await
+      {
+        Ok(count) => count,
+        Err(_e) => {
+          debug!("could not fetch online count");
+          1
+        }
+      }
     } else {
       0
     };
