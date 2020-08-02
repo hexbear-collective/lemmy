@@ -642,6 +642,8 @@ mod tests {
       creator_name: inserted_user.name.to_owned(),
       creator_published: inserted_user.published,
       creator_avatar: None,
+      creator_tags: None,
+      creator_community_tags: None,
       score: 1,
       downvotes: 0,
       hot_rank: 0,

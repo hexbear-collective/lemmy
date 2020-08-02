@@ -306,13 +306,14 @@ select
   coalesce(pl.upvotes, 0) as upvotes,
   coalesce(pl.downvotes, 0) as downvotes,
   hot_rank(
-    coalesce(pl.score , 0), (
-      case
-        when (p.published < ('now'::timestamp - '1 month'::interval))
-        then p.published
-        else greatest(ct.recent_comment_time, p.published)
-      end
-    )
+      coalesce(pl.score , 0), (
+          -- ~77% of a new comment's effect at (24/6) = 12 hours
+          p.published + ('86400 seconds'::interval * (1 - exp(
+              -- -1.2146493725346809e-05 = ln(1.3) / (3600 * 6)
+              -1.2146493725346809e-05::decimal *
+              (EXTRACT(EPOCH FROM (greatest(ct.recent_comment_time, p.published) - p.published)))
+          )))
+      )
   ) as hot_rank,
   (
     case
