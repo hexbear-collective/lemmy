@@ -164,6 +164,7 @@ pub struct PostQueryBuilder<'a> {
   show_nsfw: bool,
   saved_only: bool,
   unread_only: bool,
+  max_age: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
 }
@@ -188,6 +189,7 @@ impl<'a> PostQueryBuilder<'a> {
       show_nsfw: true,
       saved_only: false,
       unread_only: false,
+      max_age: None,
       page: None,
       limit: None,
     }
@@ -245,6 +247,11 @@ impl<'a> PostQueryBuilder<'a> {
 
   pub fn unread_only(mut self, unread_only: bool) -> Self {
     self.unread_only = unread_only;
+    self
+  }
+
+  pub fn max_age<T: MaybeOptional<i32>>(mut self, max_age: T) -> Self {
+    self.max_age = max_age.get_optional();
     self
   }
 
@@ -339,6 +346,10 @@ impl<'a> PostQueryBuilder<'a> {
 
     if self.unread_only {
       query = query.filter(read.eq(false));
+    };
+
+    if let Some(max_age) = self.max_age {
+      query = query.filter(published.gt(now - max_age.days()))
     };
 
     let (limit, offset) = limit_and_offset(self.page, self.limit);
