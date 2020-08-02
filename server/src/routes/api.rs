@@ -1,6 +1,13 @@
 use crate::{
   api::{
-    comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, Oper,
+    comment::*,
+    community::*,
+    community_settings::*,
+    post::*,
+    report::*,
+    site::*,
+    user::*,
+    Oper,
     Perform,
   },
   rate_limit::RateLimit,

@@ -7,7 +7,13 @@ use crate::{
   api::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, *},
   rate_limit::RateLimit,
   websocket::UserOperation,
-  CommunityId, ConnectionId, DbPool, IPAddr, LemmyError, PostId, UserId,
+  CommunityId,
+  ConnectionId,
+  DbPool,
+  IPAddr,
+  LemmyError,
+  PostId,
+  UserId,
 };
 use actix_web::client::Client;
 
