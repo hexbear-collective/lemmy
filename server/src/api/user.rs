@@ -18,7 +18,8 @@ use crate::{
     UserOperation,
     WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use bcrypt::verify;
 use captcha::{gen, Difficulty};
@@ -43,7 +44,11 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud, Followable, Joinable, ListingType, SortType,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
 };
 use lemmy_utils::{
   generate_actor_keypair,
