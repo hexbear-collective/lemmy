@@ -18,8 +18,7 @@ use crate::{
     UserOperation,
     WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use captcha::{gen, Difficulty};
@@ -44,11 +43,7 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
   generate_actor_keypair,
@@ -1212,7 +1207,7 @@ impl Perform for Oper<RemoveUserContent> {
   async fn perform(
     &self,
     pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    websocket_info: Option<WebsocketInfo>,
   ) -> Result<BanUserResponse, LemmyError> {
     let data: &RemoveUserContent = &self.data;
 
@@ -1247,8 +1242,10 @@ impl Perform for Oper<RemoveUserContent> {
       None => {
         if is_admin {
           Ok(Vec::new())
-        } else {
+        } else if !mod_communities.is_empty() {
           Ok(mod_communities)
+        } else {
+          Err(LemmyError::from(APIError::err("couldnt_update_user")))
         }
       }
     }?;
@@ -1257,7 +1254,7 @@ impl Perform for Oper<RemoveUserContent> {
     let mut comment_id_list: Vec<i32> = Vec::new();
     let remove_user_id = data.user_id;
     if remove_communities.is_empty() {
-      let _ = blocking(pool, move |conn| {
+      blocking(pool, move |conn| {
         let posts_query = PostQueryBuilder::create(conn).for_creator_id(remove_user_id);
         posts_query.list()
       })
@@ -1265,7 +1262,7 @@ impl Perform for Oper<RemoveUserContent> {
       .iter()
       .for_each(|pv| post_id_list.push(pv.id));
 
-      let _ = blocking(pool, move |conn| {
+      blocking(pool, move |conn| {
         let comments_query = CommentQueryBuilder::create(conn).for_creator_id(remove_user_id);
         comments_query.list()
       })
@@ -1274,7 +1271,7 @@ impl Perform for Oper<RemoveUserContent> {
       .for_each(|cv| comment_id_list.push(cv.id));
     } else {
       for community_id in remove_communities {
-        let _ = blocking(pool, move |conn| {
+        blocking(pool, move |conn| {
           let posts_query = PostQueryBuilder::create(conn)
             .for_creator_id(remove_user_id)
             .for_community_id(community_id);
@@ -1290,7 +1287,7 @@ impl Perform for Oper<RemoveUserContent> {
         .iter()
         .for_each(|pv| post_id_list.push(pv.id));
 
-        let _ = blocking(pool, move |conn| {
+        blocking(pool, move |conn| {
           let comments_query = CommentQueryBuilder::create(conn)
             .for_creator_id(remove_user_id)
             .for_community_id(community_id);
@@ -1334,15 +1331,13 @@ impl Perform for Oper<RemoveUserContent> {
       banned,
     };
 
-    /*
     if let Some(ws) = websocket_info {
       ws.chatserver.do_send(SendAllMessage {
-        op: UserOperation::BanUser,
+        op: UserOperation::RemoveUserContent,
         response: res.clone(),
         my_id: ws.id,
       });
     }
-    */
 
     Ok(res)
   }
