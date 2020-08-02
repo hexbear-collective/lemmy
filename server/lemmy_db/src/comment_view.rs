@@ -128,6 +128,7 @@ pub struct CommentQueryBuilder<'a> {
   search_term: Option<String>,
   my_user_id: Option<i32>,
   saved_only: bool,
+  max_age: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
 }
@@ -149,6 +150,7 @@ impl<'a> CommentQueryBuilder<'a> {
       search_term: None,
       my_user_id: None,
       saved_only: false,
+      max_age: None,
       page: None,
       limit: None,
     }
@@ -191,6 +193,11 @@ impl<'a> CommentQueryBuilder<'a> {
 
   pub fn saved_only(mut self, saved_only: bool) -> Self {
     self.saved_only = saved_only;
+    self
+  }
+
+  pub fn max_age<T: MaybeOptional<i32>>(mut self, max_age: T) -> Self {
+    self.max_age = max_age.get_optional();
     self
   }
 
@@ -239,6 +246,10 @@ impl<'a> CommentQueryBuilder<'a> {
     if self.saved_only {
       query = query.filter(saved.eq(true));
     }
+
+    if let Some(max_age) = self.max_age {
+      query = query.filter(published.gt(now - max_age.days()))
+    };
 
     query = match self.sort {
       SortType::Hot => query
