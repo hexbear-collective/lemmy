@@ -52,17 +52,22 @@ table! {
         community_actor_id -> Nullable<Varchar>,
         community_local -> Nullable<Bool>,
         community_name -> Nullable<Varchar>,
+        community_icon -> Nullable<Text>,
         banned -> Nullable<Bool>,
         banned_from_community -> Nullable<Bool>,
         creator_actor_id -> Nullable<Varchar>,
         creator_local -> Nullable<Bool>,
         creator_name -> Nullable<Varchar>,
+        creator_preferred_username -> Nullable<Varchar>,
         creator_published -> Nullable<Timestamp>,
         creator_avatar -> Nullable<Text>,
+        creator_tags -> Nullable<Jsonb>,
+        creator_community_tags -> Nullable<Jsonb>,
         score -> Nullable<Int8>,
         upvotes -> Nullable<Int8>,
         downvotes -> Nullable<Int8>,
         hot_rank -> Nullable<Int4>,
+        hot_rank_active -> Nullable<Int4>,
     }
 }
 
@@ -117,6 +122,8 @@ table! {
         private_key -> Nullable<Text>,
         public_key -> Nullable<Text>,
         last_refreshed_at -> Timestamp,
+        icon -> Nullable<Text>,
+        banner -> Nullable<Text>,
     }
 }
 
@@ -125,6 +132,8 @@ table! {
         id -> Int4,
         name -> Nullable<Varchar>,
         title -> Nullable<Varchar>,
+        icon -> Nullable<Text>,
+        banner -> Nullable<Text>,
         description -> Nullable<Text>,
         category_id -> Nullable<Int4>,
         creator_id -> Nullable<Int4>,
@@ -139,6 +148,7 @@ table! {
         creator_actor_id -> Nullable<Varchar>,
         creator_local -> Nullable<Bool>,
         creator_name -> Nullable<Varchar>,
+        creator_preferred_username -> Nullable<Varchar>,
         creator_avatar -> Nullable<Text>,
         category_name -> Nullable<Varchar>,
         number_of_subscribers -> Nullable<Int8>,
@@ -174,6 +184,7 @@ table! {
         post_links -> Bool,
         comment_images -> Int4,
         published -> Timestamp,
+        allow_as_default -> Bool,
     }
 }
 
@@ -183,6 +194,14 @@ table! {
         community_id -> Int4,
         user_id -> Int4,
         published -> Timestamp,
+    }
+}
+
+table! {
+    community_user_tag (user_id) {
+        user_id -> Int4,
+        community_id -> Nullable<Int4>,
+        tags -> Jsonb,
     }
 }
 
@@ -343,13 +362,17 @@ table! {
         creator_actor_id -> Nullable<Varchar>,
         creator_local -> Nullable<Bool>,
         creator_name -> Nullable<Varchar>,
+        creator_preferred_username -> Nullable<Varchar>,
         creator_published -> Nullable<Timestamp>,
         creator_avatar -> Nullable<Text>,
+        creator_tags -> Nullable<Jsonb>,
+        creator_community_tags -> Nullable<Jsonb>,
         banned -> Nullable<Bool>,
         banned_from_community -> Nullable<Bool>,
         community_actor_id -> Nullable<Varchar>,
         community_local -> Nullable<Bool>,
         community_name -> Nullable<Varchar>,
+        community_icon -> Nullable<Text>,
         community_removed -> Nullable<Bool>,
         community_deleted -> Nullable<Bool>,
         community_nsfw -> Nullable<Bool>,
@@ -358,6 +381,7 @@ table! {
         upvotes -> Nullable<Int8>,
         downvotes -> Nullable<Int8>,
         hot_rank -> Nullable<Int4>,
+        hot_rank_active -> Nullable<Int4>,
         newest_activity_time -> Nullable<Timestamp>,
     }
 }
@@ -432,6 +456,8 @@ table! {
         open_registration -> Bool,
         enable_nsfw -> Bool,
         enable_create_communities -> Bool,
+        icon -> Nullable<Text>,
+        banner -> Nullable<Text>,
     }
 }
 
@@ -461,6 +487,8 @@ table! {
         private_key -> Nullable<Text>,
         public_key -> Nullable<Text>,
         last_refreshed_at -> Timestamp,
+        sitemod -> Bool,
+        banner -> Nullable<Text>,
     }
 }
 
@@ -477,12 +505,15 @@ table! {
         id -> Int4,
         actor_id -> Nullable<Varchar>,
         name -> Nullable<Varchar>,
+        preferred_username -> Nullable<Varchar>,
         avatar -> Nullable<Text>,
+        banner -> Nullable<Text>,
         email -> Nullable<Text>,
         matrix_user_id -> Nullable<Text>,
         bio -> Nullable<Text>,
         local -> Nullable<Bool>,
         admin -> Nullable<Bool>,
+        sitemod -> Nullable<Bool>,
         banned -> Nullable<Bool>,
         show_avatars -> Nullable<Bool>,
         send_notifications_to_email -> Nullable<Bool>,
@@ -501,6 +532,13 @@ table! {
         comment_id -> Int4,
         read -> Bool,
         published -> Timestamp,
+    }
+}
+
+table! {
+    user_tag (user_id) {
+        user_id -> Int4,
+        tags -> Jsonb,
     }
 }
 
@@ -523,6 +561,8 @@ joinable!(community_moderator -> user_ (user_id));
 joinable!(community_settings -> community (id));
 joinable!(community_user_ban -> community (community_id));
 joinable!(community_user_ban -> user_ (user_id));
+joinable!(community_user_tag -> community (community_id));
+joinable!(community_user_tag -> user_ (user_id));
 joinable!(mod_add_community -> community (community_id));
 joinable!(mod_ban_from_community -> community (community_id));
 joinable!(mod_lock_post -> post (post_id));
@@ -550,41 +590,44 @@ joinable!(site -> user_ (creator_id));
 joinable!(user_ban -> user_ (user_id));
 joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
+joinable!(user_tag -> user_ (user_id));
 
 allow_tables_to_appear_in_same_query!(
-  activity,
-  category,
-  comment,
-  comment_aggregates_fast,
-  comment_like,
-  comment_report,
-  comment_saved,
-  community,
-  community_aggregates_fast,
-  community_follower,
-  community_moderator,
-  community_settings,
-  community_user_ban,
-  mod_add,
-  mod_add_community,
-  mod_ban,
-  mod_ban_from_community,
-  mod_lock_post,
-  mod_remove_comment,
-  mod_remove_community,
-  mod_remove_post,
-  mod_sticky_post,
-  password_reset_request,
-  post,
-  post_aggregates_fast,
-  post_like,
-  post_read,
-  post_report,
-  post_saved,
-  private_message,
-  site,
-  user_,
-  user_ban,
-  user_fast,
-  user_mention,
+    activity,
+    category,
+    comment,
+    comment_aggregates_fast,
+    comment_like,
+    comment_report,
+    comment_saved,
+    community,
+    community_aggregates_fast,
+    community_follower,
+    community_moderator,
+    community_settings,
+    community_user_ban,
+    community_user_tag,
+    mod_add,
+    mod_add_community,
+    mod_ban,
+    mod_ban_from_community,
+    mod_lock_post,
+    mod_remove_comment,
+    mod_remove_community,
+    mod_remove_post,
+    mod_sticky_post,
+    password_reset_request,
+    post,
+    post_aggregates_fast,
+    post_like,
+    post_read,
+    post_report,
+    post_saved,
+    private_message,
+    site,
+    user_,
+    user_ban,
+    user_fast,
+    user_mention,
+    user_tag,
 );

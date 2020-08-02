@@ -1,5 +1,5 @@
 GF_SECURITY_ADMIN_PASSWORD=1Y4tpIREUWjX
 GF_USERS_ALLOW_SIGN_UP=false
-GF_SERVER_DOMAIN=dev.chapo.chat
-GF_SERVER_ROOT_URL=https://dev.chapo.chat/grafana/
+GF_SERVER_DOMAIN=thoseamongbranches.chapo.chat
+GF_SERVER_ROOT_URL=https://thoseamongbranches.chapo.chat/grafana/
 GF_SERVER_SERVE_FROM_SUB_PATH=true
