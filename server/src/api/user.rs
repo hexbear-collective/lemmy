@@ -962,6 +962,10 @@ impl Perform for Oper<RemoveUserContent> {
     let mut post_id_list: Vec<i32> = Vec::new();
     let mut comment_id_list: Vec<i32> = Vec::new();
     let remove_user_id = data.user_id;
+    let reason = "USER CONTENT MASS REMOVED";
+    if let Some(given_reason) = data.reason.to_owned() {
+      [reason, &given_reason].join(": ");
+    }
     if remove_communities.is_empty() {
       let time = data.time;
       blocking(pool, move |conn| {
@@ -1019,7 +1023,7 @@ impl Perform for Oper<RemoveUserContent> {
       let form = ModRemovePostForm {
         mod_user_id: user_id,
         post_id,
-        reason: data.reason.to_owned(),
+        reason: Some(reason.to_string()),
         removed: Some(true),
       };
 
@@ -1030,7 +1034,7 @@ impl Perform for Oper<RemoveUserContent> {
       let form = ModRemoveCommentForm {
         mod_user_id: user_id,
         comment_id,
-        reason: data.reason.to_owned(),
+        reason: Some(reason.to_string()),
         removed: Some(true),
       };
 
