@@ -3,12 +3,28 @@ use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::fetcher::search_by_apub_id,
   blocking,
-  websocket::{server::SendAllMessage, UserOperation, WebsocketInfo},
-  DbPool, LemmyError,
+  websocket::{
+    server::{GetUsersOnline, SendAllMessage},
+    UserOperation,
+    WebsocketInfo,
+  },
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
-  category::*, comment_view::*, community_view::*, moderator::*, moderator_views::*, naive_now,
-  post_view::*, site::*, site_view::*, user_view::*, Crud, SearchType, SortType,
+  category::*,
+  comment_view::*,
+  community_view::*,
+  moderator::*,
+  moderator_views::*,
+  naive_now,
+  post_view::*,
+  site::*,
+  site_view::*,
+  user_view::*,
+  Crud,
+  SearchType,
+  SortType,
 };
 use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str};
 use log::{debug, info};
@@ -451,13 +467,20 @@ impl Perform for Oper<GetSite> {
 
     let banned = blocking(pool, move |conn| UserView::banned(conn)).await??;
 
-    let online = if let Some(_ws) = websocket_info {
-      // TODO
-      1
-    // let fut = async {
-    //   ws.chatserver.send(GetUsersOnline).await.unwrap()
-    // };
-    // Runtime::new().unwrap().block_on(fut)
+    let online = if let Some(ws) = websocket_info {
+      use std::time::Duration;
+      match ws
+        .chatserver
+        .send(GetUsersOnline)
+        .timeout(Duration::from_millis(10))
+        .await
+      {
+        Ok(count) => count,
+        Err(_e) => {
+          debug!("could not fetch online count");
+          1
+        }
+      }
     } else {
       0
     };

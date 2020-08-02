@@ -19,7 +19,6 @@ use lemmy_db::{
   moderator::*,
   naive_now,
   post::*,
-  post_view::*,
   site_view::*,
   user::*,
   user_mention::*,
@@ -143,11 +142,9 @@ impl Perform for Oper<CreateComment> {
     };
 
     let user_id = claims.id;
+
     let post_id = data.post_id;
-    let post = blocking(pool, move |conn| {
-      PostView::read(conn, post_id, Some(user_id))
-    })
-    .await??;
+    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
 
     // Check community settings
     let community_id = post.community_id;
@@ -171,6 +168,33 @@ impl Perform for Oper<CreateComment> {
     let num_images: i32 = num_md_images(&content_slurs_removed); // replaced content_pii_removed
     if !privileged && settings.comment_images < num_images {
       return Err(APIError::err("community_too_many_images").into());
+    }
+
+    if post.locked {
+      let user_id = claims.id;
+      let community_id = post.community_id;
+
+      let mut moderators: Vec<i32> = vec![];
+      let mut admins: Vec<i32> = vec![];
+
+      admins.append(
+        &mut blocking(pool, move |conn| {
+          UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        })
+        .await??,
+      );
+
+      moderators.append(
+        &mut blocking(pool, move |conn| {
+          CommunityModeratorView::for_community(conn, community_id)
+            .map(|v| v.into_iter().map(|m| m.user_id).collect())
+        })
+        .await??,
+      );
+
+      if !(admins.contains(&user_id) | moderators.contains(&user_id)) {
+        return Err(APIError::err("post_is_locked").into());
+      }
     }
 
     // Check for a community ban

@@ -1,6 +1,13 @@
 use crate::{
   api::{
-    comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, Oper,
+    comment::*,
+    community::*,
+    community_settings::*,
+    post::*,
+    report::*,
+    site::*,
+    user::*,
+    Oper,
     Perform,
   },
   rate_limit::RateLimit,
@@ -86,9 +93,9 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       )
       .service(
         // Handle POST to /post/report separately to add the post() rate limitter
-        web::scope("/post")
+        web::resource("/post/report")
           .wrap(rate_limit.post())
-          .route("/report", web::post().to(route_post::<CreatePostReport>)),
+          .route(web::post().to(route_post::<CreatePostReport>)),
       )
       .service(
         web::scope("/post")
@@ -113,9 +120,9 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       )
       .service(
         // Handle POST to /comment/report separately to add the post() rate limitter
-        web::scope("/comment")
+        web::resource("/comment/report")
           .wrap(rate_limit.post())
-          .route("/report", web::post().to(route_post::<CreateCommentReport>)),
+          .route(web::post().to(route_post::<CreateCommentReport>)),
       )
       .service(
         web::scope("/comment")
