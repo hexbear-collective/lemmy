@@ -44,6 +44,7 @@ pub struct GetCommunityResponse {
   pub community: CommunityView,
   pub moderators: Vec<CommunityModeratorView>,
   pub admins: Vec<UserView>,
+  pub sitemods: Vec<UserView>,
   pub online: usize,
 }
 
@@ -196,6 +197,7 @@ impl Perform for Oper<GetCommunity> {
     let site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
     let site_creator_id = site.creator_id;
     let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
@@ -229,6 +231,7 @@ impl Perform for Oper<GetCommunity> {
       community: community_view,
       moderators,
       admins,
+      sitemods,
       online,
     };
 
@@ -721,6 +724,12 @@ impl Perform for Oper<BanFromCommunity> {
       })
       .await??,
     );
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+      })
+      .await??,
+    );
 
     if !community_moderators.contains(&user_id) {
       return Err(APIError::err("couldnt_update_community").into());
@@ -824,6 +833,12 @@ impl Perform for Oper<AddModToCommunity> {
       })
       .await??,
     );
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+      })
+      .await??,
+    );
 
     if !community_moderators.contains(&user_id) {
       return Err(APIError::err("couldnt_update_community").into());
@@ -896,6 +911,8 @@ impl Perform for Oper<TransferCommunity> {
       blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
     let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
 
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
@@ -996,6 +1013,7 @@ impl Perform for Oper<TransferCommunity> {
       community: community_view,
       moderators,
       admins,
+      sitemods,
       online: 0,
     })
   }

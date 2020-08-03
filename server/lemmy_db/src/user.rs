@@ -21,6 +21,7 @@ pub struct User_ {
   pub email: Option<String>,
   pub avatar: Option<String>,
   pub admin: bool,
+  pub sitemod: bool,
   pub banned: bool,
   pub published: chrono::NaiveDateTime,
   pub updated: Option<chrono::NaiveDateTime>,
@@ -47,6 +48,7 @@ pub struct UserForm {
   pub preferred_username: Option<String>,
   pub password_encrypted: String,
   pub admin: bool,
+  pub sitemod: bool,
   pub banned: bool,
   pub email: Option<String>,
   pub avatar: Option<String>,
@@ -122,6 +124,12 @@ impl User_ {
       .get_result::<Self>(conn)
   }
 
+  pub fn add_sitemod(conn: &PgConnection, user_id: i32, added: bool) -> Result<Self, Error> {
+    diesel::update(user_.find(user_id))
+      .set(sitemod.eq(added))
+      .get_result::<Self>(conn)
+  }
+
   pub fn ban_user(conn: &PgConnection, user_id: i32, ban: bool) -> Result<Self, Error> {
     diesel::update(user_.find(user_id))
       .set(banned.eq(ban))
@@ -184,6 +192,7 @@ mod tests {
       avatar: None,
       admin: false,
       banned: false,
+      sitemod: false,
       updated: None,
       show_nsfw: false,
       theme: "darkly".into(),
@@ -211,6 +220,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       admin: false,
+      sitemod: false,
       banned: false,
       published: inserted_user.published,
       updated: None,
@@ -252,6 +262,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       admin: false,
+      sitemod: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -277,6 +288,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       admin: false,
+      sitemod: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -302,6 +314,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       admin: false,
+      sitemod: false,
       banned: false,
       updated: None,
       show_nsfw: false,
