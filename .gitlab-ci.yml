@@ -26,6 +26,15 @@ build_dev:
     - docker push $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:latest
 
+build_react-test:
+  stage: build
+  script:
+    - sed -i "s/10000000-ffff-ffff-ffff-000000000001/$LEMMY_HCAPTCHA_SITEKEY/g" ui/src/env.ts
+    - docker build --tag $CI_REGISTRY_IMAGE:latest-react-test --file docker/prod/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:latest-react-test
+  only:
+    - rework/react-v2
+
 # test skeletons for whenever someone gets a chance to write the scripts
 # test_backend:
 #   stage: test
@@ -52,6 +61,14 @@ deploy_dev:
     - docker pull $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA
     - docker tag $CI_REGISTRY_IMAGE:predev-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest-dev
     - docker push $CI_REGISTRY_IMAGE:latest-dev
+
+deploy_react-test_to_dev:
+  stage: deploy
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest-react-test
+    - docker tag $CI_REGISTRY_IMAGE:latest-react-test $CI_REGISTRY_IMAGE:latest-dev
+    - docker push $CI_REGISTRY_IMAGE:latest-dev
+  when: manual
 
 deploy_prod:
   <<: *default_template
