@@ -718,6 +718,12 @@ impl Perform for Oper<EditPost> {
       })
       .await??,
     );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+      })
+      .await??,
+    );
 
     editors.extend(&moderators);
 
