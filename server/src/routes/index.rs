@@ -34,6 +34,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     .route("/modlog", web::get().to(index))
     .route("/setup", web::get().to(index))
     .route("/admin", web::get().to(index))
+    .route("/sitemod", web::get().to(index))
     .route(
       "/search/q/{q}/type/{type}/sort/{sort}/page/{page}",
       web::get().to(index),

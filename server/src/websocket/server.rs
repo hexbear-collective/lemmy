@@ -441,6 +441,7 @@ impl ChatServer {
         UserOperation::GetUserDetails => do_user_operation::<GetUserDetails>(args).await,
         UserOperation::GetReplies => do_user_operation::<GetReplies>(args).await,
         UserOperation::AddAdmin => do_user_operation::<AddAdmin>(args).await,
+        UserOperation::AddSitemod => do_user_operation::<AddSitemod>(args).await,
         UserOperation::BanUser => do_user_operation::<BanUser>(args).await,
         UserOperation::GetUserMentions => do_user_operation::<GetUserMentions>(args).await,
         UserOperation::EditUserMention => do_user_operation::<EditUserMention>(args).await,

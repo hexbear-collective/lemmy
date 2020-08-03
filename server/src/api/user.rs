@@ -68,6 +68,7 @@ pub struct Register {
   pub password: String,
   pub password_verify: String,
   pub admin: bool,
+  pub sitemod: bool,
   pub show_nsfw: bool,
   pub captcha_id: String,
 }
@@ -142,6 +143,18 @@ pub struct AddAdmin {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AddAdminResponse {
   admins: Vec<UserView>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddSitemod {
+  user_id: i32,
+  added: bool,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AddSitemodResponse {
+  sitemods: Vec<UserView>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -420,6 +433,7 @@ impl Perform for Oper<Register> {
       preferred_username: None,
       updated: None,
       admin: data.admin,
+      sitemod: data.sitemod,
       banned: false,
       show_nsfw: data.show_nsfw,
       theme: "darkly".into(),
@@ -610,6 +624,7 @@ impl Perform for Oper<SaveUserSettings> {
       preferred_username: read_user.preferred_username,
       updated: Some(naive_now()),
       admin: read_user.admin,
+      sitemod: read_user.sitemod,
       banned: read_user.banned,
       show_nsfw: data.show_nsfw,
       theme: data.theme.to_owned(),
@@ -834,6 +849,68 @@ impl Perform for Oper<AddAdmin> {
 }
 
 #[async_trait::async_trait(?Send)]
+impl Perform for Oper<AddSitemod> {
+  type Response = AddSitemodResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<AddSitemodResponse, LemmyError> {
+    let data: &AddSitemod = &self.data;
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user_id = claims.id;
+
+    // Make sure user is an admin
+    let is_admin = move |conn: &'_ _| UserView::read(conn, user_id).map(|u| u.admin);
+    if !blocking(pool, is_admin).await?? {
+      return Err(APIError::err("not_an_admin").into());
+    }
+
+    let added = data.added;
+    let added_user_id = data.user_id;
+    let add_sitemod = move |conn: &'_ _| User_::add_sitemod(conn, added_user_id, added);
+    if blocking(pool, add_sitemod).await?.is_err() {
+      return Err(APIError::err("couldnt_update_user").into());
+    }
+
+    // Mod tables
+    let form = ModAddForm {
+      mod_user_id: user_id,
+      other_user_id: data.user_id,
+      removed: Some(!data.added),
+    };
+
+    blocking(pool, move |conn| ModAdd::create(conn, &form)).await??;
+
+    let site_creator_id =
+      blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
+
+    let mut sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let creator_index = sitemods.iter().position(|r| r.id == site_creator_id).unwrap();
+    let creator_user = sitemods.remove(creator_index);
+    sitemods.insert(0, creator_user);
+
+    let res = AddSitemodResponse { sitemods };
+
+    if let Some(ws) = websocket_info {
+      ws.chatserver.do_send(SendAllMessage {
+        op: UserOperation::AddSitemod,
+        response: res.clone(),
+        my_id: ws.id,
+      });
+    }
+
+    Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
 impl Perform for Oper<BanUser> {
   type Response = BanUserResponse;
 
@@ -851,10 +928,10 @@ impl Perform for Oper<BanUser> {
 
     let user_id = claims.id;
 
-    // Make sure user is an admin
-    let is_admin = move |conn: &'_ _| UserView::read(conn, user_id).map(|u| u.admin);
-    if !blocking(pool, is_admin).await?? {
-      return Err(APIError::err("not_an_admin").into());
+    // Make sure user is an admin or sitemod
+    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
+    if !user.admin || !user.sitemod {
+      return Err(APIError::err("not_an_admin_or_sitemod").into());
     }
 
     let ban = data.ban;

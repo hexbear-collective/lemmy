@@ -191,8 +191,8 @@ impl Perform for Oper<CreatePost> {
     let score = user_view.post_score + user_view.comment_score;
 
     // no upstream, dessalines wants to leverage rate limiting
-    if score < 0 {
-      return Err(APIError::err("score_too_low").into());
+    if score < 0 && !privileged {
+      return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
     }
 
     let url = match data.url.to_owned() {
@@ -201,8 +201,8 @@ impl Perform for Oper<CreatePost> {
           None
         } else {
           // no upstream, dessalines wants to leverage rate limiting
-          if score < 5 {
-            return Err(APIError::err("score_too_low").into());
+          if score < 5 && !privileged {
+            return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
           }
           match Url::parse(&url) {
             Ok(_t) => Some(url),

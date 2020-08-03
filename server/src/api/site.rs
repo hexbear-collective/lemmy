@@ -101,6 +101,7 @@ pub struct SiteResponse {
 pub struct GetSiteResponse {
   site: Option<SiteView>,
   admins: Vec<UserView>,
+  sitemods: Vec<UserView>,
   banned: Vec<UserView>,
   pub online: usize,
 }
@@ -413,6 +414,7 @@ impl Perform for Oper<GetSite> {
         password: setup.admin_password.to_owned(),
         password_verify: setup.admin_password.to_owned(),
         admin: true,
+        sitemod: true,
         show_nsfw: true,
         captcha_id: "".to_string(),
       };
@@ -439,6 +441,7 @@ impl Perform for Oper<GetSite> {
     };
 
     let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
 
     // Make sure the site creator is the top admin
     if let Some(site_view) = site_view.to_owned() {
@@ -474,6 +477,7 @@ impl Perform for Oper<GetSite> {
     Ok(GetSiteResponse {
       site: site_view,
       admins,
+      sitemods,
       banned,
       online,
     })
@@ -705,6 +709,7 @@ impl Perform for Oper<TransferSite> {
     let site_view = blocking(pool, move |conn| SiteView::read(conn)).await??;
 
     let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
     let creator_index = admins
       .iter()
       .position(|r| r.id == site_view.creator_id)
@@ -717,6 +722,7 @@ impl Perform for Oper<TransferSite> {
     Ok(GetSiteResponse {
       site: Some(site_view),
       admins,
+      sitemods,
       banned,
       online: 0,
     })
