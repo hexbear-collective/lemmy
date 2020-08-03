@@ -6,6 +6,7 @@ pub extern crate bcrypt;
 pub extern crate chrono;
 pub extern crate log;
 pub extern crate serde;
+#[macro_use]
 pub extern crate serde_json;
 pub extern crate sha2;
 pub extern crate strum;
@@ -36,6 +37,7 @@ pub mod site_view;
 pub mod user;
 pub mod user_mention;
 pub mod user_mention_view;
+pub mod user_tag;
 pub mod user_view;
 
 pub trait Crud<T> {

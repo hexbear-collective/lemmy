@@ -30,6 +30,7 @@ use lemmy_db::{
   user::*,
   user_mention::*,
   user_mention_view::*,
+  user_tag::*,
   user_view::*,
   Crud,
   Followable,
@@ -52,7 +53,7 @@ use lemmy_utils::{
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{env, str::FromStr};
+use std::{collections::BTreeMap, env, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
@@ -70,6 +71,7 @@ pub struct Register {
   pub admin: bool,
   pub show_nsfw: bool,
   pub captcha_id: String,
+  pub pronouns: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -259,6 +261,120 @@ struct CaptchaResponse {
   success: bool,
   #[serde(rename = "error-codes")]
   error_codes: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetUserTag {
+  user: i32,
+  community: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SetUserTag {
+  tag: String,
+  value: Option<String>,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UserTagResponse {
+  user: i32,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  community: Option<i32>,
+  tags: UserTagsSchema,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct UserTagsSchema {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pronouns: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  tendency: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  favorite_food: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  flair: Option<String>,
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<SetUserTag> {
+  type Response = UserTagResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<UserTagResponse, LemmyError> {
+    let data: &SetUserTag = &self.data;
+    let key = data.tag.clone();
+    let value = data.value.clone();
+    let mut tags = BTreeMap::new();
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user = claims.id;
+
+    if let Some(v) = data.value.clone() {
+      tags.insert(key.clone(), v);
+    }
+
+    match blocking(pool, move |conn| UserTag::set_key(conn, user, key, value)).await? {
+      Ok(usertag) => Ok(UserTagResponse {
+        user,
+        community: None,
+        tags: serde_json::from_value(usertag.tags)?,
+      }),
+      Err(e) => Err(LemmyError::from(e)),
+    }
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetUserTag> {
+  type Response = UserTagResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<UserTagResponse, LemmyError> {
+    let data: &GetUserTag = &self.data;
+    let user = data.user;
+
+    // Check if user exists
+    let user_exists = blocking(pool, move |conn| User_::read(conn, user))
+      .await?
+      .is_ok();
+    if !user_exists {
+      return Err(APIError::err("user_doesnt_exist").into());
+    }
+
+    match blocking(pool, move |conn| UserTag::read(conn, user)).await? {
+      Ok(usertag) => Ok(UserTagResponse {
+        user,
+        community: None,
+        tags: serde_json::from_value(usertag.tags)?,
+      }),
+      Err(diesel::result::Error::NotFound) => {
+        let empty = UserTagsSchema {
+          // I hate this
+          pronouns: None,
+          tendency: None,
+          favorite_food: None,
+          flair: None,
+        };
+        Ok(UserTagResponse {
+          user,
+          community: None,
+          tags: empty,
+        })
+      }
+      Err(e) => Err(LemmyError::from(e)),
+    }
+  }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -519,6 +635,15 @@ impl Perform for Oper<Register> {
       if blocking(pool, join).await?.is_err() {
         return Err(APIError::err("community_moderator_already_exists").into());
       }
+    }
+
+    // Add their pronouns if they specified at account registration
+    if let Some(pronouns) = data.pronouns.clone() {
+      let user_id = inserted_user.id;
+      blocking(pool, move |conn| {
+        UserTag::set_key(conn, user_id, "pronouns".to_string(), Some(pronouns))
+      })
+      .await??;
     }
 
     // Return the jwt
