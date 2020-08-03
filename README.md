@@ -10,7 +10,6 @@ Please make sure to visit the original readme for all of the information.
 
 ## Running in Docker
 
-The doc
 ```
 cd docker/dev
 sudo ./docker_update.sh
