@@ -157,12 +157,30 @@ impl Perform for Oper<CreatePost> {
     })
     .await??;
 
-    let community_id = data.community_id;
-    let privileged = blocking(pool, move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let mut moderators: Vec<i32> = vec![];
+
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+      })
+      .await??,
+    );
+
+    let privileged = moderators.contains(&user_id);
+
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
