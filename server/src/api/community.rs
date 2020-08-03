@@ -713,6 +713,12 @@ impl Perform for Oper<BanFromCommunity> {
       })
       .await??,
     );
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+      })
+      .await??,
+    );
 
     if !community_moderators.contains(&user_id) {
       return Err(APIError::err("couldnt_update_community").into());
@@ -813,6 +819,12 @@ impl Perform for Oper<AddModToCommunity> {
     community_moderators.append(
       &mut blocking(pool, move |conn| {
         UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+    community_moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
       })
       .await??,
     );
