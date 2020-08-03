@@ -59,6 +59,8 @@ table! {
         creator_name -> Nullable<Varchar>,
         creator_published -> Nullable<Timestamp>,
         creator_avatar -> Nullable<Text>,
+        creator_tags -> Nullable<Jsonb>,
+        creator_community_tags -> Nullable<Jsonb>,
         score -> Nullable<Int8>,
         upvotes -> Nullable<Int8>,
         downvotes -> Nullable<Int8>,
@@ -183,6 +185,14 @@ table! {
         community_id -> Int4,
         user_id -> Int4,
         published -> Timestamp,
+    }
+}
+
+table! {
+    community_user_tag (user_id) {
+        user_id -> Int4,
+        community_id -> Nullable<Int4>,
+        tags -> Jsonb,
     }
 }
 
@@ -345,6 +355,8 @@ table! {
         creator_name -> Nullable<Varchar>,
         creator_published -> Nullable<Timestamp>,
         creator_avatar -> Nullable<Text>,
+        creator_tags -> Nullable<Jsonb>,
+        creator_community_tags -> Nullable<Jsonb>,
         banned -> Nullable<Bool>,
         banned_from_community -> Nullable<Bool>,
         community_actor_id -> Nullable<Varchar>,
@@ -504,6 +516,13 @@ table! {
     }
 }
 
+table! {
+    user_tag (user_id) {
+        user_id -> Int4,
+        tags -> Jsonb,
+    }
+}
+
 joinable!(activity -> user_ (user_id));
 joinable!(comment -> post (post_id));
 joinable!(comment -> user_ (creator_id));
@@ -523,6 +542,8 @@ joinable!(community_moderator -> user_ (user_id));
 joinable!(community_settings -> community (id));
 joinable!(community_user_ban -> community (community_id));
 joinable!(community_user_ban -> user_ (user_id));
+joinable!(community_user_tag -> community (community_id));
+joinable!(community_user_tag -> user_ (user_id));
 joinable!(mod_add_community -> community (community_id));
 joinable!(mod_ban_from_community -> community (community_id));
 joinable!(mod_lock_post -> post (post_id));
@@ -550,6 +571,7 @@ joinable!(site -> user_ (creator_id));
 joinable!(user_ban -> user_ (user_id));
 joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
+joinable!(user_tag -> user_ (user_id));
 
 allow_tables_to_appear_in_same_query!(
   activity,
@@ -565,6 +587,7 @@ allow_tables_to_appear_in_same_query!(
   community_moderator,
   community_settings,
   community_user_ban,
+  community_user_tag,
   mod_add,
   mod_add_community,
   mod_ban,
@@ -587,4 +610,5 @@ allow_tables_to_appear_in_same_query!(
   user_ban,
   user_fast,
   user_mention,
+  user_tag,
 );

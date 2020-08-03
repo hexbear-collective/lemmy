@@ -455,6 +455,8 @@ impl ChatServer {
         UserOperation::GetPrivateMessages => do_user_operation::<GetPrivateMessages>(args).await,
         UserOperation::UserJoin => do_user_operation::<UserJoin>(args).await,
         UserOperation::SaveUserSettings => do_user_operation::<SaveUserSettings>(args).await,
+        UserOperation::GetUserTag => do_user_operation::<GetUserTag>(args).await,
+        UserOperation::SetUserTag => do_user_operation::<SetUserTag>(args).await,
 
         // Site ops
         UserOperation::GetModlog => do_user_operation::<GetModlog>(args).await,
