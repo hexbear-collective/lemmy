@@ -202,6 +202,12 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
         web::resource("/admin/add")
           .wrap(rate_limit.message())
           .route(web::post().to(route_post::<AddAdmin>)),
+      )
+      // Sitemod Actions
+      .service(
+        web::resource("/sitemod/add")
+          .wrap(rate_limit.message())
+          .route(web::post().to(route_post::<AddSitemod>)),
       ),
   );
 }

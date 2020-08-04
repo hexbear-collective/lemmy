@@ -176,10 +176,18 @@ impl Perform for Oper<CreateComment> {
 
       let mut moderators: Vec<i32> = vec![];
       let mut admins: Vec<i32> = vec![];
+      let mut sitemods: Vec<i32> = vec![];
 
       admins.append(
         &mut blocking(pool, move |conn| {
           UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        })
+        .await??,
+      );
+
+      sitemods.append(
+        &mut blocking(pool, move |conn| {
+          UserView::sitemods(conn).map(|v| v.into_iter().map(|a| a.id).collect())
         })
         .await??,
       );
@@ -192,7 +200,7 @@ impl Perform for Oper<CreateComment> {
         .await??,
       );
 
-      if !(admins.contains(&user_id) | moderators.contains(&user_id)) {
+      if !(admins.contains(&user_id) || sitemods.contains(&user_id) || moderators.contains(&user_id)) {
         return Err(APIError::err("post_is_locked").into());
       }
     }
@@ -325,11 +333,17 @@ impl Perform for Oper<EditComment> {
       })
       .await??,
     );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
 
     editors.extend(&moderators);
     // You are allowed to mark the comment as read even if you're banned.
     if data.read.is_none() {
-      // Verify its the creator or a mod, or an admin
+      // Verify its the creator or a mod, or an admin or sitemod
 
       if !editors.contains(&user_id) {
         return Err(APIError::err("no_comment_edit_allowed").into());
