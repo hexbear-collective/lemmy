@@ -1020,10 +1020,7 @@ impl Perform for Oper<AddSitemod> {
     let site_creator_id =
       blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
-    let mut sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
-    let creator_index = sitemods.iter().position(|r| r.id == site_creator_id).unwrap();
-    let creator_user = sitemods.remove(creator_index);
-    sitemods.insert(0, creator_user);
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
 
     let res = AddSitemodResponse { sitemods };
 
