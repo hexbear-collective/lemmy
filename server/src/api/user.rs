@@ -118,6 +118,7 @@ pub struct GetUserDetailsResponse {
   comments: Vec<CommentView>,
   posts: Vec<PostView>,
   admins: Vec<UserView>,
+  sitemods: Vec<UserView>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -889,6 +890,8 @@ impl Perform for Oper<GetUserDetails> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+
     // If its not the same user, remove the email, and settings
     // TODO an if let chain would be better here, but can't figure it out
     // TODO separate out settings into its own thing
@@ -907,6 +910,7 @@ impl Perform for Oper<GetUserDetails> {
       comments,
       posts,
       admins,
+      sitemods
     })
   }
 }

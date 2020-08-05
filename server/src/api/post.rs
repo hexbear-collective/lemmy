@@ -50,6 +50,7 @@ pub struct GetPostResponse {
   community: CommunityView,
   moderators: Vec<CommunityModeratorView>,
   admins: Vec<UserView>,
+  sitemods: Vec<UserView>,
   pub online: usize,
 }
 
@@ -429,6 +430,8 @@ impl Perform for Oper<GetPost> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+
     let online = if let Some(ws) = websocket_info {
       if let Some(id) = ws.id {
         ws.chatserver.do_send(JoinPostRoom {
@@ -461,6 +464,7 @@ impl Perform for Oper<GetPost> {
       community,
       moderators,
       admins,
+      sitemods,
       online,
     })
   }
