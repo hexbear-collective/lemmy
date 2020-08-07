@@ -295,8 +295,15 @@ impl Perform for Oper<CreateCommunity> {
         .await??,
       );
 
-      // ...but let admins create them anyway
-      if !admins.contains(&user_id) {
+      let mut sitemods: Vec<i32> = vec![];
+      sitemods.append(
+        &mut blocking(pool, move |conn| {
+          UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+        })
+        .await??,
+      );
+      // ...but let admins/sitemods create them anyway
+      if !(admins.contains(&user_id) || sitemods.contains(&user_id)) {
         return Err(APIError::err("create_community_disabled").into());
       }
     }
@@ -918,9 +925,11 @@ impl Perform for Oper<TransferCommunity> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    // Make sure user is the creator, or an admin
-    if user_id != read_community.creator_id && !admins.iter().map(|a| a.id).any(|x| x == user_id) {
-      return Err(APIError::err("not_an_admin").into());
+    // Make sure user is the creator, or an admin, or sitemod
+    if user_id != read_community.creator_id
+      && !(admins.iter().map(|a| a.id).any(|x| x == user_id)
+        || sitemods.iter().map(|a| a.id).any(|x| x == user_id)) {
+      return Err(APIError::err("not_an_admin_or_sitemod").into());
     }
 
     let community_form = CommunityForm {
