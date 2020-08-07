@@ -1017,9 +1017,6 @@ impl Perform for Oper<AddSitemod> {
 
     blocking(pool, move |conn| ModAdd::create(conn, &form)).await??;
 
-    let site_creator_id =
-      blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
-
     let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
 
     let res = AddSitemodResponse { sitemods };
