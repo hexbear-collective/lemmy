@@ -1,21 +1,42 @@
 use crate::{
   api::{claims::Claims, APIError, Oper, Perform},
   apub::{ApubLikeableType, ApubObjectType},
-  blocking, fetch_iframely_and_pictrs_data, is_within_post_body_char_limit,
+  blocking,
+  fetch_iframely_and_pictrs_data,
+  is_within_post_body_char_limit,
   is_within_post_title_char_limit,
   websocket::{
     server::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
-  comment_view::*, community_settings::*, community_view::*, moderator::*, naive_now, post::*,
-  post_view::*, site::*, site_view::*, user::*, user_view::*, Crud, Likeable, ListingType,
-  Saveable, SortType,
+  comment_view::*,
+  community_settings::*,
+  community_view::*,
+  moderator::*,
+  naive_now,
+  post::*,
+  post_view::*,
+  site::*,
+  site_view::*,
+  user::*,
+  user_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  Saveable,
+  SortType,
 };
 use lemmy_utils::{
-  is_valid_post_title, make_apub_endpoint, slur_check, slurs_vec_to_str, EndpointType,
+  is_valid_post_title,
+  make_apub_endpoint,
+  slur_check,
+  slurs_vec_to_str,
+  EndpointType,
 };
 use log::debug;
 use serde::{Deserialize, Serialize};

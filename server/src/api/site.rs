@@ -8,7 +8,8 @@ use crate::{
     UserOperation,
     WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
   category::*,

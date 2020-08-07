@@ -4,7 +4,7 @@ server/target
 docker/dev/volumes
 docker/federation/volumes
 docker/federation-test/volumes
-.git
+#.git # needed to get git sha
 ansible
 
 # exceptions, needed for federation-test build

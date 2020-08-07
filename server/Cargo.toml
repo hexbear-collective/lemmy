@@ -2,6 +2,7 @@
 name = "lemmy_server"
 version = "0.0.1"
 edition = "2018"
+build = "build.rs"
 
 [profile.release]
 lto = true
@@ -61,3 +62,7 @@ strum_macros = "0.18.0"
 tokio = "0.2.21"
 url = { version = "2.1.1", features = ["serde"] }
 uuid = { version = "0.6", features = ["serde", "v4"] }
+
+[build-dependencies]
+vergen = "3"
+
