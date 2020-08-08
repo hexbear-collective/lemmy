@@ -8,7 +8,9 @@ table! {
     id -> Int4,
     actor_id -> Text,
     name -> Varchar,
+    preferred_username -> Nullable<Varchar>,
     avatar -> Nullable<Text>,
+    banner -> Nullable<Text>,
     email -> Nullable<Text>,
     matrix_user_id -> Nullable<Text>,
     bio -> Nullable<Text>,
@@ -30,7 +32,9 @@ table! {
     id -> Int4,
     actor_id -> Text,
     name -> Varchar,
+    preferred_username -> Nullable<Varchar>,
     avatar -> Nullable<Text>,
+    banner -> Nullable<Text>,
     email -> Nullable<Text>,
     matrix_user_id -> Nullable<Text>,
     bio -> Nullable<Text>,
@@ -55,15 +59,17 @@ pub struct UserView {
   pub id: i32,
   pub actor_id: String,
   pub name: String,
+  pub preferred_username: Option<String>,
   pub avatar: Option<String>,
-  pub email: Option<String>,
+  pub banner: Option<String>,
+  pub email: Option<String>, // TODO this shouldn't be in this view
   pub matrix_user_id: Option<String>,
   pub bio: Option<String>,
   pub local: bool,
   pub admin: bool,
   pub banned: bool,
-  pub show_avatars: bool,
-  pub send_notifications_to_email: bool,
+  pub show_avatars: bool, // TODO this is a setting, probably doesn't need to be here
+  pub send_notifications_to_email: bool, // TODO also never used
   pub published: chrono::NaiveDateTime,
   pub number_of_posts: i64,
   pub post_score: i64,
@@ -126,6 +132,9 @@ impl<'a> UserQueryBuilder<'a> {
       SortType::Hot => query
         .order_by(comment_score.desc())
         .then_order_by(published.desc()),
+      SortType::Active => query
+        .order_by(comment_score.desc())
+        .then_order_by(published.desc()),
       SortType::New => query.order_by(published.desc()),
       SortType::TopAll => query.order_by(comment_score.desc()),
       SortType::TopYear => query
@@ -164,7 +173,9 @@ impl UserView {
         id,
         actor_id,
         name,
+        preferred_username,
         avatar,
+        banner,
         "".into_sql::<Nullable<Text>>(),
         matrix_user_id,
         bio,
@@ -192,7 +203,9 @@ impl UserView {
         id,
         actor_id,
         name,
+        preferred_username,
         avatar,
+        banner,
         "".into_sql::<Nullable<Text>>(),
         matrix_user_id,
         bio,

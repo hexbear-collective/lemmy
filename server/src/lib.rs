@@ -3,11 +3,11 @@
 pub extern crate strum_macros;
 #[macro_use]
 pub extern crate lazy_static;
-#[macro_use]
-pub extern crate failure;
 pub extern crate actix;
 pub extern crate actix_web;
+pub extern crate base64;
 pub extern crate bcrypt;
+pub extern crate captcha;
 pub extern crate chrono;
 pub extern crate diesel;
 pub extern crate dotenv;
@@ -31,10 +31,15 @@ pub mod websocket;
 
 use crate::request::{retry, RecvError};
 use actix_web::{client::Client, dev::ConnectionInfo};
+use anyhow::anyhow;
+use lemmy_utils::{get_apub_protocol_string, settings::Settings};
 use log::error;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Deserialize;
-use std::net::{IpAddr, SocketAddr};
+use std::{
+  net::{IpAddr, SocketAddr},
+  process::Command,
+};
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 pub type ConnectionId = usize;
@@ -45,12 +50,12 @@ pub type IPAddr = String;
 
 #[derive(Debug)]
 pub struct LemmyError {
-  inner: failure::Error,
+  inner: anyhow::Error,
 }
 
 impl<T> From<T> for LemmyError
 where
-  T: Into<failure::Error>,
+  T: Into<anyhow::Error>,
 {
   fn from(t: T) -> Self {
     LemmyError { inner: t.into() }
@@ -115,7 +120,7 @@ pub async fn fetch_pictrs(client: &Client, image_url: &str) -> Result<PictrsResp
   if response.msg == "ok" {
     Ok(response)
   } else {
-    Err(format_err!("{}", &response.msg).into())
+    Err(anyhow!("{}", &response.msg).into())
   }
 }
 
@@ -141,7 +146,7 @@ async fn fetch_iframely_and_pictrs_data(
         };
 
       // Fetch pictrs thumbnail
-      let pictrs_thumbnail = match iframely_thumbnail_url {
+      let pictrs_hash = match iframely_thumbnail_url {
         Some(iframely_thumbnail_url) => match fetch_pictrs(client, &iframely_thumbnail_url).await {
           Ok(res) => Some(res.files[0].file.to_owned()),
           Err(e) => {
@@ -157,6 +162,18 @@ async fn fetch_iframely_and_pictrs_data(
             None
           }
         },
+      };
+
+      // The full urls are necessary for federation
+      let pictrs_thumbnail = if let Some(pictrs_hash) = pictrs_hash {
+        Some(format!(
+          "{}://{}/pictrs/image/{}",
+          get_apub_protocol_string(),
+          Settings::get().hostname,
+          pictrs_hash
+        ))
+      } else {
+        None
       };
 
       (
@@ -176,13 +193,13 @@ pub async fn is_image_content_type(client: &Client, test: &str) -> Result<(), Le
   if response
     .headers()
     .get("Content-Type")
-    .ok_or_else(|| format_err!("No Content-Type header"))?
+    .ok_or_else(|| anyhow!("No Content-Type header"))?
     .to_str()?
     .starts_with("image/")
   {
     Ok(())
   } else {
-    Err(format_err!("Not an image type.").into())
+    Err(anyhow!("Not an image type.").into())
   }
 }
 
@@ -231,9 +248,56 @@ pub fn is_within_message_char_limit(content: &str) -> bool {
   content.len() <= 4000
 }
 
+pub fn captcha_espeak_wav_base64(captcha: &str) -> Result<String, LemmyError> {
+  let mut built_text = String::new();
+
+  // Building proper speech text for espeak
+  for mut c in captcha.chars() {
+    let new_str = if c.is_alphabetic() {
+      if c.is_lowercase() {
+        c.make_ascii_uppercase();
+        format!("lower case {} ... ", c)
+      } else {
+        c.make_ascii_uppercase();
+        format!("capital {} ... ", c)
+      }
+    } else {
+      format!("{} ...", c)
+    };
+
+    built_text.push_str(&new_str);
+  }
+
+  espeak_wav_base64(&built_text)
+}
+
+pub fn espeak_wav_base64(text: &str) -> Result<String, LemmyError> {
+  // Make a temp file path
+  let uuid = uuid::Uuid::new_v4().to_string();
+  let file_path = format!("/tmp/lemmy_espeak_{}.wav", &uuid);
+
+  // Write the wav file
+  Command::new("espeak")
+    .arg("-w")
+    .arg(&file_path)
+    .arg(text)
+    .status()?;
+
+  // Read the wav file bytes
+  let bytes = std::fs::read(&file_path)?;
+
+  // Delete the file
+  std::fs::remove_file(file_path)?;
+
+  // Convert to base64
+  let base64 = base64::encode(bytes);
+
+  Ok(base64)
+}
+
 #[cfg(test)]
 mod tests {
-  use crate::is_image_content_type;
+  use crate::{captcha_espeak_wav_base64, is_image_content_type};
 
   #[test]
   fn test_image() {
@@ -246,6 +310,11 @@ mod tests {
         .await.is_err()
       );
     });
+  }
+
+  #[test]
+  fn test_espeak() {
+    assert!(captcha_espeak_wav_base64("WxRt2l").is_ok())
   }
 
   // These helped with testing

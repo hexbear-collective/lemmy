@@ -1,31 +1,45 @@
 use super::user::Register;
 use crate::{
-  api::{claims::Claims, APIError, Oper, Perform},
+  api::{
+    check_slurs,
+    check_slurs_opt,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_admin,
+    is_mod_or_admin,
+    APIError,
+    Oper,
+    Perform,
+  },
   apub::fetcher::search_by_apub_id,
   blocking,
+  version,
   websocket::{
     server::{GetUsersOnline, SendAllMessage},
     UserOperation,
     WebsocketInfo,
   },
-  DbPool, LemmyError,
+  DbPool,
+  LemmyError,
 };
 use lemmy_db::{
   category::*,
   comment_view::*,
   community_view::*,
+  diesel_option_overwrite,
   moderator::*,
   moderator_views::*,
   naive_now,
   post_view::*,
   site::*,
   site_view::*,
+  user::*,
   user_view::*,
   Crud,
   SearchType,
   SortType,
 };
-use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str};
+use lemmy_utils::settings::Settings;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -84,6 +98,8 @@ pub struct GetModlogResponse {
 pub struct CreateSite {
   pub name: String,
   pub description: Option<String>,
+  pub icon: Option<String>,
+  pub banner: Option<String>,
   pub enable_downvotes: bool,
   pub open_registration: bool,
   pub enable_nsfw: bool,
@@ -94,6 +110,8 @@ pub struct CreateSite {
 pub struct EditSite {
   name: String,
   description: Option<String>,
+  icon: Option<String>,
+  banner: Option<String>,
   enable_downvotes: bool,
   open_registration: bool,
   enable_nsfw: bool,
@@ -102,7 +120,9 @@ pub struct EditSite {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct GetSite {}
+pub struct GetSite {
+  auth: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SiteResponse {
@@ -115,6 +135,8 @@ pub struct GetSiteResponse {
   admins: Vec<UserView>,
   banned: Vec<UserView>,
   pub online: usize,
+  version: String,
+  my_user: Option<User_>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -188,28 +210,19 @@ impl Perform for Oper<GetModlog> {
     let community_id = data.community_id;
 
     let anon_log: bool = match &data.auth {
-      Some(auth) => match Claims::decode(&auth) {
-        Ok(claims) => {
-          let user_id = claims.claims.id;
-          let mut log_viewers: Vec<i32> = vec![];
+      Some(auth) => match get_user_from_jwt(&auth, pool).await {
+        Ok(user) => {
           if let Some(c_id) = community_id {
-            log_viewers.append(
-              &mut blocking(pool, move |conn| {
-                CommunityModeratorView::for_community(conn, c_id)
-                  .map(|v| v.into_iter().map(|m| m.user_id).collect())
-              })
-              .await??,
-            );
+            match is_mod_or_admin(pool, user.id, c_id).await {
+              Ok(_) => false,
+              Err(_e) => true,
+            }
+          } else {
+            match is_admin(pool, user.id).await {
+              Ok(_) => false,
+              Err(_e) => true,
+            }
           }
-
-          log_viewers.append(
-            &mut blocking(pool, move |conn| {
-              UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
-            })
-            .await??,
-          );
-
-          !log_viewers.contains(&user_id)
         }
         Err(_e) => true,
       },
@@ -289,33 +302,20 @@ impl Perform for Oper<CreateSite> {
   ) -> Result<SiteResponse, LemmyError> {
     let data: &CreateSite = &self.data;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
-    if let Err(slurs) = slur_check(&data.name) {
-      return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
-    }
-
-    if let Some(description) = &data.description {
-      if let Err(slurs) = slur_check(description) {
-        return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
-      }
-    }
-
-    let user_id = claims.id;
+    check_slurs(&data.name)?;
+    check_slurs_opt(&data.description)?;
 
     // Make sure user is an admin
-    let user = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
-    if !user.admin {
-      return Err(APIError::err("not_an_admin").into());
-    }
+    is_admin(pool, user.id).await?;
 
     let site_form = SiteForm {
       name: data.name.to_owned(),
       description: data.description.to_owned(),
-      creator_id: user_id,
+      icon: Some(data.icon.to_owned()),
+      banner: Some(data.banner.to_owned()),
+      creator_id: user.id,
       enable_downvotes: data.enable_downvotes,
       open_registration: data.open_registration,
       enable_nsfw: data.enable_nsfw,
@@ -343,35 +343,24 @@ impl Perform for Oper<EditSite> {
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<SiteResponse, LemmyError> {
     let data: &EditSite = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    if let Err(slurs) = slur_check(&data.name) {
-      return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
-    }
-
-    if let Some(description) = &data.description {
-      if let Err(slurs) = slur_check(description) {
-        return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
-      }
-    }
-
-    let user_id = claims.id;
+    check_slurs(&data.name)?;
+    check_slurs_opt(&data.description)?;
 
     // Make sure user is an admin
-    let user = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
-    if !user.admin {
-      return Err(APIError::err("not_an_admin").into());
-    }
+    is_admin(pool, user.id).await?;
 
     let found_site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
+
+    let icon = diesel_option_overwrite(&data.icon);
+    let banner = diesel_option_overwrite(&data.banner);
 
     let site_form = SiteForm {
       name: data.name.to_owned(),
       description: data.description.to_owned(),
+      icon,
+      banner,
       creator_id: found_site.creator_id,
       updated: Some(naive_now()),
       enable_downvotes: data.enable_downvotes,
@@ -412,7 +401,7 @@ impl Perform for Oper<GetSite> {
     pool: &DbPool,
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetSiteResponse, LemmyError> {
-    let _data: &GetSite = &self.data;
+    let data: &GetSite = &self.data;
 
     // TODO refactor this a little
     let res = blocking(pool, move |conn| Site::read(conn, 1)).await?;
@@ -428,6 +417,8 @@ impl Perform for Oper<GetSite> {
         show_nsfw: true,
         captcha_id: "".to_string(),
         pronouns: None,
+        captcha_uuid: None,
+        captcha_answer: None,
       };
       let login_response = Oper::new(register, self.client.clone())
         .perform(pool, websocket_info.clone())
@@ -437,6 +428,8 @@ impl Perform for Oper<GetSite> {
       let create_site = CreateSite {
         name: setup.site_name.to_owned(),
         description: None,
+        icon: None,
+        banner: None,
         enable_downvotes: true,
         open_registration: true,
         enable_nsfw: true,
@@ -484,11 +477,20 @@ impl Perform for Oper<GetSite> {
       0
     };
 
+    let my_user = get_user_from_jwt_opt(&data.auth, pool).await?.map(|mut u| {
+      u.password_encrypted = "".to_string();
+      u.private_key = None;
+      u.public_key = None;
+      u
+    });
+
     Ok(GetSiteResponse {
       site: site_view,
       admins,
       banned,
       online,
+      version: version::VERSION.to_string(),
+      my_user,
     })
   }
 }
@@ -511,16 +513,8 @@ impl Perform for Oper<Search> {
       Err(e) => debug!("Failed to resolve search query as activitypub ID: {}", e),
     }
 
-    let user_id: Option<i32> = match &data.auth {
-      Some(auth) => match Claims::decode(&auth) {
-        Ok(claims) => {
-          let user_id = claims.claims.id;
-          Some(user_id)
-        }
-        Err(_e) => None,
-      },
-      None => None,
-    };
+    let user = get_user_from_jwt_opt(&data.auth, pool).await?;
+    let user_id = user.map(|u| u.id);
 
     let type_ = SearchType::from_str(&data.type_)?;
 
@@ -675,40 +669,29 @@ impl Perform for Oper<TransferSite> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetSiteResponse, LemmyError> {
     let data: &TransferSite = &self.data;
+    let mut user = get_user_from_jwt(&data.auth, pool).await?;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    // TODO add a User_::read_safe() for this.
+    user.password_encrypted = "".to_string();
+    user.private_key = None;
+    user.public_key = None;
 
     let read_site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
 
     // Make sure user is the creator
-    if read_site.creator_id != user_id {
+    if read_site.creator_id != user.id {
       return Err(APIError::err("not_an_admin").into());
     }
 
-    let site_form = SiteForm {
-      name: read_site.name,
-      description: read_site.description,
-      creator_id: data.user_id,
-      updated: Some(naive_now()),
-      enable_downvotes: read_site.enable_downvotes,
-      open_registration: read_site.open_registration,
-      enable_nsfw: read_site.enable_nsfw,
-      enable_create_communities: read_site.enable_create_communities,
-    };
-
-    let update_site = move |conn: &'_ _| Site::update(conn, 1, &site_form);
-    if blocking(pool, update_site).await?.is_err() {
+    let new_creator_id = data.user_id;
+    let transfer_site = move |conn: &'_ _| Site::transfer(conn, new_creator_id);
+    if blocking(pool, transfer_site).await?.is_err() {
       return Err(APIError::err("couldnt_update_site").into());
     };
 
     // Mod tables
     let form = ModAddForm {
-      mod_user_id: user_id,
+      mod_user_id: user.id,
       other_user_id: data.user_id,
       removed: Some(false),
     };
@@ -732,6 +715,8 @@ impl Perform for Oper<TransferSite> {
       admins,
       banned,
       online: 0,
+      version: version::VERSION.to_string(),
+      my_user: Some(user),
     })
   }
 }
@@ -746,21 +731,10 @@ impl Perform for Oper<GetSiteConfig> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetSiteConfigResponse, LemmyError> {
     let data: &GetSiteConfig = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     // Only let admins read this
-    let admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
-    let admin_ids: Vec<i32> = admins.into_iter().map(|m| m.id).collect();
-
-    if !admin_ids.contains(&user_id) {
-      return Err(APIError::err("not_an_admin").into());
-    }
+    is_admin(pool, user.id).await?;
 
     let config_hjson = Settings::read_config_file()?;
 
@@ -778,19 +752,13 @@ impl Perform for Oper<SaveSiteConfig> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetSiteConfigResponse, LemmyError> {
     let data: &SaveSiteConfig = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     // Only let admins read this
     let admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
     let admin_ids: Vec<i32> = admins.into_iter().map(|m| m.id).collect();
 
-    if !admin_ids.contains(&user_id) {
+    if !admin_ids.contains(&user.id) {
       return Err(APIError::err("not_an_admin").into());
     }
 

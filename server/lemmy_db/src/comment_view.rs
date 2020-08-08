@@ -23,11 +23,13 @@ table! {
     community_actor_id -> Text,
     community_local -> Bool,
     community_name -> Varchar,
+    community_icon -> Nullable<Text>,
     banned -> Bool,
     banned_from_community -> Bool,
     creator_actor_id -> Text,
     creator_local -> Bool,
     creator_name -> Varchar,
+    creator_preferred_username -> Nullable<Varchar>,
     creator_published -> Timestamp,
     creator_avatar -> Nullable<Text>,
     creator_tags -> Nullable<Jsonb>,
@@ -36,6 +38,7 @@ table! {
     upvotes -> BigInt,
     downvotes -> BigInt,
     hot_rank -> Int4,
+    hot_rank_active -> Int4,
     user_id -> Nullable<Int4>,
     my_vote -> Nullable<Int4>,
     subscribed -> Nullable<Bool>,
@@ -62,11 +65,13 @@ table! {
     community_actor_id -> Text,
     community_local -> Bool,
     community_name -> Varchar,
+    community_icon -> Nullable<Text>,
     banned -> Bool,
     banned_from_community -> Bool,
     creator_actor_id -> Text,
     creator_local -> Bool,
     creator_name -> Varchar,
+    creator_preferred_username -> Nullable<Varchar>,
     creator_published -> Timestamp,
     creator_avatar -> Nullable<Text>,
     creator_tags -> Nullable<Jsonb>,
@@ -75,6 +80,7 @@ table! {
     upvotes -> BigInt,
     downvotes -> BigInt,
     hot_rank -> Int4,
+    hot_rank_active -> Int4,
     user_id -> Nullable<Int4>,
     my_vote -> Nullable<Int4>,
     subscribed -> Nullable<Bool>,
@@ -104,11 +110,13 @@ pub struct CommentView {
   pub community_actor_id: String,
   pub community_local: bool,
   pub community_name: String,
+  pub community_icon: Option<String>,
   pub banned: bool,
   pub banned_from_community: bool,
   pub creator_actor_id: String,
   pub creator_local: bool,
   pub creator_name: String,
+  pub creator_preferred_username: Option<String>,
   pub creator_published: chrono::NaiveDateTime,
   pub creator_avatar: Option<String>,
   pub creator_tags: Option<serde_json::Value>,
@@ -117,6 +125,7 @@ pub struct CommentView {
   pub upvotes: i64,
   pub downvotes: i64,
   pub hot_rank: i32,
+  pub hot_rank_active: i32,
   pub user_id: Option<i32>,
   pub my_vote: Option<i32>,
   pub subscribed: Option<bool>,
@@ -250,6 +259,9 @@ impl<'a> CommentQueryBuilder<'a> {
       SortType::Hot => query
         .order_by(hot_rank.desc())
         .then_order_by(published.desc()),
+      SortType::Active => query
+        .order_by(hot_rank_active.desc())
+        .then_order_by(published.desc()),
       SortType::New => query.order_by(published.desc()),
       SortType::TopAll => query.order_by(score.desc()),
       SortType::TopYear => query
@@ -321,11 +333,13 @@ table! {
     community_actor_id -> Text,
     community_local -> Bool,
     community_name -> Varchar,
+    community_icon -> Nullable<Varchar>,
     banned -> Bool,
     banned_from_community -> Bool,
     creator_actor_id -> Text,
     creator_local -> Bool,
     creator_name -> Varchar,
+    creator_preferred_username -> Nullable<Varchar>,
     creator_avatar -> Nullable<Text>,
     creator_tags -> Nullable<Jsonb>,
     creator_community_tags -> Nullable<Jsonb>,
@@ -334,6 +348,7 @@ table! {
     upvotes -> BigInt,
     downvotes -> BigInt,
     hot_rank -> Int4,
+    hot_rank_active -> Int4,
     user_id -> Nullable<Int4>,
     my_vote -> Nullable<Int4>,
     subscribed -> Nullable<Bool>,
@@ -364,11 +379,13 @@ pub struct ReplyView {
   pub community_actor_id: String,
   pub community_local: bool,
   pub community_name: String,
+  pub community_icon: Option<String>,
   pub banned: bool,
   pub banned_from_community: bool,
   pub creator_actor_id: String,
   pub creator_local: bool,
   pub creator_name: String,
+  pub creator_preferred_username: Option<String>,
   pub creator_avatar: Option<String>,
   pub creator_tags: Option<serde_json::Value>,
   pub creator_community_tags: Option<serde_json::Value>,
@@ -377,6 +394,7 @@ pub struct ReplyView {
   pub upvotes: i64,
   pub downvotes: i64,
   pub hot_rank: i32,
+  pub hot_rank_active: i32,
   pub user_id: Option<i32>,
   pub my_vote: Option<i32>,
   pub subscribed: Option<bool>,
@@ -447,7 +465,7 @@ impl<'a> ReplyQueryBuilder<'a> {
     }
 
     query = match self.sort {
-      // SortType::Hot => query.order_by(hot_rank.desc()),
+      // SortType::Hot => query.order_by(hot_rank.desc()), // TODO why is this commented
       SortType::New => query.order_by(published.desc()),
       SortType::TopAll => query.order_by(score.desc()),
       SortType::TopYear => query
@@ -498,6 +516,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       updated: None,
@@ -508,7 +527,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
+      actor_id: "changeme_92873982".into(),
       bio: None,
       local: true,
       private_key: None,
@@ -528,12 +547,14 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "http://fake.com".into(),
+      actor_id: "changeme_7625376".into(),
       local: true,
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
       published: None,
+      icon: None,
+      banner: None,
     };
 
     let inserted_community = Community::create(&conn, &new_community).unwrap();
@@ -594,6 +615,7 @@ mod tests {
       post_name: inserted_post.name.to_owned(),
       community_id: inserted_community.id,
       community_name: inserted_community.name.to_owned(),
+      community_icon: None,
       parent_id: None,
       removed: false,
       deleted: false,
@@ -603,6 +625,7 @@ mod tests {
       published: inserted_comment.published,
       updated: None,
       creator_name: inserted_user.name.to_owned(),
+      creator_preferred_username: None,
       creator_published: inserted_user.published,
       creator_avatar: None,
       creator_tags: None,
@@ -610,6 +633,7 @@ mod tests {
       score: 1,
       downvotes: 0,
       hot_rank: 0,
+      hot_rank_active: 0,
       upvotes: 1,
       user_id: None,
       my_vote: None,
@@ -631,6 +655,7 @@ mod tests {
       post_name: inserted_post.name.to_owned(),
       community_id: inserted_community.id,
       community_name: inserted_community.name.to_owned(),
+      community_icon: None,
       parent_id: None,
       removed: false,
       deleted: false,
@@ -640,6 +665,7 @@ mod tests {
       published: inserted_comment.published,
       updated: None,
       creator_name: inserted_user.name.to_owned(),
+      creator_preferred_username: None,
       creator_published: inserted_user.published,
       creator_avatar: None,
       creator_tags: None,
@@ -647,6 +673,7 @@ mod tests {
       score: 1,
       downvotes: 0,
       hot_rank: 0,
+      hot_rank_active: 0,
       upvotes: 1,
       user_id: Some(inserted_user.id),
       my_vote: Some(1),
@@ -665,6 +692,7 @@ mod tests {
       .list()
       .unwrap();
     read_comment_views_no_user[0].hot_rank = 0;
+    read_comment_views_no_user[0].hot_rank_active = 0;
 
     let mut read_comment_views_with_user = CommentQueryBuilder::create(&conn)
       .for_post_id(inserted_post.id)
@@ -672,6 +700,7 @@ mod tests {
       .list()
       .unwrap();
     read_comment_views_with_user[0].hot_rank = 0;
+    read_comment_views_with_user[0].hot_rank_active = 0;
 
     let like_removed = CommentLike::remove(&conn, &comment_like_form).unwrap();
     let num_deleted = Comment::delete(&conn, inserted_comment.id).unwrap();

@@ -1,17 +1,19 @@
 use crate::{
   community::CommunityModerator,
+  is_email_regex,
   naive_now,
   schema::{user_, user_::dsl::*},
   Crud,
 };
 use bcrypt::{hash, DEFAULT_COST};
 use diesel::{dsl::*, result::Error, *};
+use serde::{Deserialize, Serialize};
 
 // TextOrNullableText is a marker trait for Text or Nullable<Text>
 // if/when it is eventuly removed form diesel this needs to be changed
 sql_function!(fn lower<TT: TextOrNullableText>(x: TT) -> sql_types::Text);
 
-#[derive(Clone, Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Clone, Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
 #[table_name = "user_"]
 pub struct User_ {
   pub id: i32,
@@ -38,6 +40,7 @@ pub struct User_ {
   pub private_key: Option<String>,
   pub public_key: Option<String>,
   pub last_refreshed_at: chrono::NaiveDateTime,
+  pub banner: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -49,7 +52,7 @@ pub struct UserForm {
   pub admin: bool,
   pub banned: bool,
   pub email: Option<String>,
-  pub avatar: Option<String>,
+  pub avatar: Option<Option<String>>,
   pub updated: Option<chrono::NaiveDateTime>,
   pub show_nsfw: bool,
   pub theme: String,
@@ -65,6 +68,7 @@ pub struct UserForm {
   pub private_key: Option<String>,
   pub public_key: Option<String>,
   pub last_refreshed_at: Option<chrono::NaiveDateTime>,
+  pub banner: Option<Option<String>>,
 }
 
 impl Crud<UserForm> for User_ {
@@ -147,10 +151,19 @@ impl User_ {
         || community.creator_id == self.id,
     )
   }
-}
 
-impl User_ {
-  pub fn find_by_username(conn: &PgConnection, username: &str) -> Result<Self, Error> {
+  pub fn find_by_email_or_username(
+    conn: &PgConnection,
+    username_or_email: &str,
+  ) -> Result<Self, Error> {
+    if is_email_regex(username_or_email) {
+      Self::find_by_email(conn, username_or_email)
+    } else {
+      Self::find_by_username(conn, username_or_email)
+    }
+  }
+
+  pub fn find_by_username(conn: &PgConnection, username: &str) -> Result<User_, Error> {
     user_
       .filter(lower(name).eq(username.to_lowercase()))
       .first::<User_>(conn)
@@ -182,6 +195,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       updated: None,
@@ -192,7 +206,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
+      actor_id: "changeme_9826382637".into(),
       bio: None,
       local: true,
       private_key: None,
@@ -210,6 +224,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       published: inserted_user.published,
@@ -221,7 +236,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
+      actor_id: inserted_user.actor_id.to_owned(),
       bio: None,
       local: true,
       private_key: None,
@@ -251,6 +266,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       updated: None,
@@ -276,6 +292,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       updated: None,
@@ -301,6 +318,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       updated: None,
@@ -339,6 +357,8 @@ mod tests {
       public_key: None,
       last_refreshed_at: None,
       published: None,
+      banner: None,
+      icon: None,
     };
 
     let inserted_community = Community::create(&conn, &new_community).unwrap();

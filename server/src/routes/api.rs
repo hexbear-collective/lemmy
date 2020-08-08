@@ -64,7 +64,9 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("", web::put().to(route_post::<EditCommunity>))
           .route("/list", web::get().to(route_get::<ListCommunities>))
           .route("/follow", web::post().to(route_post::<FollowCommunity>))
+          .route("/delete", web::post().to(route_post::<DeleteCommunity>))
           // Mod Actions
+          .route("/remove", web::post().to(route_post::<RemoveCommunity>))
           .route("/transfer", web::post().to(route_post::<TransferCommunity>))
           .route("/ban_user", web::post().to(route_post::<BanFromCommunity>))
           .route("/mod", web::post().to(route_post::<AddModToCommunity>))
@@ -102,6 +104,10 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .wrap(rate_limit.message())
           .route("", web::get().to(route_get::<GetPost>))
           .route("", web::put().to(route_post::<EditPost>))
+          .route("/delete", web::post().to(route_post::<DeletePost>))
+          .route("/remove", web::post().to(route_post::<RemovePost>))
+          .route("/lock", web::post().to(route_post::<LockPost>))
+          .route("/sticky", web::post().to(route_post::<StickyPost>))
           .route("/list", web::get().to(route_get::<GetPosts>))
           .route("/like", web::post().to(route_post::<CreatePostLike>))
           .route("/save", web::put().to(route_post::<SavePost>))
@@ -128,6 +134,12 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
         web::scope("/comment")
           .wrap(rate_limit.message())
           .route("", web::put().to(route_post::<EditComment>))
+          .route("/delete", web::post().to(route_post::<DeleteComment>))
+          .route("/remove", web::post().to(route_post::<RemoveComment>))
+          .route(
+            "/mark_as_read",
+            web::post().to(route_post::<MarkCommentAsRead>),
+          )
           .route("/like", web::post().to(route_post::<CreateCommentLike>))
           .route("/save", web::put().to(route_post::<SaveComment>))
           .route(
@@ -146,7 +158,15 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
         web::scope("/private_message")
           .wrap(rate_limit.message())
           .route("/list", web::get().to(route_get::<GetPrivateMessages>))
-          .route("", web::put().to(route_post::<EditPrivateMessage>)),
+          .route("", web::put().to(route_post::<EditPrivateMessage>))
+          .route(
+            "/delete",
+            web::post().to(route_post::<DeletePrivateMessage>),
+          )
+          .route(
+            "/mark_as_read",
+            web::post().to(route_post::<MarkPrivateMessageAsRead>),
+          ),
       )
       // User
       .service(
@@ -163,7 +183,10 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .wrap(rate_limit.message())
           .route("", web::get().to(route_get::<GetUserDetails>))
           .route("/mention", web::get().to(route_get::<GetUserMentions>))
-          .route("/mention", web::put().to(route_post::<EditUserMention>))
+          .route(
+            "/mention/mark_as_read",
+            web::post().to(route_post::<MarkUserMentionAsRead>),
+          )
           .route("/replies", web::get().to(route_get::<GetReplies>))
           .route(
             "/followed_communities",
@@ -173,6 +196,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/ban", web::post().to(route_post::<BanUser>))
           // Account actions. I don't like that they're in /user maybe /accounts
           .route("/login", web::post().to(route_post::<Login>))
+          .route("/get_captcha", web::get().to(route_post::<GetCaptcha>))
           .route(
             "/delete_account",
             web::post().to(route_post::<DeleteAccount>),

@@ -77,6 +77,9 @@ impl Post {
     use crate::schema::post::dsl::*;
     post
       .filter(community_id.eq(the_community_id))
+      .then_order_by(published.desc())
+      .then_order_by(stickied.desc())
+      .limit(20)
       .load::<Self>(conn)
   }
 
@@ -108,6 +111,50 @@ impl Post {
         updated.eq(naive_now()),
       ))
       .get_result::<Self>(conn)
+  }
+
+  pub fn update_deleted(
+    conn: &PgConnection,
+    post_id: i32,
+    new_deleted: bool,
+  ) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+    diesel::update(post.find(post_id))
+      .set((deleted.eq(new_deleted), updated.eq(naive_now())))
+      .get_result::<Self>(conn)
+  }
+
+  pub fn update_removed(
+    conn: &PgConnection,
+    post_id: i32,
+    new_removed: bool,
+  ) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+    diesel::update(post.find(post_id))
+      .set((removed.eq(new_removed), updated.eq(naive_now())))
+      .get_result::<Self>(conn)
+  }
+
+  pub fn update_locked(conn: &PgConnection, post_id: i32, new_locked: bool) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+    diesel::update(post.find(post_id))
+      .set(locked.eq(new_locked))
+      .get_result::<Self>(conn)
+  }
+
+  pub fn update_stickied(
+    conn: &PgConnection,
+    post_id: i32,
+    new_stickied: bool,
+  ) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+    diesel::update(post.find(post_id))
+      .set(stickied.eq(new_stickied))
+      .get_result::<Self>(conn)
+  }
+
+  pub fn is_post_creator(user_id: i32, post_creator_id: i32) -> bool {
+    user_id == post_creator_id
   }
 }
 
@@ -316,6 +363,7 @@ mod tests {
       email: None,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       admin: false,
       banned: false,
       updated: None,
@@ -326,7 +374,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
+      actor_id: "changeme_8292683678".into(),
       bio: None,
       local: true,
       private_key: None,
@@ -346,12 +394,14 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "http://fake.com".into(),
+      actor_id: "changeme_8223262378".into(),
       local: true,
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
       published: None,
+      icon: None,
+      banner: None,
     };
 
     let inserted_community = Community::create(&conn, &new_community).unwrap();

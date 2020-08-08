@@ -2,9 +2,12 @@
 pub extern crate diesel;
 #[macro_use]
 pub extern crate strum_macros;
+#[macro_use]
+pub extern crate lazy_static;
 pub extern crate bcrypt;
 pub extern crate chrono;
 pub extern crate log;
+pub extern crate regex;
 pub extern crate serde;
 #[macro_use]
 pub extern crate serde_json;
@@ -13,6 +16,7 @@ pub extern crate strum;
 
 use chrono::NaiveDateTime;
 use diesel::{dsl::*, result::Error, *};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{env, env::VarError};
 
@@ -143,6 +147,7 @@ pub fn get_database_url_from_env() -> Result<String, VarError> {
 
 #[derive(EnumString, ToString, Debug, Serialize, Deserialize)]
 pub enum SortType {
+  Active,
   Hot,
   New,
   TopDay,
@@ -185,10 +190,33 @@ pub fn naive_now() -> NaiveDateTime {
   chrono::prelude::Utc::now().naive_utc()
 }
 
+pub fn is_email_regex(test: &str) -> bool {
+  EMAIL_REGEX.is_match(test)
+}
+
+pub fn diesel_option_overwrite(opt: &Option<String>) -> Option<Option<String>> {
+  match opt {
+    // An empty string is an erase
+    Some(unwrapped) => {
+      if !unwrapped.eq("") {
+        Some(Some(unwrapped.to_owned()))
+      } else {
+        Some(None)
+      }
+    }
+    None => None,
+  }
+}
+
+lazy_static! {
+  static ref EMAIL_REGEX: Regex =
+    Regex::new(r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$").unwrap();
+}
+
 #[cfg(test)]
 mod tests {
   use super::fuzzy_search;
-  use crate::get_database_url_from_env;
+  use crate::{get_database_url_from_env, is_email_regex};
   use diesel::{Connection, PgConnection};
 
   pub fn establish_unpooled_connection() -> PgConnection {
@@ -206,5 +234,11 @@ mod tests {
   fn test_fuzzy_search() {
     let test = "This is a fuzzy search";
     assert_eq!(fuzzy_search(test), "%This%is%a%fuzzy%search%".to_string());
+  }
+
+  #[test]
+  fn test_email() {
+    assert!(is_email_regex("gush@gmail.com"));
+    assert!(!is_email_regex("nada_neutho"));
   }
 }
