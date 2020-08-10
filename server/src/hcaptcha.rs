@@ -19,8 +19,8 @@ pub enum ErrorCode {
   MissingInputSecret,           // Your secret key is missing.
   InvalidInputSecret,           // Your secret key is invalid or malformed.
   MissingInputResponse,         // The response parameter (verification token) is missing.
-  InvalidInputResponse, // The response parameter (verification token) is invalid or malformed.
-  BadRequest,           // The request is invalid or malformed.
+  InvalidInputResponse,         // The response parameter (verification token) is invalid or malformed.
+  BadRequest,                   // The request is invalid or malformed.
   InvalidOrAlreadySeenResponse, // The response parameter has already been checked, or has another issue.
   SitekeySecretMismatch,        // The sitekey is not registered with the provided secret.
 
@@ -29,15 +29,6 @@ pub enum ErrorCode {
   ParseError,    // Unable to parse response from hCaptcha
   RequestFailed, // Request failed for some reason
 }
-
-// let error_strings: vec<(String, ErrorCode)> = vec!([
-//   ("missing-input-secret",             ErrorCode::MissingInputSecret),
-//   ("invalid-input-secret",             ErrorCode::InvalidInputSecret),
-//   ("missing-input-response",           ErrorCode::MissingInputResponse),
-//   ("invalid-input-response",           ErrorCode::InvalidInputResponse),
-//   ("bad-request",                      ErrorCode::BadRequest),
-//   ("invalid-or-already-seen-response", ErrorCode::InvalidOrAlreadySeenResponse),
-//   ("sitekey-secret-mismatch",          ErrorCode::SitekeySecretMismatch)]);
 
 impl ErrorCode {
   fn from_str(code: &str) -> Self {
@@ -104,7 +95,6 @@ pub async fn hcaptcha_verify(hcaptcha_id: String) -> Result<HCaptchaResponse, HC
         }
         Err(e) => {
           error!("hCaptcha parse failed: {}", e);
-          //error!("Response body: {:?}", response.text().await);
           Err(HCaptchaError::err(ErrorCode::ParseError))
         }
       }

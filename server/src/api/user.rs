@@ -468,17 +468,6 @@ impl Perform for Oper<Register> {
   ) -> Result<LoginResponse, LemmyError> {
     let data: &Register = &self.data;
 
-    if Settings::get().hcaptcha.enabled {
-      if let Some(hcaptcha_id) = data.captcha_id.clone() {
-        if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
-          error!("hCaptcha failed: {:?}", hcaptcha_error);
-          return Err(APIError::err("captcha_failed").into());
-        }
-      } else {
-        return Err(APIError::err("missing_hcaptcha_id").into());
-      }
-    }
-
     // Make sure there are no admins
     // We put this first because there is no captcha when setting up the site.
     // We bypass captcha check if an admin is legitimately being created
