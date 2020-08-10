@@ -113,6 +113,8 @@ select
   u."preferred_username" as creator_preferred_username,
   u.published as creator_published,
 	u.avatar as creator_avatar,
+  ut.tags as creator_tags,
+	cut.tags as creator_community_tags,
   u.banned as banned,
   cb.id::bool as banned_from_community,
 	-- community details
@@ -129,10 +131,19 @@ select
 	coalesce(pl.upvotes, 0) as upvotes,
 	coalesce(pl.downvotes, 0) as downvotes,
 	hot_rank(coalesce(pl.score, 1), p.published) as hot_rank,
-  hot_rank(coalesce(pl.score, 1), greatest(ct.recent_comment_time, p.published)) as hot_rank_active,
+  hot_rank(coalesce(pl.score, 1), (
+    -- ~77% of a new comment's effect at (24/6) = 12 hours
+    p.published + ('86400 seconds'::interval * (1 - exp(
+      -- -1.2146493725346809e-05 = ln(1.3) / (3600 * 6)
+      -1.2146493725346809e-05::decimal *
+      (EXTRACT(EPOCH FROM (greatest(ct.recent_comment_time, p.published) - p.published)))
+    )))
+  )) as hot_rank_active,
 	greatest(ct.recent_comment_time, p.published) as newest_activity_time
 from post p
 left join user_ u on p.creator_id = u.id
+left join user_tag ut on p.creator_id = ut.user_id
+left join community_user_tag cut on p.creator_id = cut.user_id and p.community_id = cut.community_id
 left join community_user_ban cb on p.creator_id = cb.user_id and p.community_id = cb.community_id
 left join community c on p.community_id = c.id
 left join (
@@ -412,6 +423,8 @@ select
   u.preferred_username as creator_preferred_username,
   u.published as creator_published,
 	u.avatar as creator_avatar,
+  ut.tags as creator_tags,
+	cut.tags as creator_community_tags,
 	-- score details
 	coalesce(cl.total, 0) as score,
 	coalesce(cl.up, 0) as upvotes,
@@ -422,6 +435,8 @@ from comment ct
 left join post p on ct.post_id = p.id
 left join community c on p.community_id = c.id
 left join user_ u on ct.creator_id = u.id
+left join user_tag ut on ct.creator_id = ut.user_id
+left join community_user_tag cut on ct.creator_id = cut.user_id and p.community_id = cut.community_id
 left join community_user_ban cb on ct.creator_id = cb.user_id and p.id = ct.post_id and p.community_id = cb.community_id
 left join (
 	select
