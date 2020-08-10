@@ -69,6 +69,12 @@
     enabled: true
     difficulty: medium # Can be easy, medium, or hard
   }
+  hcaptcha: {
+    enabled: false
+    verify_url: "https://hcaptcha.com/siteverify"
+    secret_key: "0x0000000000000000000000000000000000000000"
+    site_key: "10000000-ffff-ffff-ffff-000000000001"
+  }
 #  # email sending configuration
 #  email: {
 #    # hostname and port of the smtp server

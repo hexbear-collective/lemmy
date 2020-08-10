@@ -12,6 +12,7 @@ use crate::{
   apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
+  hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
@@ -63,13 +64,13 @@ use lemmy_utils::{
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, env, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
   username_or_email: String,
   password: String,
-  captcha_id: String,
+  captcha_id: Option<String>, // hcaptcha id
 }
 
 #[derive(Serialize, Deserialize)]
@@ -80,10 +81,10 @@ pub struct Register {
   pub password_verify: String,
   pub admin: bool,
   pub show_nsfw: bool,
-  pub captcha_id: String,
   pub pronouns: Option<String>,
   pub captcha_uuid: Option<String>,
   pub captcha_answer: Option<String>,
+  pub captcha_id: Option<String>, // hcaptcha id
 }
 
 #[derive(Serialize, Deserialize)]
@@ -297,13 +298,6 @@ pub struct UserJoinResponse {
   pub user_id: i32,
 }
 
-#[derive(Serialize, Deserialize)]
-struct HCaptchaResponse {
-  success: bool,
-  #[serde(rename = "error-codes")]
-  error_codes: Option<Vec<String>>,
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GetUserTag {
   user: i32,
@@ -427,35 +421,17 @@ impl Perform for Oper<Login> {
     pool: &DbPool,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
-    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
-      Ok(key) => key,
-      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
-    };
-
     let data: &Login = &self.data;
 
-    let client = reqwest::Client::new();
-    let body = [
-      ("secret", secret_key),
-      ("response", data.captcha_id.clone()),
-    ];
-    let res = client
-      .post("https://hcaptcha.com/siteverify")
-      .form(&body)
-      .send()
-      .await?;
-    //println!("received {:?}", &res.text());
-    let parsed_response: HCaptchaResponse = res.json().await?;
-    if !parsed_response.success {
-      let err_string: String = format!(
-        "invalid_captcha;{}",
-        &parsed_response
-          .error_codes
-          .unwrap()
-          .join(";")
-          .replace("-", "_")
-      );
-      return Err(APIError::err(&err_string).into());
+    if Settings::get().hcaptcha.enabled {
+      if let Some(hcaptcha_id) = data.captcha_id.clone() {
+        if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+          error!("hCaptcha failed: {:?}", hcaptcha_error);
+          return Err(APIError::err("captcha_failed").into());
+        }
+      } else {
+        return Err(APIError::err("missing_hcaptcha_id").into());
+      }
     }
 
     // Fetch that username / email
@@ -490,12 +466,18 @@ impl Perform for Oper<Register> {
     pool: &DbPool,
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
-    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
-      Ok(key) => key,
-      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
-    };
-
     let data: &Register = &self.data;
+
+    if Settings::get().hcaptcha.enabled {
+      if let Some(hcaptcha_id) = data.captcha_id.clone() {
+        if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+          error!("hCaptcha failed: {:?}", hcaptcha_error);
+          return Err(APIError::err("captcha_failed").into());
+        }
+      } else {
+        return Err(APIError::err("missing_hcaptcha_id").into());
+      }
+    }
 
     // Make sure there are no admins
     // We put this first because there is no captcha when setting up the site.
@@ -508,29 +490,14 @@ impl Perform for Oper<Register> {
       return Err(APIError::err("admin_already_created").into());
     }
 
-    if !data.admin {
-      let client = reqwest::Client::new();
-      let body = [
-        ("secret", secret_key),
-        ("response", data.captcha_id.clone()),
-      ];
-      let res = client
-        .post("https://hcaptcha.com/siteverify")
-        .form(&body)
-        .send()
-        .await?;
-      //println!("received {:?}", &res.text());
-      let parsed_response: HCaptchaResponse = res.json().await?;
-      if !parsed_response.success {
-        let err_string: String = format!(
-          "invalid_captcha;{}",
-          &parsed_response
-            .error_codes
-            .unwrap()
-            .join(";")
-            .replace("-", "_")
-        );
-        return Err(APIError::err(&err_string).into());
+    if !data.admin && Settings::get().hcaptcha.enabled {
+      if let Some(hcaptcha_id) = data.captcha_id.clone() {
+        if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+          error!("hCaptcha failed: {:?}", hcaptcha_error);
+          return Err(APIError::err("captcha_failed").into());
+        }
+      } else {
+        return Err(APIError::err("missing_hcaptcha_id").into());
       }
     }
 

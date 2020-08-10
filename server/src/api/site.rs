@@ -415,7 +415,7 @@ impl Perform for Oper<GetSite> {
         password_verify: setup.admin_password.to_owned(),
         admin: true,
         show_nsfw: true,
-        captcha_id: "".to_string(),
+        captcha_id: None,
         pronouns: None,
         captcha_uuid: None,
         captcha_answer: None,
