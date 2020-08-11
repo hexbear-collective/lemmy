@@ -19,7 +19,6 @@ pub struct Settings {
   pub email: Option<EmailConfig>,
   pub federation: Federation,
   pub captcha: CaptchaConfig,
-  pub hcaptcha: HCaptchaConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -54,15 +53,11 @@ pub struct EmailConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CaptchaConfig {
   pub enabled: bool,
+  pub provider: String,   // lemmy, hcaptcha
   pub difficulty: String, // easy, medium, or hard
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct HCaptchaConfig {
-  pub enabled: bool,
-  pub verify_url: String,
-  pub secret_key: String,
-  pub site_key: String,
+  pub hcaptcha_secret_key: String,
+  pub hcaptcha_site_key: String,
+  pub hcaptcha_verify_url: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

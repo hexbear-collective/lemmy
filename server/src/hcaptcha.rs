@@ -8,7 +8,7 @@ pub struct HCaptchaResponse {
   pub success: bool,
   pub challenge_ts: chrono::DateTime<Utc>,
   pub hostname: String,
-  pub credit: bool,
+  pub credit: Option<bool>,
   #[serde(rename = "error-codes")]
   pub error_codes: Option<Vec<String>>,
 }
@@ -19,8 +19,8 @@ pub enum ErrorCode {
   MissingInputSecret,           // Your secret key is missing.
   InvalidInputSecret,           // Your secret key is invalid or malformed.
   MissingInputResponse,         // The response parameter (verification token) is missing.
-  InvalidInputResponse,         // The response parameter (verification token) is invalid or malformed.
-  BadRequest,                   // The request is invalid or malformed.
+  InvalidInputResponse, // The response parameter (verification token) is invalid or malformed.
+  BadRequest,           // The request is invalid or malformed.
   InvalidOrAlreadySeenResponse, // The response parameter has already been checked, or has another issue.
   SitekeySecretMismatch,        // The sitekey is not registered with the provided secret.
 
@@ -69,36 +69,35 @@ impl HCaptchaError {
 }
 
 pub async fn hcaptcha_verify(hcaptcha_id: String) -> Result<HCaptchaResponse, HCaptchaError> {
+  let captcha_settings = Settings::get().captcha;
   let client = reqwest::Client::new();
   let req_body = [
-    ("secret", Settings::get().hcaptcha.secret_key),
+    ("secret", captcha_settings.hcaptcha_secret_key),
     ("response", hcaptcha_id.clone()),
   ];
 
   let response = client
-    .post(Settings::get().hcaptcha.verify_url.as_str())
+    .post(captcha_settings.hcaptcha_verify_url.as_str())
     .form(&req_body)
     .send()
     .await;
 
   match response {
-    Ok(response) => {
-      match response.json::<HCaptchaResponse>().await {
-        Ok(response) => {
-          if response.success {
-            Ok(response)
-          } else if let Some(error_codes) = response.error_codes {
-            Err(HCaptchaError::from_strings(error_codes))
-          } else {
-            Err(HCaptchaError::err(ErrorCode::Unknown))
-          }
-        }
-        Err(e) => {
-          error!("hCaptcha parse failed: {}", e);
-          Err(HCaptchaError::err(ErrorCode::ParseError))
+    Ok(response) => match response.json::<HCaptchaResponse>().await {
+      Ok(response) => {
+        if response.success {
+          Ok(response)
+        } else if let Some(error_codes) = response.error_codes {
+          Err(HCaptchaError::from_strings(error_codes))
+        } else {
+          Err(HCaptchaError::err(ErrorCode::Unknown))
         }
       }
-    }
+      Err(e) => {
+        error!("hCaptcha parse failed: {}", e);
+        Err(HCaptchaError::err(ErrorCode::ParseError))
+      }
+    },
     Err(e) => {
       error!("hCaptcha request failed: {}", e);
       Err(HCaptchaError::err(ErrorCode::RequestFailed))
