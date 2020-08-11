@@ -67,7 +67,11 @@
   }
   captcha: {
     enabled: true
+    provider: lemmy    # Can be lemmy, hcaptcha
     difficulty: medium # Can be easy, medium, or hard
+    hcaptcha_secret_key: "0x0000000000000000000000000000000000000000"
+    hcaptcha_site_key: "10000000-ffff-ffff-ffff-000000000001"
+    hcaptcha_verify_url: "https://hcaptcha.com/siteverify"
   }
 #  # email sending configuration
 #  email: {

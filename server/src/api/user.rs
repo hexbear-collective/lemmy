@@ -12,6 +12,7 @@ use crate::{
   apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
+  hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
@@ -63,13 +64,13 @@ use lemmy_utils::{
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, env, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
   username_or_email: String,
   password: String,
-  captcha_id: String,
+  hcaptcha_id: Option<String>, // hcaptcha id
 }
 
 #[derive(Serialize, Deserialize)]
@@ -80,10 +81,10 @@ pub struct Register {
   pub password_verify: String,
   pub admin: bool,
   pub show_nsfw: bool,
-  pub captcha_id: String,
   pub pronouns: Option<String>,
   pub captcha_uuid: Option<String>,
   pub captcha_answer: Option<String>,
+  pub hcaptcha_id: Option<String>, // hcaptcha id
 }
 
 #[derive(Serialize, Deserialize)]
@@ -91,7 +92,10 @@ pub struct GetCaptcha {}
 
 #[derive(Serialize, Deserialize)]
 pub struct GetCaptchaResponse {
+  #[serde(skip_serializing_if = "Option::is_none")]
   ok: Option<CaptchaResponse>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  hcaptcha: Option<HCaptchaResponse>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -99,6 +103,12 @@ pub struct CaptchaResponse {
   png: String,         // A Base64 encoded png
   wav: Option<String>, // A Base64 encoded wav audio
   uuid: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HCaptchaResponse {
+  site_key: String,
+  verify_url: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -297,13 +307,6 @@ pub struct UserJoinResponse {
   pub user_id: i32,
 }
 
-#[derive(Serialize, Deserialize)]
-struct HCaptchaResponse {
-  success: bool,
-  #[serde(rename = "error-codes")]
-  error_codes: Option<Vec<String>>,
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GetUserTag {
   user: i32,
@@ -427,35 +430,18 @@ impl Perform for Oper<Login> {
     pool: &DbPool,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
-    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
-      Ok(key) => key,
-      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
-    };
-
     let data: &Login = &self.data;
+    let captcha_settings = Settings::get().captcha;
 
-    let client = reqwest::Client::new();
-    let body = [
-      ("secret", secret_key),
-      ("response", data.captcha_id.clone()),
-    ];
-    let res = client
-      .post("https://hcaptcha.com/siteverify")
-      .form(&body)
-      .send()
-      .await?;
-    //println!("received {:?}", &res.text());
-    let parsed_response: HCaptchaResponse = res.json().await?;
-    if !parsed_response.success {
-      let err_string: String = format!(
-        "invalid_captcha;{}",
-        &parsed_response
-          .error_codes
-          .unwrap()
-          .join(";")
-          .replace("-", "_")
-      );
-      return Err(APIError::err(&err_string).into());
+    if captcha_settings.enabled && captcha_settings.provider == *"hcaptcha" {
+      if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
+        if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+          error!("hCaptcha failed: {:?}", hcaptcha_error);
+          return Err(APIError::err("captcha_failed").into());
+        }
+      } else {
+        return Err(APIError::err("missing_hcaptcha_id").into());
+      }
     }
 
     // Fetch that username / email
@@ -490,12 +476,8 @@ impl Perform for Oper<Register> {
     pool: &DbPool,
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
-    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
-      Ok(key) => key,
-      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
-    };
-
     let data: &Register = &self.data;
+    let captcha_settings = Settings::get().captcha;
 
     // Make sure there are no admins
     // We put this first because there is no captcha when setting up the site.
@@ -506,32 +488,6 @@ impl Perform for Oper<Register> {
     .await??;
     if data.admin && !any_admins {
       return Err(APIError::err("admin_already_created").into());
-    }
-
-    if !data.admin {
-      let client = reqwest::Client::new();
-      let body = [
-        ("secret", secret_key),
-        ("response", data.captcha_id.clone()),
-      ];
-      let res = client
-        .post("https://hcaptcha.com/siteverify")
-        .form(&body)
-        .send()
-        .await?;
-      //println!("received {:?}", &res.text());
-      let parsed_response: HCaptchaResponse = res.json().await?;
-      if !parsed_response.success {
-        let err_string: String = format!(
-          "invalid_captcha;{}",
-          &parsed_response
-            .error_codes
-            .unwrap()
-            .join(";")
-            .replace("-", "_")
-        );
-        return Err(APIError::err(&err_string).into());
-      }
     }
 
     // Make sure site has open registration
@@ -548,28 +504,40 @@ impl Perform for Oper<Register> {
     }
 
     // If its not the admin, check the captcha
-    if !data.admin && Settings::get().captcha.enabled {
-      match websocket_info {
-        Some(ws) => {
-          let check = ws
-            .chatserver
-            .send(CheckCaptcha {
-              uuid: data
-                .captcha_uuid
-                .to_owned()
-                .unwrap_or_else(|| "".to_string()),
-              answer: data
-                .captcha_answer
-                .to_owned()
-                .unwrap_or_else(|| "".to_string()),
-            })
-            .await?;
-          if !check {
-            return Err(APIError::err("captcha_incorrect").into());
+    if !data.admin && captcha_settings.enabled {
+      match captcha_settings.provider.as_str() {
+        "hcaptcha" => {
+          if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
+            if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+              error!("hCaptcha failed: {:?}", hcaptcha_error);
+              return Err(APIError::err("captcha_failed").into());
+            }
+          } else {
+            return Err(APIError::err("missing_hcaptcha_id").into());
           }
         }
-        None => return Err(APIError::err("captcha_incorrect").into()),
-      };
+        _ => match websocket_info {
+          Some(ws) => {
+            let check = ws
+              .chatserver
+              .send(CheckCaptcha {
+                uuid: data
+                  .captcha_uuid
+                  .to_owned()
+                  .unwrap_or_else(|| "".to_string()),
+                answer: data
+                  .captcha_answer
+                  .to_owned()
+                  .unwrap_or_else(|| "".to_string()),
+              })
+              .await?;
+            if !check {
+              return Err(APIError::err("captcha_incorrect").into());
+            }
+          }
+          None => return Err(APIError::err("captcha_incorrect").into()),
+        },
+      }
     }
 
     check_slurs(&data.username)?;
@@ -741,39 +709,54 @@ impl Perform for Oper<GetCaptcha> {
     let captcha_settings = Settings::get().captcha;
 
     if !captcha_settings.enabled {
-      return Ok(GetCaptchaResponse { ok: None });
+      return Ok(GetCaptchaResponse {
+        ok: None,
+        hcaptcha: None,
+      });
     }
 
-    let captcha = match captcha_settings.difficulty.as_str() {
-      "easy" => gen(Difficulty::Easy),
-      "medium" => gen(Difficulty::Medium),
-      "hard" => gen(Difficulty::Hard),
-      _ => gen(Difficulty::Medium),
-    };
+    match captcha_settings.provider.as_str() {
+      "hcaptcha" => Ok(GetCaptchaResponse {
+        ok: None,
+        hcaptcha: Some(HCaptchaResponse {
+          site_key: captcha_settings.hcaptcha_site_key,
+          verify_url: captcha_settings.hcaptcha_verify_url,
+        }),
+      }),
+      _ => {
+        let captcha = match captcha_settings.difficulty.as_str() {
+          "easy" => gen(Difficulty::Easy),
+          "medium" => gen(Difficulty::Medium),
+          "hard" => gen(Difficulty::Hard),
+          _ => gen(Difficulty::Medium),
+        };
 
-    let answer = captcha.chars_as_string();
+        let answer = captcha.chars_as_string();
 
-    let png_byte_array = captcha.as_png().expect("failed to generate captcha");
+        let png_byte_array = captcha.as_png().expect("failed to generate captcha");
 
-    let png = base64::encode(png_byte_array);
+        let png = base64::encode(png_byte_array);
 
-    let uuid = uuid::Uuid::new_v4().to_string();
+        let uuid = uuid::Uuid::new_v4().to_string();
 
-    let wav = captcha_espeak_wav_base64(&answer).ok();
+        let wav = captcha_espeak_wav_base64(&answer).ok();
 
-    let captcha_item = CaptchaItem {
-      answer,
-      uuid: uuid.to_owned(),
-      expires: naive_now() + Duration::minutes(10), // expires in 10 minutes
-    };
+        let captcha_item = CaptchaItem {
+          answer,
+          uuid: uuid.to_owned(),
+          expires: naive_now() + Duration::minutes(10), // expires in 10 minutes
+        };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(captcha_item);
+        if let Some(ws) = websocket_info {
+          ws.chatserver.do_send(captcha_item);
+        }
+
+        Ok(GetCaptchaResponse {
+          ok: Some(CaptchaResponse { png, uuid, wav }),
+          hcaptcha: None,
+        })
+      }
     }
-
-    Ok(GetCaptchaResponse {
-      ok: Some(CaptchaResponse { png, uuid, wav }),
-    })
   }
 }
 

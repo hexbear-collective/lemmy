@@ -23,6 +23,7 @@ pub extern crate strum;
 pub mod api;
 pub mod apub;
 pub mod code_migrations;
+pub mod hcaptcha;
 pub mod rate_limit;
 pub mod request;
 pub mod routes;

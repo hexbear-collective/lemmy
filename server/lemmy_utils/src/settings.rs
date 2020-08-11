@@ -53,7 +53,11 @@ pub struct EmailConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CaptchaConfig {
   pub enabled: bool,
+  pub provider: String,   // lemmy, hcaptcha
   pub difficulty: String, // easy, medium, or hard
+  pub hcaptcha_secret_key: String,
+  pub hcaptcha_site_key: String,
+  pub hcaptcha_verify_url: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
