@@ -70,7 +70,6 @@ use std::{collections::BTreeMap, str::FromStr};
 pub struct Login {
   username_or_email: String,
   password: String,
-  hcaptcha_id: Option<String>, // hcaptcha id
 }
 
 #[derive(Serialize, Deserialize)]
@@ -431,18 +430,6 @@ impl Perform for Oper<Login> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &Login = &self.data;
-    let captcha_settings = Settings::get().captcha;
-
-    if captcha_settings.enabled && captcha_settings.provider == *"hcaptcha" {
-      if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
-        if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
-          error!("hCaptcha failed: {:?}", hcaptcha_error);
-          return Err(APIError::err("captcha_failed").into());
-        }
-      } else {
-        return Err(APIError::err("missing_hcaptcha_id").into());
-      }
-    }
 
     // Fetch that username / email
     let username_or_email = data.username_or_email.clone();
