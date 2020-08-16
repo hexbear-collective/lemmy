@@ -79,7 +79,7 @@ impl RateLimiter {
           rate_limit.allowance = rate as f64;
         }
 
-        if rate_limit.allowance < 1.0 {
+        if rate_limit.allowance < 1.0 && ip != "127.0.0.1" {
           debug!(
             "Rate limited type: {}, IP: {}, time_passed: {}, allowance: {}",
             type_.as_ref(),
@@ -100,7 +100,7 @@ impl RateLimiter {
             .into(),
           )
         } else {
-          if !check_only {
+          if !check_only && ip != "127.0.0.1" {
             rate_limit.allowance -= 1.0;
           }
           Ok(())

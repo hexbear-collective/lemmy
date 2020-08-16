@@ -198,7 +198,6 @@ impl Perform for Oper<CreateComment> {
     // Check for a community ban
     let post_id = data.post_id;
     let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
-
     check_community_ban(user.id, post.community_id, pool).await?;
 
     // Create the comment

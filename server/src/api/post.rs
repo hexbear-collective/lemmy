@@ -74,6 +74,8 @@ pub struct GetPostResponse {
   comments: Vec<CommentView>,
   community: CommunityView,
   moderators: Vec<CommunityModeratorView>,
+  admins: Vec<UserView>,
+  sitemods: Vec<UserView>,
   pub online: usize,
 }
 
@@ -188,12 +190,30 @@ impl Perform for Oper<CreatePost> {
     })
     .await??;
 
-    let community_id = data.community_id;
-    let privileged = blocking(pool, move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let mut moderators: Vec<i32> = vec![];
+
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        CommunityModeratorView::for_community(conn, community_id)
+          .map(|v| v.into_iter().map(|m| m.user_id).collect())
+      })
+      .await??,
+    );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+      })
+      .await??,
+    );
+    moderators.append(
+      &mut blocking(pool, move |conn| {
+        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+      })
+      .await??,
+    );
+
+    let privileged = moderators.contains(&user_id);
+
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
@@ -216,8 +236,8 @@ impl Perform for Oper<CreatePost> {
     let score = user_view.post_score + user_view.comment_score;
 
     // no upstream, dessalines wants to leverage rate limiting
-    if score < 0 {
-      return Err(APIError::err("score_too_low").into());
+    if score < 0 && !privileged {
+      return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
     }
 
     let url = match data.url.to_owned() {
@@ -226,8 +246,8 @@ impl Perform for Oper<CreatePost> {
           None
         } else {
           // no upstream, dessalines wants to leverage rate limiting
-          if score < 5 {
-            return Err(APIError::err("score_too_low").into());
+          if score < 5 && !privileged {
+            return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
           }
           match Url::parse(&url) {
             Ok(_t) => Some(url),
@@ -451,6 +471,8 @@ impl Perform for Oper<GetPost> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+
     let online = if let Some(ws) = websocket_info {
       if let Some(id) = ws.id {
         ws.chatserver.do_send(JoinPostRoom {
@@ -482,6 +504,8 @@ impl Perform for Oper<GetPost> {
       comments,
       community,
       moderators,
+      admins,
+      sitemods,
       online,
     })
   }

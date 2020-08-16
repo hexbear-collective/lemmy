@@ -36,25 +36,26 @@ drop table user_fast;
 drop view user_view;
 create view user_view as
 select 
-	u.id,
+  u.id,
   u.actor_id,
-	u.name,
+  u.name,
   u.preferred_username,
-	u.avatar,
+  u.avatar,
   u.banner,
-	u.email,
-	u.matrix_user_id,
+  u.email,
+  u.matrix_user_id,
   u.bio,
   u.local,
-	u.admin,
-	u.banned,
-	u.show_avatars,
-	u.send_notifications_to_email,
-	u.published,
-	coalesce(pd.posts, 0) as number_of_posts,
-	coalesce(pd.score, 0) as post_score,
-	coalesce(cd.comments, 0) as number_of_comments,
-	coalesce(cd.score, 0) as comment_score
+  u.admin,
+  u.sitemod,
+  u.banned,
+  u.show_avatars,
+  u.send_notifications_to_email,
+  u.published,
+  coalesce(pd.posts, 0) as number_of_posts,
+  coalesce(pd.score, 0) as post_score,
+  coalesce(cd.comments, 0) as number_of_comments,
+  coalesce(cd.score, 0) as comment_score
 from user_ u
 left join (
     select

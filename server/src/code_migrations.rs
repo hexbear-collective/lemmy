@@ -59,6 +59,7 @@ fn user_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
       preferred_username: cuser.preferred_username.to_owned(),
       updated: None,
       admin: cuser.admin,
+      sitemod: cuser.sitemod,
       banned: cuser.banned,
       show_nsfw: cuser.show_nsfw,
       theme: cuser.theme.to_owned(),

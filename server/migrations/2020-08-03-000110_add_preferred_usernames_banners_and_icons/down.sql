@@ -56,6 +56,7 @@ select
   u.local,
 	u.admin,
 	u.banned,
+  u.sitemod,
 	u.show_avatars,
 	u.send_notifications_to_email,
 	u.published,

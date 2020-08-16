@@ -1,5 +1,6 @@
 use super::user_view::user_fast::BoxedQuery;
 use crate::{fuzzy_search, limit_and_offset, MaybeOptional, SortType};
+
 use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +17,7 @@ table! {
     bio -> Nullable<Text>,
     local -> Bool,
     admin -> Bool,
+    sitemod -> Bool,
     banned -> Bool,
     show_avatars -> Bool,
     send_notifications_to_email -> Bool,
@@ -40,6 +42,7 @@ table! {
     bio -> Nullable<Text>,
     local -> Bool,
     admin -> Bool,
+    sitemod -> Bool,
     banned -> Bool,
     show_avatars -> Bool,
     send_notifications_to_email -> Bool,
@@ -67,6 +70,7 @@ pub struct UserView {
   pub bio: Option<String>,
   pub local: bool,
   pub admin: bool,
+  pub sitemod: bool,
   pub banned: bool,
   pub show_avatars: bool, // TODO this is a setting, probably doesn't need to be here
   pub send_notifications_to_email: bool, // TODO also never used
@@ -181,6 +185,7 @@ impl UserView {
         bio,
         local,
         admin,
+        sitemod,
         banned,
         show_avatars,
         send_notifications_to_email,
@@ -191,6 +196,38 @@ impl UserView {
         comment_score,
       ))
       .filter(admin.eq(true))
+      .order_by(published)
+      .load::<Self>(conn)
+  }
+
+  pub fn sitemods(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_fast::dsl::*;
+    use diesel::sql_types::{Nullable, Text};
+    user_fast
+      // The select is necessary here to not get back emails
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        "".into_sql::<Nullable<Text>>(),
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        banned,
+        show_avatars,
+        send_notifications_to_email,
+        published,
+        number_of_posts,
+        post_score,
+        number_of_comments,
+        comment_score,
+      ))
+      .filter(sitemod.eq(true))
       .order_by(published)
       .load::<Self>(conn)
   }
@@ -211,6 +248,7 @@ impl UserView {
         bio,
         local,
         admin,
+        sitemod,
         banned,
         show_avatars,
         send_notifications_to_email,

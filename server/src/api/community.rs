@@ -42,6 +42,8 @@ pub struct GetCommunity {
 pub struct GetCommunityResponse {
   pub community: CommunityView,
   pub moderators: Vec<CommunityModeratorView>,
+  pub admins: Vec<UserView>,
+  pub sitemods: Vec<UserView>,
   pub online: usize,
 }
 
@@ -198,6 +200,14 @@ impl Perform for Oper<GetCommunity> {
       Err(_e) => return Err(APIError::err("couldnt_find_community").into()),
     };
 
+    let site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
+    let site_creator_id = site.creator_id;
+    let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
+    let creator_user = admins.remove(creator_index);
+    admins.insert(0, creator_user);
+
     let online = if let Some(ws) = websocket_info {
       if let Some(id) = ws.id {
         ws.chatserver.do_send(JoinCommunityRoom {
@@ -226,6 +236,8 @@ impl Perform for Oper<GetCommunity> {
     let res = GetCommunityResponse {
       community: community_view,
       moderators,
+      admins,
+      sitemods,
       online,
     };
 
@@ -274,8 +286,15 @@ impl Perform for Oper<CreateCommunity> {
         .await??,
       );
 
-      // ...but let admins create them anyway
-      if !admins.contains(&user_id) {
+      let mut sitemods: Vec<i32> = vec![];
+      sitemods.append(
+        &mut blocking(pool, move |conn| {
+          UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+        })
+        .await??,
+      );
+      // ...but let admins/sitemods create them anyway
+      if !(admins.contains(&user_id) || sitemods.contains(&user_id)) {
         return Err(APIError::err("create_community_disabled").into());
       }
     }
@@ -896,13 +915,17 @@ impl Perform for Oper<TransferCommunity> {
 
     let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
 
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    // Make sure user is the creator, or an admin
-    if user.id != read_community.creator_id && !admins.iter().map(|a| a.id).any(|x| x == user.id) {
-      return Err(APIError::err("not_an_admin").into());
+    // Make sure user is the creator, or an admin, or sitemod
+    if user.id != read_community.creator_id
+      && !(admins.iter().map(|a| a.id).any(|x| x == user.id)
+        || sitemods.iter().map(|a| a.id).any(|x| x == user.id)) {
+      return Err(APIError::err("not_an_admin_or_sitemod").into());
     }
 
     let community_id = data.community_id;
@@ -978,6 +1001,8 @@ impl Perform for Oper<TransferCommunity> {
     Ok(GetCommunityResponse {
       community: community_view,
       moderators,
+      admins,
+      sitemods,
       online: 0,
     })
   }
