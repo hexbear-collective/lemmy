@@ -43,3 +43,4 @@ left join (
 
 drop table user_fast;
 create table user_fast as select * from user_view;
+alter table user_fast add primary key (id);
