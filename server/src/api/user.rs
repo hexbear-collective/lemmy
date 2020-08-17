@@ -1,23 +1,16 @@
 use crate::{
   api::{
-    check_slurs,
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    APIError,
-    Oper,
-    Perform,
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, APIError,
+    Oper, Perform,
   },
-  apub::ApubObjectType,
+  //  apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
   DbPool,
   LemmyError,
@@ -45,22 +38,11 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  EndpointType,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -1011,7 +993,7 @@ impl Perform for Oper<GetUserDetails> {
       comments,
       posts,
       admins,
-      sitemods
+      sitemods,
     })
   }
 }
@@ -1560,7 +1542,7 @@ impl Perform for Oper<CreatePrivateMessage> {
       .send_create(&user, &self.client, pool)
       .await?;
      */
-    
+
     // Send notifications to the recipient
     let recipient_id = data.recipient_id;
     let recipient_user = blocking(pool, move |conn| User_::read(conn, recipient_id)).await??;
