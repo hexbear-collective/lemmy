@@ -11,7 +11,7 @@ services:
       - RUST_LOG=error
       - LEMMY_DATABASE__PASSWORD=${LEMMYDEV_POSTGRES_PW}
       - LEMMY_DATABASE__HOST=postgres-dev
-      - LEMMY_HOSTNAME=dev.chapo.chat
+      - LEMMY_HOSTNAME=${LEMMYDEV_LEMMY_HOSTNAME}
       - LEMMY_PORT=8536
       - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
       - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
