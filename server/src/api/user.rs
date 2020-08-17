@@ -1541,7 +1541,7 @@ impl Perform for Oper<CreatePrivateMessage> {
     };
 
     let inserted_private_message_id = inserted_private_message.id;
-    let updated_private_message = match blocking(pool, move |conn| {
+    let _updated_private_message = match blocking(pool, move |conn| {
       let apub_id = make_apub_endpoint(
         EndpointType::PrivateMessage,
         &inserted_private_message_id.to_string(),
@@ -1555,10 +1555,12 @@ impl Perform for Oper<CreatePrivateMessage> {
       Err(_e) => return Err(APIError::err("couldnt_create_private_message").into()),
     };
 
+    /*
     updated_private_message
       .send_create(&user, &self.client, pool)
       .await?;
-
+     */
+    
     // Send notifications to the recipient
     let recipient_id = data.recipient_id;
     let recipient_user = blocking(pool, move |conn| User_::read(conn, recipient_id)).await??;
@@ -1623,7 +1625,7 @@ impl Perform for Oper<EditPrivateMessage> {
     // Doing the update
     let content_slurs_removed = remove_slurs(&data.content);
     let edit_id = data.edit_id;
-    let updated_private_message = match blocking(pool, move |conn| {
+    let _updated_private_message = match blocking(pool, move |conn| {
       PrivateMessage::update_content(conn, edit_id, &content_slurs_removed)
     })
     .await?
@@ -1633,9 +1635,11 @@ impl Perform for Oper<EditPrivateMessage> {
     };
 
     // Send the apub update
+    /*
     updated_private_message
       .send_update(&user, &self.client, pool)
       .await?;
+     */
 
     let edit_id = data.edit_id;
     let message = blocking(pool, move |conn| PrivateMessageView::read(conn, edit_id)).await??;
@@ -1679,7 +1683,7 @@ impl Perform for Oper<DeletePrivateMessage> {
     // Doing the update
     let edit_id = data.edit_id;
     let deleted = data.deleted;
-    let updated_private_message = match blocking(pool, move |conn| {
+    let _updated_private_message = match blocking(pool, move |conn| {
       PrivateMessage::update_deleted(conn, edit_id, deleted)
     })
     .await?
@@ -1689,6 +1693,7 @@ impl Perform for Oper<DeletePrivateMessage> {
     };
 
     // Send the apub update
+    /*
     if data.deleted {
       updated_private_message
         .send_delete(&user, &self.client, pool)
@@ -1698,6 +1703,7 @@ impl Perform for Oper<DeletePrivateMessage> {
         .send_undo_delete(&user, &self.client, pool)
         .await?;
     }
+     */
 
     let edit_id = data.edit_id;
     let message = blocking(pool, move |conn| PrivateMessageView::read(conn, edit_id)).await??;
