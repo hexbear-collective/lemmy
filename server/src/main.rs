@@ -86,6 +86,7 @@ async fn main() -> Result<(), LemmyError> {
     let rate_limiter = rate_limiter.clone();
     App::new()
       .wrap_fn(add_cache_headers)
+      .wrap(middleware::DefaultHeaders::new().header("Access-Control-Allow-Origin", "*"))
       .wrap(middleware::Logger::default())
       .data(pool.clone())
       .data(server.clone())
