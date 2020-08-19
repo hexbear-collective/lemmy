@@ -16,3 +16,6 @@ ui/src/translations
 
 # ide config
 .idea/
+.vscode/
+
+target

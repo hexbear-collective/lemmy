@@ -1,4 +1,4 @@
-use crate::{schema::site, Crud};
+use crate::{naive_now, schema::site, Crud};
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +15,8 @@ pub struct Site {
   pub open_registration: bool,
   pub enable_nsfw: bool,
   pub enable_create_communities: bool,
+  pub icon: Option<String>,
+  pub banner: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize)]
@@ -28,6 +30,9 @@ pub struct SiteForm {
   pub open_registration: bool,
   pub enable_nsfw: bool,
   pub enable_create_communities: bool,
+  // when you want to null out a column, you have to send Some(None)), since sending None means you just don't want to update that column.
+  pub icon: Option<Option<String>>,
+  pub banner: Option<Option<String>>,
 }
 
 impl Crud<SiteForm> for Site {
@@ -50,6 +55,15 @@ impl Crud<SiteForm> for Site {
     use crate::schema::site::dsl::*;
     diesel::update(site.find(site_id))
       .set(new_site)
+      .get_result::<Self>(conn)
+  }
+}
+
+impl Site {
+  pub fn transfer(conn: &PgConnection, new_creator_id: i32) -> Result<Self, Error> {
+    use crate::schema::site::dsl::*;
+    diesel::update(site.find(1))
+      .set((creator_id.eq(new_creator_id), updated.eq(naive_now())))
       .get_result::<Self>(conn)
   }
 }
