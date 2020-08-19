@@ -1,14 +1,12 @@
 pub mod activities;
 pub mod comment;
 pub mod community;
-pub mod community_inbox;
 pub mod extensions;
 pub mod fetcher;
+pub mod inbox;
 pub mod post;
 pub mod private_message;
-pub mod shared_inbox;
 pub mod user;
-pub mod user_inbox;
 
 use crate::{
   apub::extensions::{
@@ -22,16 +20,16 @@ use crate::{
   DbPool,
   LemmyError,
 };
-use activitystreams_ext::{Ext1, Ext2};
-use activitystreams_new::{
+use activitystreams::{
   activity::Follow,
   actor::{ApActor, Group, Person},
   object::{Page, Tombstone},
   prelude::*,
 };
+use activitystreams_ext::{Ext1, Ext2};
 use actix_web::{body::Body, client::Client, HttpResponse};
+use anyhow::anyhow;
 use chrono::NaiveDateTime;
-use failure::_core::fmt::Debug;
 use lemmy_db::{activity::do_insert_activity, user::User_};
 use lemmy_utils::{convert_datetime, get_apub_protocol_string, settings::Settings, MentionData};
 use log::debug;
@@ -65,33 +63,34 @@ where
 }
 
 // Checks if the ID has a valid format, correct scheme, and is in the allowed instance list.
-fn is_apub_id_valid(apub_id: &Url) -> bool {
-  debug!("Checking {}", apub_id);
+fn check_is_apub_id_valid(apub_id: &Url) -> Result<(), LemmyError> {
   if apub_id.scheme() != get_apub_protocol_string() {
-    debug!("invalid scheme: {:?}", apub_id.scheme());
-    return false;
+    return Err(anyhow!("invalid apub id scheme: {:?}", apub_id.scheme()).into());
   }
 
-  let allowed_instances: Vec<String> = Settings::get()
+  let mut allowed_instances: Vec<String> = Settings::get()
     .federation
     .allowed_instances
     .split(',')
     .map(|d| d.to_string())
     .collect();
+  // need to allow this explicitly because apub activities might contain objects from our local
+  // instance. replace is needed to remove the port in our federation test setup.
+  let settings = Settings::get();
+  let local_instance = settings.hostname.split(':').collect::<Vec<&str>>();
+  allowed_instances.push(local_instance.first().unwrap().to_string());
+
   match apub_id.domain() {
     Some(d) => {
       let contains = allowed_instances.contains(&d.to_owned());
 
       if !contains {
-        debug!("{} not in {:?}", d, allowed_instances);
+        return Err(anyhow!("{} not in federation allowlist", d).into());
       }
 
-      contains
+      Ok(())
     }
-    None => {
-      debug!("missing domain");
-      false
-    }
+    None => Err(anyhow!("federation allowlist is empty").into()),
   }
 }
 
@@ -103,24 +102,27 @@ pub trait ToApub {
 }
 
 /// Updated is actually the deletion time
-fn create_tombstone(
+fn create_tombstone<T>(
   deleted: bool,
   object_id: &str,
   updated: Option<NaiveDateTime>,
-  former_type: String,
-) -> Result<Tombstone, LemmyError> {
+  former_type: T,
+) -> Result<Tombstone, LemmyError>
+where
+  T: ToString,
+{
   if deleted {
     if let Some(updated) = updated {
       let mut tombstone = Tombstone::new();
       tombstone.set_id(object_id.parse()?);
-      tombstone.set_former_type(former_type);
+      tombstone.set_former_type(former_type.to_string());
       tombstone.set_deleted(convert_datetime(updated));
       Ok(tombstone)
     } else {
-      Err(format_err!("Cant convert to tombstone because updated time was None.").into())
+      Err(anyhow!("Cant convert to tombstone because updated time was None.").into())
     }
   } else {
-    Err(format_err!("Cant convert object to tombstone if it wasnt deleted").into())
+    Err(anyhow!("Cant convert object to tombstone if it wasnt deleted").into())
   }
 }
 
@@ -131,7 +133,6 @@ pub trait FromApub {
     apub: &Self::ApubType,
     client: &Client,
     pool: &DbPool,
-    actor_id: &Url,
   ) -> Result<Self, LemmyError>
   where
     Self: Sized;
@@ -219,6 +220,9 @@ pub trait ActorType {
   fn public_key(&self) -> String;
   fn private_key(&self) -> String;
 
+  /// numeric id in the database, used for insert_activity
+  fn user_id(&self) -> i32;
+
   // These two have default impls, since currently a community can't follow anything,
   // and a user can't be followed (yet)
   #[allow(unused_variables)]
@@ -277,8 +281,8 @@ pub trait ActorType {
   }
 
   // TODO move these to the db rows
-  fn get_inbox_url(&self) -> String {
-    format!("{}/inbox", &self.actor_id_str())
+  fn get_inbox_url(&self) -> Result<Url, ParseError> {
+    Url::parse(&format!("{}/inbox", &self.actor_id_str()))
   }
 
   // TODO: make this return `Result<Url, ParseError>
@@ -286,8 +290,8 @@ pub trait ActorType {
     get_shared_inbox(&self.actor_id().unwrap())
   }
 
-  fn get_outbox_url(&self) -> String {
-    format!("{}/outbox", &self.actor_id_str())
+  fn get_outbox_url(&self) -> Result<Url, ParseError> {
+    Url::parse(&format!("{}/outbox", &self.actor_id_str()))
   }
 
   fn get_followers_url(&self) -> String {
@@ -336,13 +340,13 @@ pub async fn fetch_webfinger_url(
     .links
     .iter()
     .find(|l| l.type_.eq(&Some("application/activity+json".to_string())))
-    .ok_or_else(|| format_err!("No application/activity+json link found."))?;
+    .ok_or_else(|| anyhow!("No application/activity+json link found."))?;
   link
     .href
     .to_owned()
     .map(|u| Url::parse(&u))
     .transpose()?
-    .ok_or_else(|| format_err!("No href found.").into())
+    .ok_or_else(|| anyhow!("No href found.").into())
 }
 
 pub async fn insert_activity<T>(
@@ -352,7 +356,7 @@ pub async fn insert_activity<T>(
   pool: &DbPool,
 ) -> Result<(), LemmyError>
 where
-  T: Serialize + Debug + Send + 'static,
+  T: Serialize + std::fmt::Debug + Send + 'static,
 {
   blocking(pool, move |conn| {
     do_insert_activity(conn, user_id, &data, local)

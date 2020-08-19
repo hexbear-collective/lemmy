@@ -1,17 +1,23 @@
 use crate::{
-  api::{claims::Claims, APIError, Oper, Perform},
-  apub::ApubObjectType,
+  api::{
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, APIError,
+    Oper, Perform,
+  },
+  //  apub::ApubObjectType,
   blocking,
+  captcha_espeak_wav_base64,
+  hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
-    server::{JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
+    UserOperation, WebsocketInfo,
   },
   DbPool,
   LemmyError,
 };
 use bcrypt::verify;
+use captcha::{gen, Difficulty};
+use chrono::Duration;
 use lemmy_db::{
   comment::*,
   comment_view::*,
@@ -32,34 +38,20 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  slur_check,
-  slurs_vec_to_str,
-  EndpointType,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, env, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Login {
   username_or_email: String,
   password: String,
-  captcha_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -69,9 +61,36 @@ pub struct Register {
   pub password: String,
   pub password_verify: String,
   pub admin: bool,
+  pub sitemod: bool,
   pub show_nsfw: bool,
-  pub captcha_id: String,
   pub pronouns: Option<String>,
+  pub captcha_uuid: Option<String>,
+  pub captcha_answer: Option<String>,
+  pub hcaptcha_id: Option<String>, // hcaptcha id
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCaptcha {}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCaptchaResponse {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  ok: Option<CaptchaResponse>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  hcaptcha: Option<HCaptchaResponse>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CaptchaResponse {
+  png: String,         // A Base64 encoded png
+  wav: Option<String>, // A Base64 encoded wav audio
+  uuid: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HCaptchaResponse {
+  site_key: String,
+  verify_url: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -82,7 +101,10 @@ pub struct SaveUserSettings {
   default_listing_type: i16,
   lang: String,
   avatar: Option<String>,
+  banner: Option<String>,
+  preferred_username: Option<String>,
   email: Option<String>,
+  bio: Option<String>,
   matrix_user_id: Option<String>,
   new_password: Option<String>,
   new_password_verify: Option<String>,
@@ -117,6 +139,7 @@ pub struct GetUserDetailsResponse {
   comments: Vec<CommentView>,
   posts: Vec<PostView>,
   admins: Vec<UserView>,
+  sitemods: Vec<UserView>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -144,6 +167,18 @@ pub struct AddAdmin {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AddAdminResponse {
   admins: Vec<UserView>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddSitemod {
+  user_id: i32,
+  added: bool,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AddSitemodResponse {
+  sitemods: Vec<UserView>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -180,9 +215,9 @@ pub struct GetUserMentions {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct EditUserMention {
+pub struct MarkUserMentionAsRead {
   user_mention_id: i32,
-  read: Option<bool>,
+  read: bool,
   auth: String,
 }
 
@@ -222,9 +257,21 @@ pub struct CreatePrivateMessage {
 #[derive(Serialize, Deserialize)]
 pub struct EditPrivateMessage {
   edit_id: i32,
-  content: Option<String>,
-  deleted: Option<bool>,
-  read: Option<bool>,
+  content: String,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeletePrivateMessage {
+  edit_id: i32,
+  deleted: bool,
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MarkPrivateMessageAsRead {
+  edit_id: i32,
+  read: bool,
   auth: String,
 }
 
@@ -254,13 +301,6 @@ pub struct UserJoin {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UserJoinResponse {
   pub user_id: i32,
-}
-
-#[derive(Deserialize)]
-struct CaptchaResponse {
-  success: bool,
-  #[serde(rename = "error-codes")]
-  error_codes: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -386,41 +426,12 @@ impl Perform for Oper<Login> {
     pool: &DbPool,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
-    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
-      Ok(key) => key,
-      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
-    };
-
     let data: &Login = &self.data;
-
-    let client = reqwest::Client::new();
-    let body = [
-      ("secret", secret_key),
-      ("response", data.captcha_id.clone()),
-    ];
-    let res = client
-      .post("https://hcaptcha.com/siteverify")
-      .form(&body)
-      .send()
-      .await?;
-    //println!("received {:?}", &res.text());
-    let parsed_response: CaptchaResponse = res.json().await?;
-    if !parsed_response.success {
-      let err_string: String = format!(
-        "invalid_captcha;{}",
-        &parsed_response
-          .error_codes
-          .unwrap()
-          .join(";")
-          .replace("-", "_")
-      );
-      return Err(APIError::err(&err_string).into());
-    }
 
     // Fetch that username / email
     let username_or_email = data.username_or_email.clone();
     let user = match blocking(pool, move |conn| {
-      Claims::find_by_email_or_username(conn, &username_or_email)
+      User_::find_by_email_or_username(conn, &username_or_email)
     })
     .await?
     {
@@ -447,14 +458,10 @@ impl Perform for Oper<Register> {
   async fn perform(
     &self,
     pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
-    let secret_key: String = match env::var("HCAPTCHA_SECRET_KEY") {
-      Ok(key) => key,
-      Err(_e) => "0x0000000000000000000000000000000000000000".to_string(),
-    };
-
     let data: &Register = &self.data;
+    let captcha_settings = Settings::get().captcha;
 
     // Make sure there are no admins
     // We put this first because there is no captcha when setting up the site.
@@ -465,32 +472,6 @@ impl Perform for Oper<Register> {
     .await??;
     if data.admin && !any_admins {
       return Err(APIError::err("admin_already_created").into());
-    }
-
-    if !data.admin {
-      let client = reqwest::Client::new();
-      let body = [
-        ("secret", secret_key),
-        ("response", data.captcha_id.clone()),
-      ];
-      let res = client
-        .post("https://hcaptcha.com/siteverify")
-        .form(&body)
-        .send()
-        .await?;
-      //println!("received {:?}", &res.text());
-      let parsed_response: CaptchaResponse = res.json().await?;
-      if !parsed_response.success {
-        let err_string: String = format!(
-          "invalid_captcha;{}",
-          &parsed_response
-            .error_codes
-            .unwrap()
-            .join(";")
-            .replace("-", "_")
-        );
-        return Err(APIError::err(&err_string).into());
-      }
     }
 
     // Make sure site has open registration
@@ -506,8 +487,52 @@ impl Perform for Oper<Register> {
       return Err(APIError::err("passwords_dont_match").into());
     }
 
-    if let Err(slurs) = slur_check(&data.username) {
-      return Err(APIError::err(&slurs_vec_to_str(slurs)).into());
+    // If its not the admin, check the captcha
+    if !data.admin && captcha_settings.enabled {
+      match captcha_settings.provider.as_str() {
+        "hcaptcha" => {
+          if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
+            if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+              error!("hCaptcha failed: {:?}", hcaptcha_error);
+              return Err(APIError::err("captcha_failed").into());
+            }
+          } else {
+            return Err(APIError::err("missing_hcaptcha_id").into());
+          }
+        }
+        _ => match websocket_info {
+          Some(ws) => {
+            let check = ws
+              .chatserver
+              .send(CheckCaptcha {
+                uuid: data
+                  .captcha_uuid
+                  .to_owned()
+                  .unwrap_or_else(|| "".to_string()),
+                answer: data
+                  .captcha_answer
+                  .to_owned()
+                  .unwrap_or_else(|| "".to_string()),
+              })
+              .await?;
+            if !check {
+              return Err(APIError::err("captcha_incorrect").into());
+            }
+          }
+          None => return Err(APIError::err("captcha_incorrect").into()),
+        },
+      }
+    }
+
+    check_slurs(&data.username)?;
+
+    // Make sure there are no admins
+    let any_admins = blocking(pool, move |conn| {
+      UserView::admins(conn).map(|a| a.is_empty())
+    })
+    .await??;
+    if data.admin && !any_admins {
+      return Err(APIError::err("admin_already_created").into());
     }
 
     let user_keypair = generate_actor_keypair()?;
@@ -532,14 +557,16 @@ impl Perform for Oper<Register> {
       email,
       matrix_user_id: None,
       avatar: None,
+      banner: None,
       password_encrypted: data.password.to_owned(),
       preferred_username: None,
       updated: None,
       admin: data.admin,
+      sitemod: data.sitemod,
       banned: false,
       show_nsfw: data.show_nsfw,
       theme: "darkly".into(),
-      default_sort_type: SortType::Hot as i16,
+      default_sort_type: SortType::Active as i16,
       default_listing_type: ListingType::Subscribed as i16,
       lang: "browser".into(),
       show_avatars: true,
@@ -591,6 +618,8 @@ impl Perform for Oper<Register> {
           public_key: Some(main_community_keypair.public_key),
           last_refreshed_at: None,
           published: None,
+          icon: None,
+          banner: None,
         };
         let main_community =
           blocking(pool, move |conn| Community::create(conn, &community_form)).await??;
@@ -654,6 +683,69 @@ impl Perform for Oper<Register> {
 }
 
 #[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetCaptcha> {
+  type Response = GetCaptchaResponse;
+
+  async fn perform(
+    &self,
+    _pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<Self::Response, LemmyError> {
+    let captcha_settings = Settings::get().captcha;
+
+    if !captcha_settings.enabled {
+      return Ok(GetCaptchaResponse {
+        ok: None,
+        hcaptcha: None,
+      });
+    }
+
+    match captcha_settings.provider.as_str() {
+      "hcaptcha" => Ok(GetCaptchaResponse {
+        ok: None,
+        hcaptcha: Some(HCaptchaResponse {
+          site_key: captcha_settings.hcaptcha_site_key,
+          verify_url: captcha_settings.hcaptcha_verify_url,
+        }),
+      }),
+      _ => {
+        let captcha = match captcha_settings.difficulty.as_str() {
+          "easy" => gen(Difficulty::Easy),
+          "medium" => gen(Difficulty::Medium),
+          "hard" => gen(Difficulty::Hard),
+          _ => gen(Difficulty::Medium),
+        };
+
+        let answer = captcha.chars_as_string();
+
+        let png_byte_array = captcha.as_png().expect("failed to generate captcha");
+
+        let png = base64::encode(png_byte_array);
+
+        let uuid = uuid::Uuid::new_v4().to_string();
+
+        let wav = captcha_espeak_wav_base64(&answer).ok();
+
+        let captcha_item = CaptchaItem {
+          answer,
+          uuid: uuid.to_owned(),
+          expires: naive_now() + Duration::minutes(10), // expires in 10 minutes
+        };
+
+        if let Some(ws) = websocket_info {
+          ws.chatserver.do_send(captcha_item);
+        }
+
+        Ok(GetCaptchaResponse {
+          ok: Some(CaptchaResponse { png, uuid, wav }),
+          hcaptcha: None,
+        })
+      }
+    }
+  }
+}
+
+#[async_trait::async_trait(?Send)]
 impl Perform for Oper<SaveUserSettings> {
   type Response = LoginResponse;
 
@@ -663,14 +755,9 @@ impl Perform for Oper<SaveUserSettings> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &SaveUserSettings = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
-
+    let user_id = user.id;
     let read_user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
 
     let email = match &data.email {
@@ -684,14 +771,35 @@ impl Perform for Oper<SaveUserSettings> {
       None => read_user.email,
     };
 
-    // temporarily disable avitars
-    let avatar = None;
     /*
     let avatar = match &data.avatar {
       Some(avatar) => Some(avatar.to_owned()),
       None => read_user.avatar,
     };
     */
+    let bio = match &data.bio {
+      Some(bio) => {
+        if bio.chars().count() <= 300 {
+          Some(bio.to_owned())
+        } else {
+          return Err(APIError::err("bio_length_overflow").into());
+        }
+      }
+      None => read_user.bio,
+    };
+
+    // let avatar = diesel_option_overwrite(&data.avatar);
+    // let banner = diesel_option_overwrite(&data.banner);
+
+    // temporarily disable avitars
+    let avatar: Option<Option<String>> = None;
+    let banner: Option<Option<String>> = None;
+
+    // The DB constraint should stop too many characters
+    let preferred_username = match &data.preferred_username {
+      Some(preferred_username) => Some(preferred_username.to_owned()),
+      None => read_user.preferred_username,
+    };
 
     let password_encrypted = match &data.new_password {
       Some(new_password) => {
@@ -731,10 +839,12 @@ impl Perform for Oper<SaveUserSettings> {
       email,
       matrix_user_id: data.matrix_user_id.to_owned(),
       avatar,
+      banner,
       password_encrypted,
-      preferred_username: read_user.preferred_username,
+      preferred_username,
       updated: Some(naive_now()),
       admin: read_user.admin,
+      sitemod: read_user.sitemod,
       banned: read_user.banned,
       show_nsfw: data.show_nsfw,
       theme: data.theme.to_owned(),
@@ -744,7 +854,7 @@ impl Perform for Oper<SaveUserSettings> {
       show_avatars: data.show_avatars,
       send_notifications_to_email: data.send_notifications_to_email,
       actor_id: read_user.actor_id,
-      bio: read_user.bio,
+      bio,
       local: read_user.local,
       private_key: read_user.private_key,
       public_key: read_user.public_key,
@@ -784,22 +894,10 @@ impl Perform for Oper<GetUserDetails> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetUserDetailsResponse, LemmyError> {
     let data: &GetUserDetails = &self.data;
+    let user = get_user_from_jwt_opt(&data.auth, pool).await?;
 
-    let user_claims: Option<Claims> = match &data.auth {
-      Some(auth) => match Claims::decode(&auth) {
-        Ok(claims) => Some(claims.claims),
-        Err(_e) => None,
-      },
-      None => None,
-    };
-
-    let user_id = match &user_claims {
-      Some(claims) => Some(claims.id),
-      None => None,
-    };
-
-    let show_nsfw = match &user_claims {
-      Some(claims) => claims.show_nsfw,
+    let show_nsfw = match &user {
+      Some(user) => user.show_nsfw,
       None => false,
     };
 
@@ -826,6 +924,7 @@ impl Perform for Oper<GetUserDetails> {
     let limit = data.limit;
     let saved_only = data.saved_only;
     let community_id = data.community_id;
+    let user_id = user.map(|u| u.id);
     let (posts, comments) = blocking(pool, move |conn| {
       let mut posts_query = PostQueryBuilder::create(conn)
         .sort(&sort)
@@ -874,6 +973,8 @@ impl Perform for Oper<GetUserDetails> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+
     // If its not the same user, remove the email, and settings
     // TODO an if let chain would be better here, but can't figure it out
     // TODO separate out settings into its own thing
@@ -892,6 +993,7 @@ impl Perform for Oper<GetUserDetails> {
       comments,
       posts,
       admins,
+      sitemods,
     })
   }
 }
@@ -906,19 +1008,10 @@ impl Perform for Oper<AddAdmin> {
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<AddAdminResponse, LemmyError> {
     let data: &AddAdmin = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     // Make sure user is an admin
-    let is_admin = move |conn: &'_ _| UserView::read(conn, user_id).map(|u| u.admin);
-    if !blocking(pool, is_admin).await?? {
-      return Err(APIError::err("not_an_admin").into());
-    }
+    is_admin(pool, user.id).await?;
 
     let added = data.added;
     let added_user_id = data.user_id;
@@ -929,7 +1022,7 @@ impl Perform for Oper<AddAdmin> {
 
     // Mod tables
     let form = ModAddForm {
-      mod_user_id: user_id,
+      mod_user_id: user.id,
       other_user_id: data.user_id,
       removed: Some(!data.added),
     };
@@ -959,6 +1052,59 @@ impl Perform for Oper<AddAdmin> {
 }
 
 #[async_trait::async_trait(?Send)]
+impl Perform for Oper<AddSitemod> {
+  type Response = AddSitemodResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<AddSitemodResponse, LemmyError> {
+    let data: &AddSitemod = &self.data;
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    let user_id = claims.id;
+
+    // Make sure user is an admin
+    is_admin(pool, claims.id).await?;
+
+    let added = data.added;
+    let added_user_id = data.user_id;
+    let add_sitemod = move |conn: &'_ _| User_::add_sitemod(conn, added_user_id, added);
+    if blocking(pool, add_sitemod).await?.is_err() {
+      return Err(APIError::err("couldnt_update_user").into());
+    }
+
+    // Mod tables
+    let form = ModAddForm {
+      mod_user_id: user_id,
+      other_user_id: data.user_id,
+      removed: Some(!data.added),
+    };
+
+    blocking(pool, move |conn| ModAdd::create(conn, &form)).await??;
+
+    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+
+    let res = AddSitemodResponse { sitemods };
+
+    if let Some(ws) = websocket_info {
+      ws.chatserver.do_send(SendAllMessage {
+        op: UserOperation::AddSitemod,
+        response: res.clone(),
+        my_id: ws.id,
+      });
+    }
+
+    Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
 impl Perform for Oper<BanUser> {
   type Response = BanUserResponse;
 
@@ -976,10 +1122,10 @@ impl Perform for Oper<BanUser> {
 
     let user_id = claims.id;
 
-    // Make sure user is an admin
-    let is_admin = move |conn: &'_ _| UserView::read(conn, user_id).map(|u| u.admin);
-    if !blocking(pool, is_admin).await?? {
-      return Err(APIError::err("not_an_admin").into());
+    // Make sure user is an admin or sitemod
+    let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
+    if !user.admin || !user.sitemod {
+      return Err(APIError::err("not_an_admin_or_sitemod").into());
     }
 
     let ban = data.ban;
@@ -996,7 +1142,7 @@ impl Perform for Oper<BanUser> {
     };
 
     let form = ModBanForm {
-      mod_user_id: user_id,
+      mod_user_id: user.id,
       other_user_id: data.user_id,
       reason: data.reason.to_owned(),
       banned: Some(data.ban),
@@ -1035,19 +1181,14 @@ impl Perform for Oper<GetReplies> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetRepliesResponse, LemmyError> {
     let data: &GetReplies = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     let sort = SortType::from_str(&data.sort)?;
 
     let page = data.page;
     let limit = data.limit;
     let unread_only = data.unread_only;
+    let user_id = user.id;
     let replies = blocking(pool, move |conn| {
       ReplyQueryBuilder::create(conn, user_id)
         .sort(&sort)
@@ -1072,19 +1213,14 @@ impl Perform for Oper<GetUserMentions> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetUserMentionsResponse, LemmyError> {
     let data: &GetUserMentions = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     let sort = SortType::from_str(&data.sort)?;
 
     let page = data.page;
     let limit = data.limit;
     let unread_only = data.unread_only;
+    let user_id = user.id;
     let mentions = blocking(pool, move |conn| {
       UserMentionQueryBuilder::create(conn, user_id)
         .sort(&sort)
@@ -1100,7 +1236,7 @@ impl Perform for Oper<GetUserMentions> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<EditUserMention> {
+impl Perform for Oper<MarkUserMentionAsRead> {
   type Response = UserMentionResponse;
 
   async fn perform(
@@ -1108,37 +1244,26 @@ impl Perform for Oper<EditUserMention> {
     pool: &DbPool,
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<UserMentionResponse, LemmyError> {
-    let data: &EditUserMention = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let data: &MarkUserMentionAsRead = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     let user_mention_id = data.user_mention_id;
     let read_user_mention =
       blocking(pool, move |conn| UserMention::read(conn, user_mention_id)).await??;
 
-    if user_id != read_user_mention.recipient_id {
+    if user.id != read_user_mention.recipient_id {
       return Err(APIError::err("couldnt_update_comment").into());
     }
 
-    let user_mention_form = UserMentionForm {
-      recipient_id: read_user_mention.recipient_id,
-      comment_id: read_user_mention.comment_id,
-      read: data.read.to_owned(),
-    };
-
     let user_mention_id = read_user_mention.id;
-    let update_mention =
-      move |conn: &'_ _| UserMention::update(conn, user_mention_id, &user_mention_form);
+    let read = data.read;
+    let update_mention = move |conn: &'_ _| UserMention::update_read(conn, user_mention_id, read);
     if blocking(pool, update_mention).await?.is_err() {
       return Err(APIError::err("couldnt_update_comment").into());
     };
 
     let user_mention_id = read_user_mention.id;
+    let user_id = user.id;
     let user_mention_view = blocking(pool, move |conn| {
       UserMentionView::read(conn, user_mention_id, user_id)
     })
@@ -1160,14 +1285,9 @@ impl Perform for Oper<MarkAllAsRead> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<GetRepliesResponse, LemmyError> {
     let data: &MarkAllAsRead = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
-
+    let user_id = user.id;
     let replies = blocking(pool, move |conn| {
       ReplyQueryBuilder::create(conn, user_id)
         .unread_only(true)
@@ -1178,70 +1298,26 @@ impl Perform for Oper<MarkAllAsRead> {
     .await??;
 
     // TODO: this should probably be a bulk operation
+    // Not easy to do as a bulk operation,
+    // because recipient_id isn't in the comment table
     for reply in &replies {
       let reply_id = reply.id;
-      let mark_as_read = move |conn: &'_ _| Comment::mark_as_read(conn, reply_id);
+      let mark_as_read = move |conn: &'_ _| Comment::update_read(conn, reply_id, true);
       if blocking(pool, mark_as_read).await?.is_err() {
         return Err(APIError::err("couldnt_update_comment").into());
       }
     }
 
-    // Mentions
-    let mentions = blocking(pool, move |conn| {
-      UserMentionQueryBuilder::create(conn, user_id)
-        .unread_only(true)
-        .page(1)
-        .limit(999)
-        .list()
-    })
-    .await??;
-
-    // TODO: this should probably be a bulk operation
-    for mention in &mentions {
-      let mention_form = UserMentionForm {
-        recipient_id: mention.to_owned().recipient_id,
-        comment_id: mention.to_owned().id,
-        read: Some(true),
-      };
-
-      let user_mention_id = mention.user_mention_id;
-      let update_mention =
-        move |conn: &'_ _| UserMention::update(conn, user_mention_id, &mention_form);
-      if blocking(pool, update_mention).await?.is_err() {
-        return Err(APIError::err("couldnt_update_comment").into());
-      }
+    // Mark all user mentions as read
+    let update_user_mentions = move |conn: &'_ _| UserMention::mark_all_as_read(conn, user_id);
+    if blocking(pool, update_user_mentions).await?.is_err() {
+      return Err(APIError::err("couldnt_update_comment").into());
     }
 
-    // messages
-    let messages = blocking(pool, move |conn| {
-      PrivateMessageQueryBuilder::create(conn, user_id)
-        .page(1)
-        .limit(999)
-        .unread_only(true)
-        .list()
-    })
-    .await??;
-
-    // TODO: this should probably be a bulk operation
-    for message in &messages {
-      let private_message_form = PrivateMessageForm {
-        content: message.to_owned().content,
-        creator_id: message.to_owned().creator_id,
-        recipient_id: message.to_owned().recipient_id,
-        deleted: None,
-        read: Some(true),
-        updated: None,
-        ap_id: message.to_owned().ap_id,
-        local: message.local,
-        published: None,
-      };
-
-      let message_id = message.id;
-      let update_pm =
-        move |conn: &'_ _| PrivateMessage::update(conn, message_id, &private_message_form);
-      if blocking(pool, update_pm).await?.is_err() {
-        return Err(APIError::err("couldnt_update_private_message").into());
-      }
+    // Mark all private_messages as read
+    let update_pm = move |conn: &'_ _| PrivateMessage::mark_all_as_read(conn, user_id);
+    if blocking(pool, update_pm).await?.is_err() {
+      return Err(APIError::err("couldnt_update_private_message").into());
     }
 
     Ok(GetRepliesResponse { replies: vec![] })
@@ -1258,15 +1334,7 @@ impl Perform for Oper<DeleteAccount> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &DeleteAccount = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
-
-    let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     // Verify the password
     let valid: bool = verify(&data.password, &user.password_encrypted).unwrap_or(false);
@@ -1275,6 +1343,7 @@ impl Perform for Oper<DeleteAccount> {
     }
 
     // Comments
+    let user_id = user.id;
     let comments = blocking(pool, move |conn| {
       CommentQueryBuilder::create(conn)
         .for_creator_id(user_id)
@@ -1420,21 +1489,9 @@ impl Perform for Oper<CreatePrivateMessage> {
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<PrivateMessageResponse, LemmyError> {
     let data: &CreatePrivateMessage = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     let hostname = &format!("https://{}", Settings::get().hostname);
-
-    // Check for a site ban
-    let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
-    if user.banned {
-      return Err(APIError::err("site_ban").into());
-    }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
 
@@ -1444,7 +1501,7 @@ impl Perform for Oper<CreatePrivateMessage> {
 
     let private_message_form = PrivateMessageForm {
       content: content_slurs_removed.to_owned(),
-      creator_id: user_id,
+      creator_id: user.id,
       recipient_id: data.recipient_id,
       deleted: None,
       read: None,
@@ -1466,7 +1523,7 @@ impl Perform for Oper<CreatePrivateMessage> {
     };
 
     let inserted_private_message_id = inserted_private_message.id;
-    let updated_private_message = match blocking(pool, move |conn| {
+    let _updated_private_message = match blocking(pool, move |conn| {
       let apub_id = make_apub_endpoint(
         EndpointType::PrivateMessage,
         &inserted_private_message_id.to_string(),
@@ -1480,9 +1537,11 @@ impl Perform for Oper<CreatePrivateMessage> {
       Err(_e) => return Err(APIError::err("couldnt_create_private_message").into()),
     };
 
+    /*
     updated_private_message
       .send_create(&user, &self.client, pool)
       .await?;
+     */
 
     // Send notifications to the recipient
     let recipient_id = data.recipient_id;
@@ -1492,11 +1551,11 @@ impl Perform for Oper<CreatePrivateMessage> {
         let subject = &format!(
           "{} - Private Message from {}",
           Settings::get().hostname,
-          claims.username
+          user.name,
         );
         let html = &format!(
           "<h1>Private Message</h1><br><div>{} - {}</div><br><a href={}/inbox>inbox</a>",
-          claims.username, &content_slurs_removed, hostname
+          user.name, &content_slurs_removed, hostname
         );
         match send_email(subject, &email, &recipient_user.name, html) {
           Ok(_o) => _o,
@@ -1535,67 +1594,21 @@ impl Perform for Oper<EditPrivateMessage> {
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<PrivateMessageResponse, LemmyError> {
     let data: &EditPrivateMessage = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
-
+    // Checking permissions
     let edit_id = data.edit_id;
     let orig_private_message =
       blocking(pool, move |conn| PrivateMessage::read(conn, edit_id)).await??;
-
-    // Check for a site ban
-    let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
-    if user.banned {
-      return Err(APIError::err("site_ban").into());
-    }
-
-    // Check to make sure they are the creator (or the recipient marking as read
-    if !(data.read.is_some() && orig_private_message.recipient_id.eq(&user_id)
-      || orig_private_message.creator_id.eq(&user_id))
-    {
+    if user.id != orig_private_message.creator_id {
       return Err(APIError::err("no_private_message_edit_allowed").into());
     }
 
-    let content_slurs_removed = match &data.content {
-      Some(content) => remove_slurs(content),
-      None => orig_private_message.content.clone(),
-    };
-
-    let private_message_form = {
-      if data.read.is_some() {
-        PrivateMessageForm {
-          content: orig_private_message.content.to_owned(),
-          creator_id: orig_private_message.creator_id,
-          recipient_id: orig_private_message.recipient_id,
-          read: data.read.to_owned(),
-          updated: orig_private_message.updated,
-          deleted: Some(orig_private_message.deleted),
-          ap_id: orig_private_message.ap_id,
-          local: orig_private_message.local,
-          published: None,
-        }
-      } else {
-        PrivateMessageForm {
-          content: content_slurs_removed,
-          creator_id: orig_private_message.creator_id,
-          recipient_id: orig_private_message.recipient_id,
-          deleted: data.deleted.to_owned(),
-          read: Some(orig_private_message.read),
-          updated: Some(naive_now()),
-          ap_id: orig_private_message.ap_id,
-          local: orig_private_message.local,
-          published: None,
-        }
-      }
-    };
-
+    // Doing the update
+    let content_slurs_removed = remove_slurs(&data.content);
     let edit_id = data.edit_id;
-    let updated_private_message = match blocking(pool, move |conn| {
-      PrivateMessage::update(conn, edit_id, &private_message_form)
+    let _updated_private_message = match blocking(pool, move |conn| {
+      PrivateMessage::update_content(conn, edit_id, &content_slurs_removed)
     })
     .await?
     {
@@ -1603,30 +1616,16 @@ impl Perform for Oper<EditPrivateMessage> {
       Err(_e) => return Err(APIError::err("couldnt_update_private_message").into()),
     };
 
-    if data.read.is_none() {
-      if let Some(deleted) = data.deleted.to_owned() {
-        if deleted {
-          updated_private_message
-            .send_delete(&user, &self.client, pool)
-            .await?;
-        } else {
-          updated_private_message
-            .send_undo_delete(&user, &self.client, pool)
-            .await?;
-        }
-      } else {
-        updated_private_message
-          .send_update(&user, &self.client, pool)
-          .await?;
-      }
-    } else {
-      updated_private_message
-        .send_update(&user, &self.client, pool)
-        .await?;
-    }
+    // Send the apub update
+    /*
+    updated_private_message
+      .send_update(&user, &self.client, pool)
+      .await?;
+     */
 
     let edit_id = data.edit_id;
     let message = blocking(pool, move |conn| PrivateMessageView::read(conn, edit_id)).await??;
+    let recipient_id = message.recipient_id;
 
     let res = PrivateMessageResponse { message };
 
@@ -1634,7 +1633,124 @@ impl Perform for Oper<EditPrivateMessage> {
       ws.chatserver.do_send(SendUserRoomMessage {
         op: UserOperation::EditPrivateMessage,
         response: res.clone(),
-        recipient_id: orig_private_message.recipient_id,
+        recipient_id,
+        my_id: ws.id,
+      });
+    }
+
+    Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<DeletePrivateMessage> {
+  type Response = PrivateMessageResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<PrivateMessageResponse, LemmyError> {
+    let data: &DeletePrivateMessage = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
+
+    // Checking permissions
+    let edit_id = data.edit_id;
+    let orig_private_message =
+      blocking(pool, move |conn| PrivateMessage::read(conn, edit_id)).await??;
+    if user.id != orig_private_message.creator_id {
+      return Err(APIError::err("no_private_message_edit_allowed").into());
+    }
+
+    // Doing the update
+    let edit_id = data.edit_id;
+    let deleted = data.deleted;
+    let _updated_private_message = match blocking(pool, move |conn| {
+      PrivateMessage::update_deleted(conn, edit_id, deleted)
+    })
+    .await?
+    {
+      Ok(private_message) => private_message,
+      Err(_e) => return Err(APIError::err("couldnt_update_private_message").into()),
+    };
+
+    // Send the apub update
+    /*
+    if data.deleted {
+      updated_private_message
+        .send_delete(&user, &self.client, pool)
+        .await?;
+    } else {
+      updated_private_message
+        .send_undo_delete(&user, &self.client, pool)
+        .await?;
+    }
+     */
+
+    let edit_id = data.edit_id;
+    let message = blocking(pool, move |conn| PrivateMessageView::read(conn, edit_id)).await??;
+    let recipient_id = message.recipient_id;
+
+    let res = PrivateMessageResponse { message };
+
+    if let Some(ws) = websocket_info {
+      ws.chatserver.do_send(SendUserRoomMessage {
+        op: UserOperation::DeletePrivateMessage,
+        response: res.clone(),
+        recipient_id,
+        my_id: ws.id,
+      });
+    }
+
+    Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<MarkPrivateMessageAsRead> {
+  type Response = PrivateMessageResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<PrivateMessageResponse, LemmyError> {
+    let data: &MarkPrivateMessageAsRead = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
+
+    // Checking permissions
+    let edit_id = data.edit_id;
+    let orig_private_message =
+      blocking(pool, move |conn| PrivateMessage::read(conn, edit_id)).await??;
+    if user.id != orig_private_message.recipient_id {
+      return Err(APIError::err("couldnt_update_private_message").into());
+    }
+
+    // Doing the update
+    let edit_id = data.edit_id;
+    let read = data.read;
+    match blocking(pool, move |conn| {
+      PrivateMessage::update_read(conn, edit_id, read)
+    })
+    .await?
+    {
+      Ok(private_message) => private_message,
+      Err(_e) => return Err(APIError::err("couldnt_update_private_message").into()),
+    };
+
+    // No need to send an apub update
+
+    let edit_id = data.edit_id;
+    let message = blocking(pool, move |conn| PrivateMessageView::read(conn, edit_id)).await??;
+    let recipient_id = message.recipient_id;
+
+    let res = PrivateMessageResponse { message };
+
+    if let Some(ws) = websocket_info {
+      ws.chatserver.do_send(SendUserRoomMessage {
+        op: UserOperation::MarkPrivateMessageAsRead,
+        response: res.clone(),
+        recipient_id,
         my_id: ws.id,
       });
     }
@@ -1653,13 +1769,8 @@ impl Perform for Oper<GetPrivateMessages> {
     _websocket_info: Option<WebsocketInfo>,
   ) -> Result<PrivateMessagesResponse, LemmyError> {
     let data: &GetPrivateMessages = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let user_id = user.id;
 
     let page = data.page;
     let limit = data.limit;
@@ -1683,24 +1794,21 @@ impl Perform for Oper<UserJoin> {
 
   async fn perform(
     &self,
-    _pool: &DbPool,
+    pool: &DbPool,
     websocket_info: Option<WebsocketInfo>,
   ) -> Result<UserJoinResponse, LemmyError> {
     let data: &UserJoin = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
 
     if let Some(ws) = websocket_info {
       if let Some(id) = ws.id {
-        ws.chatserver.do_send(JoinUserRoom { user_id, id });
+        ws.chatserver.do_send(JoinUserRoom {
+          user_id: user.id,
+          id,
+        });
       }
     }
 
-    Ok(UserJoinResponse { user_id })
+    Ok(UserJoinResponse { user_id: user.id })
   }
 }

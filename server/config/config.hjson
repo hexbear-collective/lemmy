@@ -1,5 +1,13 @@
 {
   hostname: "localhost:8536"
-  federation_enabled: true
+  federation_enabled: false
   register_per_second: 1
+  captcha: {
+    enabled:    true
+    provider:   hcaptcha
+    difficulty: easy
+    hcaptcha_secret_key: "0x0000000000000000000000000000000000000000"
+    hcaptcha_site_key:   "10000000-ffff-ffff-ffff-000000000001"
+    hcaptcha_verify_url: "https://hcaptcha.com/siteverify"
+  }
 }
