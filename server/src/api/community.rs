@@ -922,10 +922,10 @@ impl Perform for Oper<TransferCommunity> {
     admins.insert(0, creator_user);
 
     // Make sure user is the creator, or an admin, or sitemod
-    if user.id != read_community.creator_id
-      && !(admins.iter().map(|a| a.id).any(|x| x == user.id)
-        || sitemods.iter().map(|a| a.id).any(|x| x == user.id)) {
-      return Err(APIError::err("not_an_admin_or_sitemod").into());
+    if user_id != read_community.creator_id
+      && !(admins.iter().map(|a| a.id).any(|x| x == user_id)
+        || sitemods.iter().map(|a| a.id).any(|x| x == user_id)) {
+      return Err(APIError::err("not_an_admin").into());
     }
 
     let community_id = data.community_id;

@@ -1124,8 +1124,8 @@ impl Perform for Oper<BanUser> {
 
     // Make sure user is an admin or sitemod
     let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
-    if !user.admin || !user.sitemod {
-      return Err(APIError::err("not_an_admin_or_sitemod").into());
+    if !(user.admin || user.sitemod) {
+      return Err(APIError::err("not_an_admin").into());
     }
 
     let ban = data.ban;
