@@ -1,5 +1,6 @@
 use super::user_view::user_fast::BoxedQuery;
 use crate::{fuzzy_search, limit_and_offset, MaybeOptional, SortType};
+
 use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
@@ -8,12 +9,15 @@ table! {
     id -> Int4,
     actor_id -> Text,
     name -> Varchar,
+    preferred_username -> Nullable<Varchar>,
     avatar -> Nullable<Text>,
+    banner -> Nullable<Text>,
     email -> Nullable<Text>,
     matrix_user_id -> Nullable<Text>,
     bio -> Nullable<Text>,
     local -> Bool,
     admin -> Bool,
+    sitemod -> Bool,
     banned -> Bool,
     show_avatars -> Bool,
     send_notifications_to_email -> Bool,
@@ -30,12 +34,15 @@ table! {
     id -> Int4,
     actor_id -> Text,
     name -> Varchar,
+    preferred_username -> Nullable<Varchar>,
     avatar -> Nullable<Text>,
+    banner -> Nullable<Text>,
     email -> Nullable<Text>,
     matrix_user_id -> Nullable<Text>,
     bio -> Nullable<Text>,
     local -> Bool,
     admin -> Bool,
+    sitemod -> Bool,
     banned -> Bool,
     show_avatars -> Bool,
     send_notifications_to_email -> Bool,
@@ -55,15 +62,18 @@ pub struct UserView {
   pub id: i32,
   pub actor_id: String,
   pub name: String,
+  pub preferred_username: Option<String>,
   pub avatar: Option<String>,
-  pub email: Option<String>,
+  pub banner: Option<String>,
+  pub email: Option<String>, // TODO this shouldn't be in this view
   pub matrix_user_id: Option<String>,
   pub bio: Option<String>,
   pub local: bool,
   pub admin: bool,
+  pub sitemod: bool,
   pub banned: bool,
-  pub show_avatars: bool,
-  pub send_notifications_to_email: bool,
+  pub show_avatars: bool, // TODO this is a setting, probably doesn't need to be here
+  pub send_notifications_to_email: bool, // TODO also never used
   pub published: chrono::NaiveDateTime,
   pub number_of_posts: i64,
   pub post_score: i64,
@@ -126,6 +136,9 @@ impl<'a> UserQueryBuilder<'a> {
       SortType::Hot => query
         .order_by(comment_score.desc())
         .then_order_by(published.desc()),
+      SortType::Active => query
+        .order_by(comment_score.desc())
+        .then_order_by(published.desc()),
       SortType::New => query.order_by(published.desc()),
       SortType::TopAll => query.order_by(comment_score.desc()),
       SortType::TopYear => query
@@ -164,12 +177,15 @@ impl UserView {
         id,
         actor_id,
         name,
+        preferred_username,
         avatar,
+        banner,
         "".into_sql::<Nullable<Text>>(),
         matrix_user_id,
         bio,
         local,
         admin,
+        sitemod,
         banned,
         show_avatars,
         send_notifications_to_email,
@@ -184,6 +200,38 @@ impl UserView {
       .load::<Self>(conn)
   }
 
+  pub fn sitemods(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_fast::dsl::*;
+    use diesel::sql_types::{Nullable, Text};
+    user_fast
+      // The select is necessary here to not get back emails
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        "".into_sql::<Nullable<Text>>(),
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        banned,
+        show_avatars,
+        send_notifications_to_email,
+        published,
+        number_of_posts,
+        post_score,
+        number_of_comments,
+        comment_score,
+      ))
+      .filter(sitemod.eq(true))
+      .order_by(published)
+      .load::<Self>(conn)
+  }
+
   pub fn banned(conn: &PgConnection) -> Result<Vec<Self>, Error> {
     use super::user_view::user_fast::dsl::*;
     use diesel::sql_types::{Nullable, Text};
@@ -192,12 +240,15 @@ impl UserView {
         id,
         actor_id,
         name,
+        preferred_username,
         avatar,
+        banner,
         "".into_sql::<Nullable<Text>>(),
         matrix_user_id,
         bio,
         local,
         admin,
+        sitemod,
         banned,
         show_avatars,
         send_notifications_to_email,

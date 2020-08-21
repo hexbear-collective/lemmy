@@ -1,11 +1,9 @@
 use crate::apub::{
   comment::get_apub_comment,
   community::*,
-  community_inbox::community_inbox,
+  inbox::{community_inbox::community_inbox, shared_inbox::shared_inbox, user_inbox::user_inbox},
   post::get_apub_post,
-  shared_inbox::shared_inbox,
   user::*,
-  user_inbox::user_inbox,
   APUB_JSON_CONTENT_TYPE,
 };
 use actix_web::*;
@@ -30,11 +28,10 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             "/c/{community_name}/followers",
             web::get().to(get_apub_community_followers),
           )
-          // TODO This is only useful for history which we aren't doing right now
-          // .route(
-          //   "/c/{community_name}/outbox",
-          //   web::get().to(get_apub_community_outbox),
-          // )
+          .route(
+            "/c/{community_name}/outbox",
+            web::get().to(get_apub_community_outbox),
+          )
           .route("/u/{user_name}", web::get().to(get_apub_user_http))
           .route("/post/{post_id}", web::get().to(get_apub_post))
           .route("/comment/{comment_id}", web::get().to(get_apub_comment)),

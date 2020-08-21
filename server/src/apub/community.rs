@@ -1,11 +1,11 @@
 use crate::{
   apub::{
-    activities::send_activity,
+    activities::{generate_activity_id, send_activity},
     create_apub_response,
     create_apub_tombstone_response,
     create_tombstone,
     extensions::group_extensions::GroupExtension,
-    fetcher::get_or_fetch_and_upsert_remote_user,
+    fetcher::get_or_fetch_and_upsert_user,
     get_shared_inbox,
     insert_activity,
     ActorType,
@@ -18,24 +18,34 @@ use crate::{
   DbPool,
   LemmyError,
 };
-use activitystreams_ext::Ext2;
-use activitystreams_new::{
-  activity::{Accept, Announce, Delete, Follow, Remove, Undo},
+use activitystreams::{
+  activity::{
+    kind::{AcceptType, AnnounceType, DeleteType, LikeType, RemoveType, UndoType},
+    Accept,
+    Announce,
+    Delete,
+    Follow,
+    Remove,
+    Undo,
+  },
   actor::{kind::GroupType, ApActor, Endpoints, Group},
   base::{AnyBase, BaseExt},
-  collection::UnorderedCollection,
+  collection::{OrderedCollection, UnorderedCollection},
   context,
-  object::Tombstone,
+  object::{Image, Tombstone},
   prelude::*,
   public,
 };
+use activitystreams_ext::Ext2;
 use actix_web::{body::Body, client::Client, web, HttpResponse};
+use anyhow::anyhow;
 use itertools::Itertools;
 use lemmy_db::{
   community::{Community, CommunityForm},
   community_settings::CommunitySettings,
   community_view::{CommunityFollowerView, CommunityModeratorView},
   naive_now,
+  post::Post,
   user::User_,
 };
 use lemmy_utils::convert_datetime;
@@ -59,7 +69,7 @@ impl ToApub for Community {
     })
     .await??;
     if settings.private {
-      return Err(format_err!("Community is private").into());
+      return Err(anyhow!("Community is private").into());
     }
 
     // The attributed to, is an ordered vector with the creator actor_ids first,
@@ -90,10 +100,10 @@ impl ToApub for Community {
       group.set_content(d);
     }
 
-    let mut ap_actor = ApActor::new(self.get_inbox_url().parse()?, group);
+    let mut ap_actor = ApActor::new(self.get_inbox_url()?, group);
     ap_actor
       .set_preferred_username(self.title.to_owned())
-      .set_outbox(self.get_outbox_url().parse()?)
+      .set_outbox(self.get_outbox_url()?)
       .set_followers(self.get_followers_url().parse()?)
       .set_following(self.get_following_url().parse()?)
       .set_liked(self.get_liked_url().parse()?)
@@ -117,12 +127,7 @@ impl ToApub for Community {
   }
 
   fn to_tombstone(&self) -> Result<Tombstone, LemmyError> {
-    create_tombstone(
-      self.deleted,
-      &self.actor_id,
-      self.updated,
-      GroupType::Group.to_string(),
-    )
+    create_tombstone(self.deleted, &self.actor_id, self.updated, GroupType::Group)
   }
 }
 
@@ -147,13 +152,12 @@ impl ActorType for Community {
     pool: &DbPool,
   ) -> Result<(), LemmyError> {
     let actor_uri = follow.actor()?.as_single_xsd_any_uri().unwrap().to_string();
-    let id = format!("{}/accept/{}", self.actor_id, uuid::Uuid::new_v4());
 
     let mut accept = Accept::new(self.actor_id.to_owned(), follow.into_any_base()?);
     let to = format!("{}/inbox", actor_uri);
     accept
       .set_context(context())
-      .set_id(Url::parse(&id)?)
+      .set_id(generate_activity_id(AcceptType::Accept)?)
       .set_to(to.clone());
 
     insert_activity(self.creator_id, accept.clone(), true, pool).await?;
@@ -170,12 +174,10 @@ impl ActorType for Community {
   ) -> Result<(), LemmyError> {
     let group = self.to_apub(pool).await?;
 
-    let id = format!("{}/delete/{}", self.actor_id, uuid::Uuid::new_v4());
-
     let mut delete = Delete::new(creator.actor_id.to_owned(), group.into_any_base()?);
     delete
       .set_context(context())
-      .set_id(Url::parse(&id)?)
+      .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()]);
 
@@ -198,22 +200,19 @@ impl ActorType for Community {
   ) -> Result<(), LemmyError> {
     let group = self.to_apub(pool).await?;
 
-    let id = format!("{}/delete/{}", self.actor_id, uuid::Uuid::new_v4());
-
     let mut delete = Delete::new(creator.actor_id.to_owned(), group.into_any_base()?);
     delete
       .set_context(context())
-      .set_id(Url::parse(&id)?)
+      .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()]);
 
     // TODO
     // Undo that fake activity
-    let undo_id = format!("{}/undo/delete/{}", self.actor_id, uuid::Uuid::new_v4());
     let mut undo = Undo::new(creator.actor_id.to_owned(), delete.into_any_base()?);
     undo
       .set_context(context())
-      .set_id(Url::parse(&undo_id)?)
+      .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()]);
 
@@ -236,12 +235,10 @@ impl ActorType for Community {
   ) -> Result<(), LemmyError> {
     let group = self.to_apub(pool).await?;
 
-    let id = format!("{}/remove/{}", self.actor_id, uuid::Uuid::new_v4());
-
     let mut remove = Remove::new(mod_.actor_id.to_owned(), group.into_any_base()?);
     remove
       .set_context(context())
-      .set_id(Url::parse(&id)?)
+      .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()]);
 
@@ -264,21 +261,18 @@ impl ActorType for Community {
   ) -> Result<(), LemmyError> {
     let group = self.to_apub(pool).await?;
 
-    let id = format!("{}/remove/{}", self.actor_id, uuid::Uuid::new_v4());
-
     let mut remove = Remove::new(mod_.actor_id.to_owned(), group.into_any_base()?);
     remove
       .set_context(context())
-      .set_id(Url::parse(&id)?)
+      .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()]);
 
     // Undo that fake activity
-    let undo_id = format!("{}/undo/remove/{}", self.actor_id, uuid::Uuid::new_v4());
     let mut undo = Undo::new(mod_.actor_id.to_owned(), remove.into_any_base()?);
     undo
       .set_context(context())
-      .set_id(Url::parse(&undo_id)?)
+      .set_id(generate_activity_id(LikeType::Like)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()]);
 
@@ -328,6 +322,10 @@ impl ActorType for Community {
   ) -> Result<(), LemmyError> {
     unimplemented!()
   }
+
+  fn user_id(&self) -> i32 {
+    self.creator_id
+  }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -335,12 +333,7 @@ impl FromApub for CommunityForm {
   type ApubType = GroupExt;
 
   /// Parse an ActivityPub group received from another instance into a Lemmy community.
-  async fn from_apub(
-    group: &GroupExt,
-    client: &Client,
-    pool: &DbPool,
-    actor_id: &Url,
-  ) -> Result<Self, LemmyError> {
+  async fn from_apub(group: &GroupExt, client: &Client, pool: &DbPool) -> Result<Self, LemmyError> {
     let creator_and_moderator_uris = group.inner.attributed_to().unwrap();
     let creator_uri = creator_and_moderator_uris
       .as_many()
@@ -351,7 +344,33 @@ impl FromApub for CommunityForm {
       .as_xsd_any_uri()
       .unwrap();
 
-    let creator = get_or_fetch_and_upsert_remote_user(creator_uri, client, pool).await?;
+    let creator = get_or_fetch_and_upsert_user(creator_uri, client, pool).await?;
+
+    let icon = match group.icon() {
+      Some(any_image) => Some(
+        Image::from_any_base(any_image.as_one().unwrap().clone())
+          .unwrap()
+          .unwrap()
+          .url()
+          .unwrap()
+          .as_single_xsd_any_uri()
+          .map(|u| u.to_string()),
+      ),
+      None => None,
+    };
+
+    let banner = match group.image() {
+      Some(any_image) => Some(
+        Image::from_any_base(any_image.as_one().unwrap().clone())
+          .unwrap()
+          .unwrap()
+          .url()
+          .unwrap()
+          .as_single_xsd_any_uri()
+          .map(|u| u.to_string()),
+      ),
+      None => None,
+    };
 
     Ok(CommunityForm {
       name: group
@@ -377,15 +396,13 @@ impl FromApub for CommunityForm {
       updated: group.inner.updated().map(|u| u.to_owned().naive_local()),
       deleted: None,
       nsfw: group.ext_one.sensitive,
-      actor_id: group
-        .inner
-        .id(actor_id.domain().unwrap())?
-        .unwrap()
-        .to_string(),
+      actor_id: group.inner.id_unchecked().unwrap().to_string(),
       local: false,
       private_key: None,
       public_key: Some(group.ext_two.to_owned().public_key.public_key_pem),
       last_refreshed_at: Some(naive_now()),
+      icon,
+      banner,
     })
   }
 }
@@ -425,7 +442,7 @@ pub async fn get_apub_community_followers(
   })
   .await??;
 
-  let mut collection = UnorderedCollection::new(vec![]);
+  let mut collection = UnorderedCollection::new();
   collection
     .set_context(context())
     // TODO: this needs its own ID
@@ -434,18 +451,47 @@ pub async fn get_apub_community_followers(
   Ok(create_apub_response(&collection))
 }
 
+pub async fn get_apub_community_outbox(
+  info: web::Path<CommunityQuery>,
+  db: DbPoolParam,
+) -> Result<HttpResponse<Body>, LemmyError> {
+  let community = blocking(&db, move |conn| {
+    Community::read_from_name(&conn, &info.community_name)
+  })
+  .await??;
+
+  let community_id = community.id;
+  let posts = blocking(&db, move |conn| {
+    Post::list_for_community(conn, community_id)
+  })
+  .await??;
+
+  let mut pages: Vec<AnyBase> = vec![];
+  for p in posts {
+    pages.push(p.to_apub(&db).await?.into_any_base()?);
+  }
+
+  let len = pages.len();
+  let mut collection = OrderedCollection::new();
+  collection
+    .set_many_items(pages)
+    .set_context(context())
+    .set_id(community.get_outbox_url()?)
+    .set_total_items(len as u64);
+  Ok(create_apub_response(&collection))
+}
+
 pub async fn do_announce(
   activity: AnyBase,
   community: &Community,
-  sender: &dyn ActorType,
+  sender: &User_,
   client: &Client,
   pool: &DbPool,
-) -> Result<HttpResponse, LemmyError> {
-  let id = format!("{}/announce/{}", community.actor_id, uuid::Uuid::new_v4());
+) -> Result<(), LemmyError> {
   let mut announce = Announce::new(community.actor_id.to_owned(), activity);
   announce
     .set_context(context())
-    .set_id(Url::parse(&id)?)
+    .set_id(generate_activity_id(AnnounceType::Announce)?)
     .set_to(public())
     .set_many_ccs(vec![community.get_followers_url()]);
 
@@ -460,5 +506,5 @@ pub async fn do_announce(
 
   send_activity(client, &announce.into_any_base()?, community, to).await?;
 
-  Ok(HttpResponse::Ok().finish())
+  Ok(())
 }

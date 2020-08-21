@@ -18,9 +18,8 @@ members = [
 lemmy_utils = { path = "./lemmy_utils" }
 lemmy_db = { path = "./lemmy_db" }
 
-# External deps
-activitystreams-new = { git = "https://yerbamate.dev/asonix/activitystreams-new", branch = "main" }
-activitystreams-ext = { git = "https://yerbamate.dev/asonix/activitystreams-ext", branch = "main" }
+activitystreams = "0.7.0-alpha.3"
+activitystreams-ext = "0.1.0-alpha.2"
 actix = "0.10.0-alpha.2"
 actix-files = "0.3.0-alpha.1"
 actix-rt = "1.1.1"
@@ -62,7 +61,9 @@ strum_macros = "0.18.0"
 tokio = "0.2.21"
 url = { version = "2.1.1", features = ["serde"] }
 uuid = { version = "0.6", features = ["serde", "v4"] }
+captcha = "0.0.7"
+anyhow = "1.0.32"
+thiserror = "1.0.20"
 
 [build-dependencies]
 vergen = "3"
-

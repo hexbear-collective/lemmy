@@ -1,4 +1,4 @@
-pub const VERSION: &str = "v0.7.25";
+pub const VERSION: &str = "v0.7.41";
 pub const GIT_SHA: &str = env!("VERGEN_SHA");
 pub const GIT_SHA_SHORT: &str = env!("VERGEN_SHA_SHORT");
 pub const SEMVER_LIGHTWEIGHT: &str = env!("VERGEN_SEMVER_LIGHTWEIGHT");

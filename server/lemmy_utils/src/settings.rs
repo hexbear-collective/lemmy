@@ -14,9 +14,11 @@ pub struct Settings {
   pub port: u16,
   pub jwt_secret: String,
   pub front_end_dir: String,
+  pub pictrs_url: String,
   pub rate_limit: RateLimitConfig,
   pub email: Option<EmailConfig>,
   pub federation: Federation,
+  pub captcha: CaptchaConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -35,6 +37,8 @@ pub struct RateLimitConfig {
   pub post_per_second: i32,
   pub register: i32,
   pub register_per_second: i32,
+  pub image: i32,
+  pub image_per_second: i32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -44,6 +48,16 @@ pub struct EmailConfig {
   pub smtp_password: Option<String>,
   pub smtp_from_address: String,
   pub use_tls: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CaptchaConfig {
+  pub enabled: bool,
+  pub provider: String,   // lemmy, hcaptcha
+  pub difficulty: String, // easy, medium, or hard
+  pub hcaptcha_secret_key: String,
+  pub hcaptcha_site_key: String,
+  pub hcaptcha_verify_url: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -81,9 +95,9 @@ impl Settings {
   fn init() -> Result<Self, ConfigError> {
     let mut s = Config::new();
 
-    s.merge(File::with_name(CONFIG_FILE_DEFAULTS))?;
+    s.merge(File::with_name(&Self::get_config_defaults_location()))?;
 
-    s.merge(File::with_name(&Self::get_config_location()).required(false))?;
+    s.merge(File::with_name(CONFIG_FILE).required(false))?;
 
     // Add in settings from the environment (with a prefix of LEMMY)
     // Eg.. `LEMMY_DEBUG=1 ./target/app` would set the `debug` key
@@ -115,16 +129,16 @@ impl Settings {
     format!("{}/api/v1", self.hostname)
   }
 
-  pub fn get_config_location() -> String {
-    env::var("LEMMY_CONFIG_LOCATION").unwrap_or_else(|_| CONFIG_FILE.to_string())
+  pub fn get_config_defaults_location() -> String {
+    env::var("LEMMY_CONFIG_LOCATION").unwrap_or_else(|_| CONFIG_FILE_DEFAULTS.to_string())
   }
 
   pub fn read_config_file() -> Result<String, Error> {
-    fs::read_to_string(Self::get_config_location())
+    fs::read_to_string(CONFIG_FILE)
   }
 
   pub fn save_config_file(data: &str) -> Result<String, Error> {
-    fs::write(Self::get_config_location(), data)?;
+    fs::write(CONFIG_FILE, data)?;
 
     // Reload the new settings
     // From https://stackoverflow.com/questions/29654927/how-do-i-assign-a-string-to-a-mutable-static-variable/47181804#47181804
