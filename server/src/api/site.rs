@@ -493,7 +493,7 @@ impl Perform for Oper<GetSite> {
       sitemods,
       banned,
       online,
-      version: version::VERSION.to_string(),
+      version: version::SEMVER_LIGHTWEIGHT.to_string(),
       my_user,
     })
   }
@@ -721,7 +721,7 @@ impl Perform for Oper<TransferSite> {
       sitemods,
       banned,
       online: 0,
-      version: version::VERSION.to_string(),
+      version: version::SEMVER_LIGHTWEIGHT.to_string(),
       my_user: Some(user),
     })
   }
