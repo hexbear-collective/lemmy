@@ -921,6 +921,7 @@ impl Perform for Oper<TransferCommunity> {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
+    let user_id = user.id;
     // Make sure user is the creator, or an admin, or sitemod
     if user_id != read_community.creator_id
       && !(admins.iter().map(|a| a.id).any(|x| x == user_id)
