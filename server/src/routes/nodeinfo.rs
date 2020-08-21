@@ -37,11 +37,14 @@ async fn node_info(db: DbPoolParam) -> Result<HttpResponse, Error> {
     vec![]
   };
 
+  // let ver_str = format!("{}-{}", version::VERSION, version::GIT_SHA_SHORT);
+  let ver_str = version::SEMVER_LIGHTWEIGHT.to_string();
+
   let json = NodeInfo {
     version: "2.0".to_string(),
     software: NodeInfoSoftware {
       name: "lemmy".to_string(),
-      version: version::VERSION.to_string(),
+      version: ver_str,
     },
     protocols,
     usage: NodeInfoUsage {

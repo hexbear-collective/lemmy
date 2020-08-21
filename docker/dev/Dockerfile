@@ -8,7 +8,9 @@ RUN yarn install --pure-lockfile
 
 # Build 
 COPY ui /app/ui
+COPY .git/ ./.git/
 RUN yarn build
+RUN su && rm -rf .git
 
 FROM ekidd/rust-musl-builder:1.42.0-openssl11 as rust
 
@@ -17,9 +19,10 @@ WORKDIR /app
 RUN sudo chown -R rust:rust .
 RUN USER=root cargo new server
 WORKDIR /app/server
-COPY server/Cargo.toml server/Cargo.lock ./
+COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
 COPY server/lemmy_db ./lemmy_db
 COPY server/lemmy_utils ./lemmy_utils
+COPY .git/ ./.git/
 RUN mkdir -p ./src/bin \
    && echo 'fn main() { println!("Dummy") }' > ./src/bin/main.rs
 RUN cargo build
@@ -29,6 +32,8 @@ COPY server/migrations ./migrations/
 
 # Build for debug
 RUN cargo build
+
+RUN sudo rm -rf .git
 
 FROM ekidd/rust-musl-builder:1.42.0-openssl11 as docs
 WORKDIR /app
