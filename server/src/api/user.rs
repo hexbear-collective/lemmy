@@ -567,7 +567,7 @@ impl Perform for Oper<Register> {
       show_nsfw: data.show_nsfw,
       theme: "darkly".into(),
       default_sort_type: SortType::Active as i16,
-      default_listing_type: ListingType::Subscribed as i16,
+      default_listing_type: ListingType::All as i16,
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
