@@ -670,10 +670,10 @@ impl Perform for Oper<Register> {
         user_id: inserted_user.id,
       };
 
-      let follow = move |conn: &'_ _| CommunityFollower::follow(conn, &community_follower_form);
-      if blocking(pool, follow).await?.is_err() {
-        return Err(APIError::err("community_follower_already_exists").into());
-      };
+      let _ = blocking(pool, move |conn: &'_ _| {
+        CommunityFollower::follow(conn, &community_follower_form)
+      })
+      .await;
     }
 
     // If its an admin, add them as a mod and follower to main
