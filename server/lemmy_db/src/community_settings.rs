@@ -30,6 +30,11 @@ impl CommunitySettings {
     use crate::schema::community_settings::dsl::*;
     community_settings.find(community_id_).first::<Self>(conn)
   }
+
+  pub fn list_auto_subbed(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use crate::schema::community_settings::dsl::*;
+    community_settings.filter(auto_sub_new_users.eq(true)).load::<CommunitySettings>(conn)
+  }
 }
 
 impl Crud<CommunitySettingsForm> for CommunitySettings {

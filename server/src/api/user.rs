@@ -660,16 +660,21 @@ impl Perform for Oper<Register> {
       }
     };
 
-    // Sign them up for main community no matter what
-    let community_follower_form = CommunityFollowerForm {
-      community_id: main_community.id,
-      user_id: inserted_user.id,
-    };
+    // subscribe the user to all communities that have auto-sub enabled
+    let auto_sub_communities =
+      blocking(pool, move |conn| CommunitySettings::list_auto_subbed(conn)).await??;
 
-    let follow = move |conn: &'_ _| CommunityFollower::follow(conn, &community_follower_form);
-    if blocking(pool, follow).await?.is_err() {
-      return Err(APIError::err("community_follower_already_exists").into());
-    };
+    for comm in auto_sub_communities.into_iter() {
+      let community_follower_form = CommunityFollowerForm {
+        community_id: comm.id,
+        user_id: inserted_user.id,
+      };
+
+      let follow = move |conn: &'_ _| CommunityFollower::follow(conn, &community_follower_form);
+      if blocking(pool, follow).await?.is_err() {
+        return Err(APIError::err("community_follower_already_exists").into());
+      };
+    }
 
     // If its an admin, add them as a mod and follower to main
     if data.admin {
