@@ -347,6 +347,7 @@ impl Perform for Oper<CreateCommunity> {
       private: false,
       post_links: true,
       comment_images: 1,
+      auto_sub_new_users: true,
     };
 
     let _inserted_settings = blocking(pool, move |conn| {
@@ -925,7 +926,8 @@ impl Perform for Oper<TransferCommunity> {
     // Make sure user is the creator, or an admin, or sitemod
     if user_id != read_community.creator_id
       && !(admins.iter().map(|a| a.id).any(|x| x == user_id)
-        || sitemods.iter().map(|a| a.id).any(|x| x == user_id)) {
+        || sitemods.iter().map(|a| a.id).any(|x| x == user_id))
+    {
       return Err(APIError::err("not_an_admin").into());
     }
 

@@ -1,16 +1,22 @@
 use crate::{
   api::{
-    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, APIError,
-    Oper, Perform,
+    check_slurs,
+    claims::Claims,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_admin,
+    APIError,
+    Oper,
+    Perform,
   },
-  //  apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
   DbPool,
   LemmyError,
@@ -38,11 +44,22 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud, Followable, Joinable, ListingType, SortType,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
-  naive_from_unix, remove_slurs, send_email, settings::Settings, EndpointType,
+  generate_actor_keypair,
+  generate_random_string,
+  is_valid_username,
+  make_apub_endpoint,
+  naive_from_unix,
+  remove_slurs,
+  send_email,
+  settings::Settings,
+  EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -631,6 +648,7 @@ impl Perform for Oper<Register> {
           private: false,
           post_links: true,
           comment_images: 1,
+          auto_sub_new_users: true,
         };
 
         let _inserted_settings = blocking(pool, move |conn| {

@@ -27,6 +27,7 @@ pub struct GetCommunitySettingsResponse {
   pub post_links: bool,
   pub comment_images: i32,
   pub published: chrono::NaiveDateTime,
+  pub auto_sub_new_users: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -36,6 +37,7 @@ pub struct EditCommunitySettings {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
+  pub auto_sub_new_users: bool,
   auth: String,
 }
 
@@ -46,6 +48,7 @@ pub struct EditCommunitySettingsResponse {
   pub post_links: bool,
   pub comment_images: i32,
   pub published: chrono::NaiveDateTime,
+  pub auto_sub_new_users: bool,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -75,6 +78,7 @@ impl Perform for Oper<GetCommunitySettings> {
       post_links: community_settings.post_links,
       comment_images: community_settings.comment_images,
       published: naive_now(),
+      auto_sub_new_users: community_settings.auto_sub_new_users,
     };
 
     // Return the jwt
@@ -115,6 +119,7 @@ impl Perform for Oper<EditCommunitySettings> {
       private: data.private.to_owned(),
       post_links: data.post_links.to_owned(),
       comment_images: data.comment_images.to_owned(),
+      auto_sub_new_users: data.auto_sub_new_users.to_owned(),
     };
 
     let community_id = data.community_id;
@@ -133,6 +138,7 @@ impl Perform for Oper<EditCommunitySettings> {
       post_links: updated_community_settings.post_links,
       comment_images: updated_community_settings.comment_images,
       published: updated_community_settings.published,
+      auto_sub_new_users: updated_community_settings.auto_sub_new_users,
     };
 
     if let Some(ws) = websocket_info {
