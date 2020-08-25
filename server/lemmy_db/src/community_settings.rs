@@ -11,6 +11,7 @@ pub struct CommunitySettings {
   pub post_links: bool,
   pub comment_images: i32,
   pub published: chrono::NaiveDateTime,
+  pub allow_as_default: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize, Debug)]
@@ -21,12 +22,18 @@ pub struct CommunitySettingsForm {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
+  pub allow_as_default: bool,
 }
 
 impl CommunitySettings {
   pub fn read_from_community_id(conn: &PgConnection, community_id_: i32) -> Result<Self, Error> {
     use crate::schema::community_settings::dsl::*;
     community_settings.find(community_id_).first::<Self>(conn)
+  }
+
+  pub fn list_allowed_as_default(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use crate::schema::community_settings::dsl::*;
+    community_settings.filter(allow_as_default.eq(true)).load::<CommunitySettings>(conn)
   }
 }
 

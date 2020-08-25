@@ -184,6 +184,7 @@ table! {
         post_links -> Bool,
         comment_images -> Int4,
         published -> Timestamp,
+        allow_as_default -> Bool,
     }
 }
 

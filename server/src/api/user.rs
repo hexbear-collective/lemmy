@@ -1,16 +1,22 @@
 use crate::{
   api::{
-    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, APIError,
-    Oper, Perform,
+    check_slurs,
+    claims::Claims,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_admin,
+    APIError,
+    Oper,
+    Perform,
   },
-  //  apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation, WebsocketInfo,
+    UserOperation,
+    WebsocketInfo,
   },
   DbPool,
   LemmyError,
@@ -38,11 +44,22 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud, Followable, Joinable, ListingType, SortType,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
-  naive_from_unix, remove_slurs, send_email, settings::Settings, EndpointType,
+  generate_actor_keypair,
+  generate_random_string,
+  is_valid_username,
+  make_apub_endpoint,
+  naive_from_unix,
+  remove_slurs,
+  send_email,
+  settings::Settings,
+  EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -631,6 +648,7 @@ impl Perform for Oper<Register> {
           private: false,
           post_links: true,
           comment_images: 1,
+          allow_as_default: true,
         };
 
         let _inserted_settings = blocking(pool, move |conn| {
@@ -642,16 +660,23 @@ impl Perform for Oper<Register> {
       }
     };
 
-    // Sign them up for main community no matter what
-    let community_follower_form = CommunityFollowerForm {
-      community_id: main_community.id,
-      user_id: inserted_user.id,
-    };
+    // subscribe the user to all communities that have allow_as_default enabled
+    let default_communities = blocking(pool, move |conn| {
+      CommunitySettings::list_allowed_as_default(conn)
+    })
+    .await??;
 
-    let follow = move |conn: &'_ _| CommunityFollower::follow(conn, &community_follower_form);
-    if blocking(pool, follow).await?.is_err() {
-      return Err(APIError::err("community_follower_already_exists").into());
-    };
+    for comm in default_communities.into_iter() {
+      let community_follower_form = CommunityFollowerForm {
+        community_id: comm.id,
+        user_id: inserted_user.id,
+      };
+
+      let _ = blocking(pool, move |conn: &'_ _| {
+        CommunityFollower::follow(conn, &community_follower_form)
+      })
+      .await;
+    }
 
     // If its an admin, add them as a mod and follower to main
     if data.admin {
