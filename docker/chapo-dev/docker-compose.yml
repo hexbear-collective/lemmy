@@ -14,7 +14,7 @@ services:
       - LEMMY_HOSTNAME=${LEMMYDEV_LEMMY_HOSTNAME}
       - LEMMY_PORT=8536
       - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
-      - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
+      - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@thoseamongbranches.chapo.chat
       - LEMMY_EMAIL__SMTP_LOGIN=noreply@chapo.chat
       - LEMMY_EMAIL__SMTP_PASSWORD=${LEMMYDEV_SMTP_PASSWORD}
       - LEMMY_EMAIL__USE_TLS=true
