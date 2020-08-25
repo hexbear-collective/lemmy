@@ -3,7 +3,7 @@
   # https://dev.lemmy.ml/docs/administration_configuration.html
 
   # the domain name of your instance (eg "dev.lemmy.ml")
-  hostname: "dev.chapo.chat"
+  hostname: "thoseamongbranches.chapo.chat"
 
   # address where lemmy should listen for incoming requests
   bind: "0.0.0.0"
@@ -34,7 +34,7 @@
     # hostname of the smtp server
     smtp_server: "postfix-dev:25"
     # address to send emails from, eg "noreply@your-instance.com"
-    smtp_from_address: "noreply@dev.chapo.chat"
+    smtp_from_address: "noreply@thoseamongbranches.chapo.chat"
     use_tls: false
   }
 }
