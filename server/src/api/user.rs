@@ -648,7 +648,7 @@ impl Perform for Oper<Register> {
           private: false,
           post_links: true,
           comment_images: 1,
-          auto_sub_new_users: true,
+          allow_as_default: true,
         };
 
         let _inserted_settings = blocking(pool, move |conn| {
@@ -660,11 +660,13 @@ impl Perform for Oper<Register> {
       }
     };
 
-    // subscribe the user to all communities that have auto-sub enabled
-    let auto_sub_communities =
-      blocking(pool, move |conn| CommunitySettings::list_auto_subbed(conn)).await??;
+    // subscribe the user to all communities that have allow_as_default enabled
+    let default_communities = blocking(pool, move |conn| {
+      CommunitySettings::list_allowed_as_default(conn)
+    })
+    .await??;
 
-    for comm in auto_sub_communities.into_iter() {
+    for comm in default_communities.into_iter() {
       let community_follower_form = CommunityFollowerForm {
         community_id: comm.id,
         user_id: inserted_user.id,

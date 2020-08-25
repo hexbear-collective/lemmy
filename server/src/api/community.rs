@@ -347,7 +347,7 @@ impl Perform for Oper<CreateCommunity> {
       private: false,
       post_links: true,
       comment_images: 1,
-      auto_sub_new_users: true,
+      allow_as_default: true,
     };
 
     let _inserted_settings = blocking(pool, move |conn| {

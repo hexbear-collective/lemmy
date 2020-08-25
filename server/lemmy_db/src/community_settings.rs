@@ -11,7 +11,7 @@ pub struct CommunitySettings {
   pub post_links: bool,
   pub comment_images: i32,
   pub published: chrono::NaiveDateTime,
-  pub auto_sub_new_users: bool,
+  pub allow_as_default: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize, Debug)]
@@ -22,7 +22,7 @@ pub struct CommunitySettingsForm {
   pub private: bool,
   pub post_links: bool,
   pub comment_images: i32,
-  pub auto_sub_new_users: bool,
+  pub allow_as_default: bool,
 }
 
 impl CommunitySettings {
@@ -31,9 +31,9 @@ impl CommunitySettings {
     community_settings.find(community_id_).first::<Self>(conn)
   }
 
-  pub fn list_auto_subbed(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+  pub fn list_allowed_as_default(conn: &PgConnection) -> Result<Vec<Self>, Error> {
     use crate::schema::community_settings::dsl::*;
-    community_settings.filter(auto_sub_new_users.eq(true)).load::<CommunitySettings>(conn)
+    community_settings.filter(allow_as_default.eq(true)).load::<CommunitySettings>(conn)
   }
 }
 

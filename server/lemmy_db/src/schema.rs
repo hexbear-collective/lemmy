@@ -184,7 +184,7 @@ table! {
         post_links -> Bool,
         comment_images -> Int4,
         published -> Timestamp,
-        auto_sub_new_users -> Bool,
+        allow_as_default -> Bool,
     }
 }
 

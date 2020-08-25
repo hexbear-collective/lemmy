@@ -1,1 +1,1 @@
-alter table community_settings drop column auto_sub_new_users;
+alter table community_settings drop column allow_as_default;

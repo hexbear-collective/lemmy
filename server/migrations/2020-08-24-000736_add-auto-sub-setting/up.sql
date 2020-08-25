@@ -1,1 +1,1 @@
-alter table community_settings add column auto_sub_new_users bool not null default true;
+alter table community_settings add column allow_as_default bool not null default true;
