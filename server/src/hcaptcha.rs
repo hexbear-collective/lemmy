@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct HCaptchaResponse {
   pub success: bool,
-  pub challenge_ts: Option<chrono::DateTime<Utc>>,
-  pub hostname: Option<String>,
-  pub credit: Option<bool>,
+  //  pub challenge_ts: Option<chrono::DateTime<Utc>>,
+  //  pub hostname: Option<String>,
+  //  pub credit: Option<bool>,
   #[serde(rename = "error-codes")]
   pub error_codes: Option<Vec<String>>,
 }
