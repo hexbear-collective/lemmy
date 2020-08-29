@@ -773,8 +773,8 @@ impl Perform for Oper<BanFromCommunity> {
     is_mod_or_admin(pool, user.id, community_id).await?;
 
     match is_mod_or_admin(pool, data.user_id, community_id).await {
-      Ok(_) => (),
-      Err(_e) => return Err(APIError::err("couldnt_ban_privilaged_user").into()),
+      Ok(_) => return Err(APIError::err("couldnt_ban_privilaged_user").into()),
+      Err(_e) => (),
     };
 
     let community_user_ban_form = CommunityUserBanForm {
