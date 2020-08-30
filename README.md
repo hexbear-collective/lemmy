@@ -1,6 +1,20 @@
-*(Original Lemmy readme is [here](README-lemmy.md))*
+<div align="center">
 
-# Lemmy (Chapo edition)
+[Original Lemmy README](README-lemmy.md)
+</div>
+
+<p align="center">
+    <a href="https://www.chapo.chat" rel="noopener">
+    <img width=300px height=300px src="ui/public/android-chrome-512x512.png"></a>
+</p>
+
+# Hexbear
+
+Hexbear is the engine that powers [chapo.chat](https://www.chapo.chat). It is a customization of the [Lemmy](https://github.com/LemmyNet/lemmy) project.
+
+> **Why Hexbear?**
+>
+> The geometric beauty of Hexbear; all edges and angles equal. She guides our solidarity.
 
 ## Overview
 
