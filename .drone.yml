@@ -1,25 +1,25 @@
 ---
   kind: pipeline
-  type: docker
   name: default
   
   steps:
-  - name: docker
-    image: plugins/docker
-    settings:
-      username:
-        from_secret: CHAPO_REGISTRY_USER
-      password:
-        from_secret: CHAPO_REGISTRY_TOKEN
-      registry:
-        from_secret: CHAPO_REGISTRY_URL
-      repo:
-        from_secret: CHAPO_REGISTRY_URL_REPO
-      dockerfile: docker/prod/Dockerfile
-      tags: drone-test
-
-  trigger:
-    branch:
-      - chapo-dev
+  - name: test
+    image: docker:dind
+    volumes:
+    - name: dockersock
+      path: /var/run
+    commands:
+    - sleep 5 # give docker enough time to start
+    - docker ps -a
   
-  ...
+  services:
+  - name: docker
+    image: docker:dind
+    privileged: true
+    volumes:
+    - name: dockersock
+      path: /var/run
+  
+  volumes:
+  - name: dockersock
+    temp: {}
