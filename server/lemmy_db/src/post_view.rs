@@ -425,8 +425,6 @@ mod tests {
       avatar: None,
       banner: None,
       updated: None,
-      admin: false,
-      sitemod: false,
       banned: false,
       show_nsfw: false,
       theme: "darkly".into(),

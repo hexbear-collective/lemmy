@@ -249,8 +249,6 @@ impl FromApub for UserForm {
         .to_string(),
       preferred_username: person.inner.preferred_username().map(|u| u.to_string()),
       password_encrypted: "".to_string(),
-      admin: false,
-      sitemod: false,
       banned: false,
       email: None,
       avatar,

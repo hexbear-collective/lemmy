@@ -414,8 +414,6 @@ impl Perform for Oper<GetSite> {
         email: setup.admin_email.to_owned(),
         password: setup.admin_password.to_owned(),
         password_verify: setup.admin_password.to_owned(),
-        admin: true,
-        sitemod: true,
         show_nsfw: true,
         hcaptcha_id: None,
         pronouns: None,
