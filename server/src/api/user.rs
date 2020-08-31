@@ -1146,6 +1146,13 @@ impl Perform for Oper<BanUser> {
       return Err(APIError::err("not_an_admin").into());
     }
 
+    let banned_user_id = data.user_id;
+    // Make sure target user is not an admin or sitemod
+    let target = blocking(pool, move |conn| User_::read(&conn, banned_user_id)).await??;
+    if target.admin || target.sitemod {
+      return Err(APIError::err("couldnt_update_user").into());
+    }
+
     let ban = data.ban;
     let banned_user_id = data.user_id;
     let ban_user = move |conn: &'_ _| User_::ban_user(conn, banned_user_id, ban);
