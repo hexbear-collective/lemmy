@@ -1,6 +1,9 @@
 kind: pipeline
 name: default
 
+clone:
+  skip_verify: true
+
 steps:
 - name: test
   image: docker:dind
