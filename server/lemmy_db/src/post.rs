@@ -364,8 +364,6 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
-      admin: false,
-      sitemod: false,
       banned: false,
       updated: None,
       show_nsfw: false,
