@@ -28,7 +28,7 @@ use lemmy_db::{
   comment::*,
   comment_view::*,
   community::*,
-  community_settings::{CommunitySettings, CommunitySettingsForm},
+  community_settings::CommunitySettings,
   community_view::*,
   moderator::*,
   naive_now,
@@ -46,7 +46,6 @@ use lemmy_db::{
   user_view::*,
   Crud,
   Followable,
-  Joinable,
   ListingType,
   SortType,
 };
@@ -77,8 +76,6 @@ pub struct Register {
   pub email: Option<String>,
   pub password: String,
   pub password_verify: String,
-  pub admin: bool,
-  pub sitemod: bool,
   pub show_nsfw: bool,
   pub pronouns: Option<String>,
   pub captcha_uuid: Option<String>,
@@ -483,13 +480,13 @@ impl Perform for Oper<Register> {
     // Make sure there are no admins
     // We put this first because there is no captcha when setting up the site.
     // We bypass captcha check if an admin is legitimately being created
-    let any_admins = blocking(pool, move |conn| {
-      UserView::admins(conn).map(|a| a.is_empty())
-    })
-    .await??;
-    if data.admin && !any_admins {
-      return Err(APIError::err("admin_already_created").into());
-    }
+    // let any_admins = blocking(pool, move |conn| {
+    //   UserView::admins(conn).map(|a| a.is_empty())
+    // })
+    // .await??;
+    // if data.admin && !any_admins {
+    //   return Err(APIError::err("admin_already_created").into());
+    // }
 
     // Make sure site has open registration
     if let Ok(site) = blocking(pool, move |conn| SiteView::read(conn)).await? {
@@ -505,7 +502,7 @@ impl Perform for Oper<Register> {
     }
 
     // If its not the admin, check the captcha
-    if !data.admin && captcha_settings.enabled {
+    if captcha_settings.enabled {
       match captcha_settings.provider.as_str() {
         "hcaptcha" => {
           if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
@@ -544,13 +541,13 @@ impl Perform for Oper<Register> {
     check_slurs(&data.username)?;
 
     // Make sure there are no admins
-    let any_admins = blocking(pool, move |conn| {
-      UserView::admins(conn).map(|a| a.is_empty())
-    })
-    .await??;
-    if data.admin && !any_admins {
-      return Err(APIError::err("admin_already_created").into());
-    }
+    // let any_admins = blocking(pool, move |conn| {
+    //   UserView::admins(conn).map(|a| a.is_empty())
+    // })
+    // .await??;
+    // if data.admin && !any_admins {
+    //   return Err(APIError::err("admin_already_created").into());
+    // }
 
     let user_keypair = generate_actor_keypair()?;
     if !is_valid_username(&data.username) {
@@ -578,8 +575,6 @@ impl Perform for Oper<Register> {
       password_encrypted: data.password.to_owned(),
       preferred_username: None,
       updated: None,
-      admin: data.admin,
-      sitemod: data.sitemod,
       banned: false,
       show_nsfw: data.show_nsfw,
       theme: "darkly".into(),
@@ -612,53 +607,53 @@ impl Perform for Oper<Register> {
       }
     };
 
-    let main_community_keypair = generate_actor_keypair()?;
+    // let main_community_keypair = generate_actor_keypair()?;
 
-    // Create the main community if it doesn't exist
-    let main_community = match blocking(pool, move |conn| Community::read(conn, 2)).await? {
-      Ok(c) => c,
-      Err(_e) => {
-        let default_community_name = "main";
-        let community_form = CommunityForm {
-          name: default_community_name.to_string(),
-          title: "The Default Community".to_string(),
-          description: Some("The Default Community".to_string()),
-          category_id: 1,
-          nsfw: false,
-          creator_id: inserted_user.id,
-          removed: None,
-          deleted: None,
-          updated: None,
-          actor_id: make_apub_endpoint(EndpointType::Community, default_community_name).to_string(),
-          local: true,
-          private_key: Some(main_community_keypair.private_key),
-          public_key: Some(main_community_keypair.public_key),
-          last_refreshed_at: None,
-          published: None,
-          icon: None,
-          banner: None,
-        };
-        let main_community =
-          blocking(pool, move |conn| Community::create(conn, &community_form)).await??;
-        // Initialize community settings
-        let community_id = main_community.id;
-        let community_settings_form = CommunitySettingsForm {
-          id: community_id,
-          read_only: false,
-          private: false,
-          post_links: true,
-          comment_images: 1,
-          allow_as_default: true,
-        };
+    // // Create the main community if it doesn't exist
+    // let main_community = match blocking(pool, move |conn| Community::read(conn, 2)).await? {
+    //   Ok(c) => c,
+    //   Err(_e) => {
+    //     let default_community_name = "main";
+    //     let community_form = CommunityForm {
+    //       name: default_community_name.to_string(),
+    //       title: "The Default Community".to_string(),
+    //       description: Some("The Default Community".to_string()),
+    //       category_id: 1,
+    //       nsfw: false,
+    //       creator_id: inserted_user.id,
+    //       removed: None,
+    //       deleted: None,
+    //       updated: None,
+    //       actor_id: make_apub_endpoint(EndpointType::Community, default_community_name).to_string(),
+    //       local: true,
+    //       private_key: Some(main_community_keypair.private_key),
+    //       public_key: Some(main_community_keypair.public_key),
+    //       last_refreshed_at: None,
+    //       published: None,
+    //       icon: None,
+    //       banner: None,
+    //     };
+    //     let main_community =
+    //       blocking(pool, move |conn| Community::create(conn, &community_form)).await??;
+    //     // Initialize community settings
+    //     let community_id = main_community.id;
+    //     let community_settings_form = CommunitySettingsForm {
+    //       id: community_id,
+    //       read_only: false,
+    //       private: false,
+    //       post_links: true,
+    //       comment_images: 1,
+    //       allow_as_default: true,
+    //     };
 
-        let _inserted_settings = blocking(pool, move |conn| {
-          CommunitySettings::create(conn, &community_settings_form)
-        })
-        .await??;
+    //     let _inserted_settings = blocking(pool, move |conn| {
+    //       CommunitySettings::create(conn, &community_settings_form)
+    //     })
+    //     .await??;
 
-        main_community
-      }
-    };
+    //     main_community
+    //   }
+    // };
 
     // subscribe the user to all communities that have allow_as_default enabled
     let default_communities = blocking(pool, move |conn| {
@@ -679,17 +674,17 @@ impl Perform for Oper<Register> {
     }
 
     // If its an admin, add them as a mod and follower to main
-    if data.admin {
-      let community_moderator_form = CommunityModeratorForm {
-        community_id: main_community.id,
-        user_id: inserted_user.id,
-      };
+    // if data.admin {
+    //   let community_moderator_form = CommunityModeratorForm {
+    //     community_id: main_community.id,
+    //     user_id: inserted_user.id,
+    //   };
 
-      let join = move |conn: &'_ _| CommunityModerator::join(conn, &community_moderator_form);
-      if blocking(pool, join).await?.is_err() {
-        return Err(APIError::err("community_moderator_already_exists").into());
-      }
-    }
+    //   let join = move |conn: &'_ _| CommunityModerator::join(conn, &community_moderator_form);
+    //   if blocking(pool, join).await?.is_err() {
+    //     return Err(APIError::err("community_moderator_already_exists").into());
+    //   }
+    // }
 
     // Add their pronouns if they specified at account registration
     if let Some(pronouns) = data.pronouns.clone() {
@@ -868,8 +863,6 @@ impl Perform for Oper<SaveUserSettings> {
       password_encrypted,
       preferred_username,
       updated: Some(naive_now()),
-      admin: read_user.admin,
-      sitemod: read_user.sitemod,
       banned: read_user.banned,
       show_nsfw: data.show_nsfw,
       theme: data.theme.to_owned(),
@@ -1151,6 +1144,13 @@ impl Perform for Oper<BanUser> {
     let user = blocking(pool, move |conn| User_::read(&conn, user_id)).await??;
     if !(user.admin || user.sitemod) {
       return Err(APIError::err("not_an_admin").into());
+    }
+
+    let banned_user_id = data.user_id;
+    // Make sure target user is not an admin or sitemod
+    let target = blocking(pool, move |conn| User_::read(&conn, banned_user_id)).await??;
+    if target.admin || target.sitemod {
+      return Err(APIError::err("couldnt_update_user").into());
     }
 
     let ban = data.ban;
