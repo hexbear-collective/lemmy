@@ -1,25 +1,16 @@
 use crate::{
   api::{
-    check_slurs,
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    APIError,
-    Oper,
-    Perform,
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_admin_or_sitemod, APIError, Oper, Perform,
   },
-  blocking,
-  captcha_espeak_wav_base64,
+  blocking, captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use captcha::{gen, Difficulty};
@@ -44,22 +35,11 @@ use lemmy_db::{
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  Crud, Followable, Joinable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  EndpointType,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -1216,20 +1196,14 @@ impl Perform for Oper<RemoveUserContent> {
   ) -> Result<BanUserResponse, LemmyError> {
     let data: &RemoveUserContent = &self.data;
 
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
+    // Permissions checks
+    let user = get_user_from_jwt(data.auth.as_str(), pool).await?;
+    let admin = is_admin_or_sitemod(pool, user.id).await.is_ok();
 
-    let user_id = claims.id;
-    let is_admin = blocking(pool, move |conn: &'_ _| {
-      UserView::read(conn, user_id).map(|u| u.admin)
-    })
-    .await??;
-
-    let user_id = claims.id;
+    // Gather a list of communities the user moderates
+    let uid = user.id;
     let mod_communities = blocking(pool, move |conn| {
-      CommunityModeratorView::for_user(conn, user_id)
+      CommunityModeratorView::for_user(conn, uid)
     })
     .await??
     .iter()
@@ -1245,7 +1219,7 @@ impl Perform for Oper<RemoveUserContent> {
         }
       }
       None => {
-        if is_admin {
+        if admin {
           Ok(Vec::new())
         } else if !mod_communities.is_empty() {
           Ok(mod_communities)
@@ -1317,7 +1291,7 @@ impl Perform for Oper<RemoveUserContent> {
 
     for post_id in post_id_list {
       let form = ModRemovePostForm {
-        mod_user_id: user_id,
+        mod_user_id: user.id,
         post_id,
         reason: Some(reason.to_string()),
         removed: Some(true),
@@ -1328,7 +1302,7 @@ impl Perform for Oper<RemoveUserContent> {
 
     for comment_id in comment_id_list {
       let form = ModRemoveCommentForm {
-        mod_user_id: user_id,
+        mod_user_id: user.id,
         comment_id,
         reason: Some(reason.to_string()),
         removed: Some(true),
