@@ -1,5 +1,7 @@
 #[macro_use]
 pub extern crate lazy_static;
+pub extern crate actix_web;
+pub extern crate anyhow;
 pub extern crate comrak;
 pub extern crate lettre;
 pub extern crate lettre_email;
@@ -12,7 +14,8 @@ pub extern crate url;
 pub mod settings;
 
 use crate::settings::Settings;
-use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Utc};
+use actix_web::dev::ConnectionInfo;
+use chrono::{DateTime, FixedOffset, Local, NaiveDateTime};
 use itertools::Itertools;
 use lettre::{
   smtp::{
@@ -31,9 +34,45 @@ use regex::{Regex, RegexBuilder};
 use std::io::{Error, ErrorKind};
 use url::Url;
 
-pub fn to_datetime_utc(ndt: NaiveDateTime) -> DateTime<Utc> {
-  DateTime::<Utc>::from_utc(ndt, Utc)
+pub type ConnectionId = usize;
+pub type PostId = i32;
+pub type CommunityId = i32;
+pub type UserId = i32;
+pub type IPAddr = String;
+
+#[macro_export]
+macro_rules! location_info {
+  () => {
+    format!(
+      "None value at {}:{}, column {}",
+      file!(),
+      line!(),
+      column!()
+    )
+  };
 }
+
+#[derive(Debug)]
+pub struct LemmyError {
+  inner: anyhow::Error,
+}
+
+impl<T> From<T> for LemmyError
+where
+  T: Into<anyhow::Error>,
+{
+  fn from(t: T) -> Self {
+    LemmyError { inner: t.into() }
+  }
+}
+
+impl std::fmt::Display for LemmyError {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    self.inner.fmt(f)
+  }
+}
+
+impl actix_web::error::ResponseError for LemmyError {}
 
 pub fn naive_from_unix(time: i64) -> NaiveDateTime {
   NaiveDateTime::from_timestamp(time, 0)
@@ -182,6 +221,13 @@ pub fn is_valid_username(name: &str) -> bool {
   VALID_USERNAME_REGEX.is_match(name)
 }
 
+// Can't do a regex here, reverse lookarounds not supported
+pub fn is_valid_preferred_username(preferred_username: &str) -> bool {
+  !preferred_username.starts_with('@')
+    && preferred_username.len() >= 3
+    && preferred_username.len() <= 20
+}
+
 pub fn is_valid_community_name(name: &str) -> bool {
   VALID_COMMUNITY_NAME_REGEX.is_match(name)
 }
@@ -195,6 +241,7 @@ mod tests {
   use crate::{
     is_valid_community_name,
     is_valid_post_title,
+    is_valid_preferred_username,
     is_valid_username,
     remove_slurs,
     scrape_text_for_mentions,
@@ -219,6 +266,12 @@ mod tests {
     assert!(!is_valid_username("Hello-98"));
     assert!(!is_valid_username("a"));
     assert!(!is_valid_username(""));
+  }
+
+  #[test]
+  fn test_valid_preferred_username() {
+    assert!(is_valid_preferred_username("hello @there"));
+    assert!(!is_valid_preferred_username("@hello there"));
   }
 
   #[test]
@@ -357,4 +410,14 @@ pub fn make_apub_endpoint(endpoint_type: EndpointType, name: &str) -> Url {
     name
   ))
   .unwrap()
+}
+
+pub fn get_ip(conn_info: &ConnectionInfo) -> String {
+  conn_info
+    .realip_remote_addr()
+    .unwrap_or("127.0.0.1:12345")
+    .split(':')
+    .next()
+    .unwrap_or("127.0.0.1")
+    .to_string()
 }

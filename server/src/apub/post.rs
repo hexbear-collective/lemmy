@@ -1,6 +1,11 @@
 use crate::{
+  api::check_slurs,
   apub::{
     activities::{generate_activity_id, send_activity_to_community},
+<<<<<<< HEAD
+=======
+    check_actor_domain,
+>>>>>>> 11149ba0
     create_apub_response,
     create_apub_tombstone_response,
     create_tombstone,
@@ -14,9 +19,14 @@ use crate::{
     ToApub,
   },
   blocking,
+<<<<<<< HEAD
   routes::DbPoolParam,
   DbPool,
   LemmyError,
+=======
+  DbPool,
+  LemmyContext,
+>>>>>>> 11149ba0
 };
 use activitystreams::{
   activity::{
@@ -29,20 +39,33 @@ use activitystreams::{
     Undo,
     Update,
   },
+<<<<<<< HEAD
   context,
   object::{kind::PageType, Image, Page, Tombstone},
+=======
+  object::{kind::PageType, Image, Object, Page, Tombstone},
+>>>>>>> 11149ba0
   prelude::*,
   public,
 };
 use activitystreams_ext::Ext1;
+<<<<<<< HEAD
 use actix_web::{body::Body, client::Client, web, HttpResponse};
+=======
+use actix_web::{body::Body, web, HttpResponse};
+use anyhow::Context;
+>>>>>>> 11149ba0
 use lemmy_db::{
   community::Community,
   post::{Post, PostForm},
   user::User_,
   Crud,
 };
+<<<<<<< HEAD
 use lemmy_utils::convert_datetime;
+=======
+use lemmy_utils::{convert_datetime, location_info, remove_slurs, LemmyError};
+>>>>>>> 11149ba0
 use serde::Deserialize;
 use url::Url;
 
@@ -54,13 +77,13 @@ pub struct PostQuery {
 /// Return the post json over HTTP.
 pub async fn get_apub_post(
   info: web::Path<PostQuery>,
-  db: DbPoolParam,
+  context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse<Body>, LemmyError> {
   let id = info.post_id.parse::<i32>()?;
-  let post = blocking(&db, move |conn| Post::read(conn, id)).await??;
+  let post = blocking(context.pool(), move |conn| Post::read(conn, id)).await??;
 
   if !post.deleted {
-    Ok(create_apub_response(&post.to_apub(&db).await?))
+    Ok(create_apub_response(&post.to_apub(context.pool()).await?))
   } else {
     Ok(create_apub_tombstone_response(&post.to_tombstone()?))
   }
@@ -84,7 +107,7 @@ impl ToApub for Post {
       // Not needed when the Post is embedded in a collection (like for community outbox)
       // TODO: need to set proper context defining sensitive/commentsEnabled fields
       // https://git.asonix.dog/Aardwolf/activitystreams/issues/5
-      .set_context(context())
+      .set_context(activitystreams::context())
       .set_id(self.ap_id.parse::<Url>()?)
       // Use summary field to be consistent with mastodon content warning.
       // https://mastodon.xyz/@Louisa/103987265222901387.json
@@ -142,6 +165,53 @@ impl ToApub for Post {
 
   fn to_tombstone(&self) -> Result<Tombstone, LemmyError> {
     create_tombstone(self.deleted, &self.ap_id, self.updated, PageType::Page)
+<<<<<<< HEAD
+=======
+  }
+}
+
+struct EmbedType {
+  title: Option<String>,
+  description: Option<String>,
+  html: Option<String>,
+}
+
+fn extract_embed_from_apub(
+  page: &Ext1<Object<PageType>, PageExtension>,
+) -> Result<EmbedType, LemmyError> {
+  match page.inner.preview() {
+    Some(preview) => {
+      let preview_page = Page::from_any_base(preview.one().context(location_info!())?.to_owned())?
+        .context(location_info!())?;
+      let title = preview_page
+        .name()
+        .map(|n| n.one())
+        .flatten()
+        .map(|s| s.as_xsd_string())
+        .flatten()
+        .map(|s| s.to_string());
+      let description = preview_page
+        .summary()
+        .map(|s| s.as_single_xsd_string())
+        .flatten()
+        .map(|s| s.to_string());
+      let html = preview_page
+        .content()
+        .map(|c| c.as_single_xsd_string())
+        .flatten()
+        .map(|s| s.to_string());
+      Ok(EmbedType {
+        title,
+        description,
+        html,
+      })
+    }
+    None => Ok(EmbedType {
+      title: None,
+      description: None,
+      html: None,
+    }),
+>>>>>>> 11149ba0
   }
 }
 
@@ -152,78 +222,89 @@ impl FromApub for PostForm {
   /// Parse an ActivityPub page received from another instance into a Lemmy post.
   async fn from_apub(
     page: &PageExt,
+<<<<<<< HEAD
     client: &Client,
     pool: &DbPool,
+=======
+    context: &LemmyContext,
+    expected_domain: Option<Url>,
+>>>>>>> 11149ba0
   ) -> Result<PostForm, LemmyError> {
     let ext = &page.ext_one;
     let creator_actor_id = page
       .inner
       .attributed_to()
       .as_ref()
-      .unwrap()
+      .context(location_info!())?
       .as_single_xsd_any_uri()
-      .unwrap();
+      .context(location_info!())?;
 
+<<<<<<< HEAD
     let creator = get_or_fetch_and_upsert_user(creator_actor_id, client, pool).await?;
+=======
+    let creator = get_or_fetch_and_upsert_user(creator_actor_id, context).await?;
+>>>>>>> 11149ba0
 
     let community_actor_id = page
       .inner
       .to()
       .as_ref()
-      .unwrap()
+      .context(location_info!())?
       .as_single_xsd_any_uri()
-      .unwrap();
+      .context(location_info!())?;
 
+<<<<<<< HEAD
     let community = get_or_fetch_and_upsert_community(community_actor_id, client, pool).await?;
+=======
+    let community = get_or_fetch_and_upsert_community(community_actor_id, context).await?;
+>>>>>>> 11149ba0
 
     let thumbnail_url = match &page.inner.image() {
-      Some(any_image) => Image::from_any_base(any_image.to_owned().as_one().unwrap().to_owned())?
-        .unwrap()
-        .url()
-        .unwrap()
-        .as_single_xsd_any_uri()
-        .map(|u| u.to_string()),
+      Some(any_image) => Image::from_any_base(
+        any_image
+          .to_owned()
+          .as_one()
+          .context(location_info!())?
+          .to_owned(),
+      )?
+      .context(location_info!())?
+      .url()
+      .context(location_info!())?
+      .as_single_xsd_any_uri()
+      .map(|u| u.to_string()),
       None => None,
     };
 
-    let (embed_title, embed_description, embed_html) = match page.inner.preview() {
-      Some(preview) => {
-        let preview_page = Page::from_any_base(preview.one().unwrap().to_owned())?.unwrap();
-        let name = preview_page
-          .name()
-          .map(|n| n.as_one().unwrap().as_xsd_string().unwrap().to_string());
-        let summary = preview_page
-          .summary()
-          .map(|s| s.as_single_xsd_string().unwrap().to_string());
-        let content = preview_page
-          .content()
-          .map(|c| c.as_single_xsd_string().unwrap().to_string());
-        (name, summary, content)
-      }
-      None => (None, None, None),
-    };
+    let embed = extract_embed_from_apub(page)?;
 
+    let name = page
+      .inner
+      .summary()
+      .as_ref()
+      .context(location_info!())?
+      .as_single_xsd_string()
+      .context(location_info!())?
+      .to_string();
     let url = page
       .inner
       .url()
       .as_ref()
-      .map(|u| u.as_single_xsd_string().unwrap().to_string());
+      .map(|u| u.as_single_xsd_string())
+      .flatten()
+      .map(|s| s.to_string());
     let body = page
       .inner
       .content()
       .as_ref()
-      .map(|c| c.as_single_xsd_string().unwrap().to_string());
+      .map(|c| c.as_single_xsd_string())
+      .flatten()
+      .map(|s| s.to_string());
+    check_slurs(&name)?;
+    let body_slurs_removed = body.map(|b| remove_slurs(&b));
     Ok(PostForm {
-      name: page
-        .inner
-        .summary()
-        .as_ref()
-        .unwrap()
-        .as_single_xsd_string()
-        .unwrap()
-        .to_string(),
+      name,
       url,
-      body,
+      body: body_slurs_removed,
       creator_id: creator.id,
       community_id: community.id,
       removed: None,
@@ -241,11 +322,19 @@ impl FromApub for PostForm {
       deleted: None,
       nsfw: ext.sensitive,
       stickied: Some(ext.stickied),
+<<<<<<< HEAD
       embed_title,
       embed_description,
       embed_html,
       thumbnail_url,
       ap_id: page.inner.id_unchecked().unwrap().to_string(),
+=======
+      embed_title: embed.title,
+      embed_description: embed.description,
+      embed_html: embed.html,
+      thumbnail_url,
+      ap_id: Some(check_actor_domain(page, expected_domain)?),
+>>>>>>> 11149ba0
       local: false,
     })
   }
@@ -254,92 +343,103 @@ impl FromApub for PostForm {
 #[async_trait::async_trait(?Send)]
 impl ApubObjectType for Post {
   /// Send out information about a newly created post, to the followers of the community.
-  async fn send_create(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_create(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
+<<<<<<< HEAD
     let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
 
     let mut create = Create::new(creator.actor_id.to_owned(), page.into_any_base()?);
     create
       .set_context(context())
+=======
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
+
+    let mut create = Create::new(creator.actor_id.to_owned(), page.into_any_base()?);
+    create
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(CreateType::Create)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      create.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      create,
+      context,
     )
     .await?;
     Ok(())
   }
 
   /// Send out information about an edited post, to the followers of the community.
-  async fn send_update(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_update(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
+<<<<<<< HEAD
     let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
 
     let mut update = Update::new(creator.actor_id.to_owned(), page.into_any_base()?);
     update
       .set_context(context())
+=======
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
+
+    let mut update = Update::new(creator.actor_id.to_owned(), page.into_any_base()?);
+    update
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(UpdateType::Update)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      update.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      update,
+      context,
     )
     .await?;
     Ok(())
   }
 
-  async fn send_delete(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_delete(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
 
     let mut delete = Delete::new(creator.actor_id.to_owned(), page.into_any_base()?);
     delete
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      delete.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      delete,
+      context,
     )
     .await?;
     Ok(())
@@ -348,104 +448,119 @@ impl ApubObjectType for Post {
   async fn send_undo_delete(
     &self,
     creator: &User_,
-    client: &Client,
-    pool: &DbPool,
+    context: &LemmyContext,
   ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
 
     let mut delete = Delete::new(creator.actor_id.to_owned(), page.into_any_base()?);
     delete
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     // Undo that fake activity
     let mut undo = Undo::new(creator.actor_id.to_owned(), delete.into_any_base()?);
     undo
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      undo.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      undo,
+      context,
     )
     .await?;
     Ok(())
   }
 
-  async fn send_remove(
-    &self,
-    mod_: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_remove(&self, mod_: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
 
     let mut remove = Remove::new(mod_.actor_id.to_owned(), page.into_any_base()?);
     remove
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       mod_,
       &community,
-      vec![community.get_shared_inbox_url()],
-      remove.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      remove,
+      context,
     )
     .await?;
     Ok(())
   }
 
-  async fn send_undo_remove(
-    &self,
-    mod_: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_undo_remove(&self, mod_: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
 
     let mut remove = Remove::new(mod_.actor_id.to_owned(), page.into_any_base()?);
     remove
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     // Undo that fake activity
     let mut undo = Undo::new(mod_.actor_id.to_owned(), remove.into_any_base()?);
     undo
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       mod_,
       &community,
-      vec![community.get_shared_inbox_url()],
-      undo.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      undo,
+      context,
     )
     .await?;
     Ok(())
@@ -454,61 +569,71 @@ impl ApubObjectType for Post {
 
 #[async_trait::async_trait(?Send)]
 impl ApubLikeableType for Post {
-  async fn send_like(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_like(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
+<<<<<<< HEAD
     let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
 
     let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
     like
       .set_context(context())
+=======
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
+
+    let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
+    like
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(LikeType::Like)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       &creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      like.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      like,
+      context,
     )
     .await?;
     Ok(())
   }
 
-  async fn send_dislike(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+  async fn send_dislike(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
+<<<<<<< HEAD
     let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
 
     let mut dislike = Dislike::new(creator.actor_id.to_owned(), page.into_any_base()?);
     dislike
       .set_context(context())
+=======
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
+
+    let mut dislike = Dislike::new(creator.actor_id.to_owned(), page.into_any_base()?);
+    dislike
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(DislikeType::Dislike)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       &creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      dislike.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      dislike,
+      context,
     )
     .await?;
     Ok(())
@@ -517,36 +642,49 @@ impl ApubLikeableType for Post {
   async fn send_undo_like(
     &self,
     creator: &User_,
-    client: &Client,
-    pool: &DbPool,
+    context: &LemmyContext,
   ) -> Result<(), LemmyError> {
-    let page = self.to_apub(pool).await?;
+    let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
+<<<<<<< HEAD
     let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
 
     let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
     like
       .set_context(context())
+=======
+    let community = blocking(context.pool(), move |conn| {
+      Community::read(conn, community_id)
+    })
+    .await??;
+
+    let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
+    like
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(LikeType::Like)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     // Undo that fake activity
     let mut undo = Undo::new(creator.actor_id.to_owned(), like.into_any_base()?);
     undo
+<<<<<<< HEAD
       .set_context(context())
+=======
+      .set_context(activitystreams::context())
+>>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
-      .set_many_ccs(vec![community.get_followers_url()]);
+      .set_many_ccs(vec![community.get_followers_url()?]);
 
     send_activity_to_community(
       &creator,
       &community,
-      vec![community.get_shared_inbox_url()],
-      undo.into_any_base()?,
-      client,
-      pool,
+      vec![community.get_shared_inbox_url()?],
+      undo,
+      context,
     )
     .await?;
     Ok(())

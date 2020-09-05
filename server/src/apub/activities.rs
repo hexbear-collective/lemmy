@@ -1,68 +1,37 @@
 use crate::{
-  apub::{
-    check_is_apub_id_valid,
-    community::do_announce,
-    extensions::signatures::sign,
-    insert_activity,
-    ActorType,
-  },
-  request::retry_custom,
-  DbPool,
-  LemmyError,
+  apub::{activity_queue::send_activity, community::do_announce, insert_activity},
+  LemmyContext,
 };
-use activitystreams::base::AnyBase;
-use actix_web::client::Client;
+use activitystreams::{
+  base::{Extends, ExtendsExt},
+  object::AsObject,
+};
 use lemmy_db::{community::Community, user::User_};
-use lemmy_utils::{get_apub_protocol_string, settings::Settings};
-use log::debug;
+use lemmy_utils::{get_apub_protocol_string, settings::Settings, LemmyError};
+use serde::{export::fmt::Debug, Serialize};
 use url::{ParseError, Url};
 use uuid::Uuid;
 
-pub async fn send_activity_to_community(
+pub async fn send_activity_to_community<T, Kind>(
   creator: &User_,
   community: &Community,
-  to: Vec<String>,
-  activity: AnyBase,
-  client: &Client,
-  pool: &DbPool,
-) -> Result<(), LemmyError> {
-  insert_activity(creator.id, activity.clone(), true, pool).await?;
+  to: Vec<Url>,
+  activity: T,
+  context: &LemmyContext,
+) -> Result<(), LemmyError>
+where
+  T: AsObject<Kind> + Extends<Kind> + Serialize + Debug + Send + Clone + 'static,
+  Kind: Serialize,
+  <T as Extends<Kind>>::Error: From<serde_json::Error> + Send + Sync + 'static,
+{
+  // TODO: looks like call this sometimes with activity, and sometimes with any_base
+  insert_activity(creator.id, activity.clone(), true, context.pool()).await?;
 
   // if this is a local community, we need to do an announce from the community instead
   if community.local {
-    do_announce(activity, &community, creator, client, pool).await?;
+    do_announce(activity.into_any_base()?, &community, creator, context).await?;
   } else {
-    send_activity(client, &activity, creator, to).await?;
-  }
-
-  Ok(())
-}
-
-/// Send an activity to a list of recipients, using the correct headers etc.
-pub async fn send_activity(
-  client: &Client,
-  activity: &AnyBase,
-  actor: &dyn ActorType,
-  to: Vec<String>,
-) -> Result<(), LemmyError> {
-  let activity = serde_json::to_string(&activity)?;
-  debug!("Sending activitypub activity {} to {:?}", activity, to);
-
-  for t in to {
-    let to_url = Url::parse(&t)?;
-    check_is_apub_id_valid(&to_url)?;
-
-    let res = retry_custom(|| async {
-      let request = client.post(&t).header("Content-Type", "application/json");
-
-      match sign(request, actor, activity.clone()).await {
-        Ok(signed) => Ok(signed.send().await),
-        Err(e) => Err(e),
-      }
-    })
-    .await?;
-
-    debug!("Result for activity send: {:?}", res);
+    send_activity(context.activity_queue(), activity, creator, to)?;
   }
 
   Ok(())

@@ -129,6 +129,7 @@ impl<'a> UserQueryBuilder<'a> {
 
   pub fn list(self) -> Result<Vec<UserView>, Error> {
     use super::user_view::user_fast::dsl::*;
+    use diesel::sql_types::{Nullable, Text};
 
     let mut query = self.query;
 
@@ -158,16 +159,33 @@ impl<'a> UserQueryBuilder<'a> {
     let (limit, offset) = limit_and_offset(self.page, self.limit);
     query = query.limit(limit).offset(offset);
 
+    // The select is necessary here to not get back emails
+    query = query.select((
+      id,
+      actor_id,
+      name,
+      preferred_username,
+      avatar,
+      banner,
+      "".into_sql::<Nullable<Text>>(),
+      matrix_user_id,
+      bio,
+      local,
+      admin,
+      banned,
+      show_avatars,
+      send_notifications_to_email,
+      published,
+      number_of_posts,
+      post_score,
+      number_of_comments,
+      comment_score,
+    ));
     query.load::<UserView>(self.conn)
   }
 }
 
 impl UserView {
-  pub fn read(conn: &PgConnection, from_user_id: i32) -> Result<Self, Error> {
-    use super::user_view::user_fast::dsl::*;
-    user_fast.find(from_user_id).first::<Self>(conn)
-  }
-
   pub fn admins(conn: &PgConnection) -> Result<Vec<Self>, Error> {
     use super::user_view::user_fast::dsl::*;
     use diesel::sql_types::{Nullable, Text};
@@ -260,5 +278,34 @@ impl UserView {
       ))
       .filter(banned.eq(true))
       .load::<Self>(conn)
+  }
+
+  pub fn get_user_secure(conn: &PgConnection, user_id: i32) -> Result<Self, Error> {
+    use super::user_view::user_fast::dsl::*;
+    use diesel::sql_types::{Nullable, Text};
+    user_fast
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        "".into_sql::<Nullable<Text>>(),
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        banned,
+        show_avatars,
+        send_notifications_to_email,
+        published,
+        number_of_posts,
+        post_score,
+        number_of_comments,
+        comment_score,
+      ))
+      .find(user_id)
+      .first::<Self>(conn)
   }
 }

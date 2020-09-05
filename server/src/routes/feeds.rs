@@ -1,11 +1,8 @@
-use crate::{api::claims::Claims, blocking, routes::DbPoolParam, LemmyError};
+use crate::{api::claims::Claims, blocking, LemmyContext};
 use actix_web::{error::ErrorBadRequest, *};
 use anyhow::anyhow;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use diesel::{
-  r2d2::{ConnectionManager, Pool},
-  PgConnection,
-};
+use diesel::PgConnection;
 use lemmy_db::{
   comment_view::{ReplyQueryBuilder, ReplyView},
   community::Community,
@@ -16,7 +13,7 @@ use lemmy_db::{
   ListingType,
   SortType,
 };
-use lemmy_utils::{markdown_to_html, settings::Settings};
+use lemmy_utils::{markdown_to_html, settings::Settings, LemmyError};
 use rss::{CategoryBuilder, ChannelBuilder, GuidBuilder, Item, ItemBuilder};
 use serde::Deserialize;
 use std::str::FromStr;
@@ -40,12 +37,17 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     .route("/feeds/all.xml", web::get().to(get_all_feed));
 }
 
-async fn get_all_feed(info: web::Query<Params>, db: DbPoolParam) -> Result<HttpResponse, Error> {
+async fn get_all_feed(
+  info: web::Query<Params>,
+  context: web::Data<LemmyContext>,
+) -> Result<HttpResponse, Error> {
   let sort_type = get_sort_type(info).map_err(ErrorBadRequest)?;
 
-  let rss = blocking(&db, move |conn| get_feed_all_data(conn, &sort_type))
-    .await?
-    .map_err(ErrorBadRequest)?;
+  let rss = blocking(context.pool(), move |conn| {
+    get_feed_all_data(conn, &sort_type)
+  })
+  .await?
+  .map_err(ErrorBadRequest)?;
 
   Ok(
     HttpResponse::Ok()
@@ -62,7 +64,7 @@ fn get_feed_all_data(conn: &PgConnection, sort_type: &SortType) -> Result<String
     .sort(sort_type)
     .list()?;
 
-  let items = create_post_items(posts);
+  let items = create_post_items(posts)?;
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
@@ -74,13 +76,13 @@ fn get_feed_all_data(conn: &PgConnection, sort_type: &SortType) -> Result<String
     channel_builder.description(&site_desc);
   }
 
-  Ok(channel_builder.build().unwrap().to_string())
+  Ok(channel_builder.build().map_err(|e| anyhow!(e))?.to_string())
 }
 
 async fn get_feed(
   path: web::Path<(String, String)>,
   info: web::Query<Params>,
-  db: web::Data<Pool<ConnectionManager<PgConnection>>>,
+  context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error> {
   let sort_type = get_sort_type(info).map_err(ErrorBadRequest)?;
 
@@ -94,7 +96,7 @@ async fn get_feed(
 
   let param = path.1.to_owned();
 
-  let builder = blocking(&db, move |conn| match request_type {
+  let builder = blocking(context.pool(), move |conn| match request_type {
     RequestType::User => get_feed_user(conn, &sort_type, param),
     RequestType::Community => get_feed_community(conn, &sort_type, param),
     RequestType::Front => get_feed_front(conn, &sort_type, param),
@@ -135,7 +137,7 @@ fn get_feed_user(
     .for_creator_id(user.id)
     .list()?;
 
-  let items = create_post_items(posts);
+  let items = create_post_items(posts)?;
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
@@ -160,7 +162,7 @@ fn get_feed_community(
     .for_community_id(community.id)
     .list()?;
 
-  let items = create_post_items(posts);
+  let items = create_post_items(posts)?;
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
@@ -189,7 +191,7 @@ fn get_feed_front(
     .my_user_id(user_id)
     .list()?;
 
-  let items = create_post_items(posts);
+  let items = create_post_items(posts)?;
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
@@ -218,7 +220,7 @@ fn get_feed_inbox(conn: &PgConnection, jwt: String) -> Result<ChannelBuilder, Le
     .sort(&sort)
     .list()?;
 
-  let items = create_reply_and_mention_items(replies, mentions);
+  let items = create_reply_and_mention_items(replies, mentions)?;
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
@@ -236,7 +238,7 @@ fn get_feed_inbox(conn: &PgConnection, jwt: String) -> Result<ChannelBuilder, Le
 fn create_reply_and_mention_items(
   replies: Vec<ReplyView>,
   mentions: Vec<UserMentionView>,
-) -> Vec<Item> {
+) -> Result<Vec<Item>, LemmyError> {
   let mut reply_items: Vec<Item> = replies
     .iter()
     .map(|r| {
@@ -248,7 +250,7 @@ fn create_reply_and_mention_items(
       );
       build_item(&r.creator_name, &r.published, &reply_url, &r.content)
     })
-    .collect();
+    .collect::<Result<Vec<Item>, LemmyError>>()?;
 
   let mut mention_items: Vec<Item> = mentions
     .iter()
@@ -261,13 +263,18 @@ fn create_reply_and_mention_items(
       );
       build_item(&m.creator_name, &m.published, &mention_url, &m.content)
     })
-    .collect();
+    .collect::<Result<Vec<Item>, LemmyError>>()?;
 
   reply_items.append(&mut mention_items);
-  reply_items
+  Ok(reply_items)
 }
 
-fn build_item(creator_name: &str, published: &NaiveDateTime, url: &str, content: &str) -> Item {
+fn build_item(
+  creator_name: &str,
+  published: &NaiveDateTime,
+  url: &str,
+  content: &str,
+) -> Result<Item, LemmyError> {
   let mut i = ItemBuilder::default();
   i.title(format!("Reply from {}", creator_name));
   let author_url = format!("https://{}/u/{}", Settings::get().hostname, creator_name);
@@ -278,16 +285,20 @@ fn build_item(creator_name: &str, published: &NaiveDateTime, url: &str, content:
   let dt = DateTime::<Utc>::from_utc(*published, Utc);
   i.pub_date(dt.to_rfc2822());
   i.comments(url.to_owned());
-  let guid = GuidBuilder::default().permalink(true).value(url).build();
-  i.guid(guid.unwrap());
+  let guid = GuidBuilder::default()
+    .permalink(true)
+    .value(url)
+    .build()
+    .map_err(|e| anyhow!(e))?;
+  i.guid(guid);
   i.link(url.to_owned());
   // TODO add images
   let html = markdown_to_html(&content.to_string());
   i.description(html);
-  i.build().unwrap()
+  Ok(i.build().map_err(|e| anyhow!(e))?)
 }
 
-fn create_post_items(posts: Vec<PostView>) -> Vec<Item> {
+fn create_post_items(posts: Vec<PostView>) -> Result<Vec<Item>, LemmyError> {
   let mut items: Vec<Item> = Vec::new();
 
   for p in posts {
@@ -309,8 +320,9 @@ fn create_post_items(posts: Vec<PostView>) -> Vec<Item> {
     let guid = GuidBuilder::default()
       .permalink(true)
       .value(&post_url)
-      .build();
-    i.guid(guid.unwrap());
+      .build()
+      .map_err(|e| anyhow!(e))?;
+    i.guid(guid);
 
     let community_url = format!(
       "https://{}/c/{}",
@@ -324,8 +336,10 @@ fn create_post_items(posts: Vec<PostView>) -> Vec<Item> {
         p.community_name, community_url
       ))
       .domain(Settings::get().hostname.to_owned())
-      .build();
-    i.categories(vec![category.unwrap()]);
+      .build()
+      .map_err(|e| anyhow!(e))?;
+
+    i.categories(vec![category]);
 
     if let Some(url) = p.url {
       i.link(url);
@@ -348,8 +362,8 @@ fn create_post_items(posts: Vec<PostView>) -> Vec<Item> {
 
     i.description(description);
 
-    items.push(i.build().unwrap());
+    items.push(i.build().map_err(|e| anyhow!(e))?);
   }
 
-  items
+  Ok(items)
 }

@@ -10,10 +10,11 @@ WORKDIR /app
 RUN sudo chown -R rust:rust .
 RUN USER=root cargo new server
 WORKDIR /app/server
-COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
+COPY server/Cargo.toml server/Cargo.lock ./
 COPY server/lemmy_db ./lemmy_db
 COPY server/lemmy_utils ./lemmy_utils
-COPY .git/ ./.git/
+COPY server/lemmy_api_structs ./lemmy_api_structs
+COPY server/lemmy_rate_limit ./lemmy_rate_limit
 RUN mkdir -p ./src/bin \
    && echo 'fn main() { println!("Dummy") }' > ./src/bin/main.rs
 RUN cargo build --release
@@ -24,8 +25,6 @@ COPY server/migrations ./migrations/
 # build for release
 # workaround for https://github.com/rust-lang/rust/issues/62896
 RUN cargo build --frozen --release
-
-RUN sudo rm -rf .git
 
 # reduce binary size
 RUN strip ./target/$CARGO_BUILD_TARGET/$RUSTRELEASEDIR/lemmy_server
@@ -47,9 +46,7 @@ RUN yarn install --pure-lockfile --network-timeout 600000
 
 # Build
 COPY ui /app/ui
-COPY .git/ ./.git/
 RUN yarn build
-RUN su && rm -rf .git
 
 FROM alpine:3.12 as lemmy
 

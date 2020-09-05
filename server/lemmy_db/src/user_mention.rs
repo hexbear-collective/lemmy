@@ -28,11 +28,6 @@ impl Crud<UserMentionForm> for UserMention {
     user_mention.find(user_mention_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, user_mention_id: i32) -> Result<usize, Error> {
-    use crate::schema::user_mention::dsl::*;
-    diesel::delete(user_mention.find(user_mention_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, user_mention_form: &UserMentionForm) -> Result<Self, Error> {
     use crate::schema::user_mention::dsl::*;
     insert_into(user_mention)
@@ -101,6 +96,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -110,7 +106,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_628763".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -128,6 +124,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -137,7 +134,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_927389278".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -157,7 +154,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_876238".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -185,7 +182,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -202,7 +199,7 @@ mod tests {
       parent_id: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -227,7 +224,6 @@ mod tests {
     let read_mention = UserMention::read(&conn, inserted_mention.id).unwrap();
     let updated_mention =
       UserMention::update(&conn, inserted_mention.id, &user_mention_form).unwrap();
-    let num_deleted = UserMention::delete(&conn, inserted_mention.id).unwrap();
     Comment::delete(&conn, inserted_comment.id).unwrap();
     Post::delete(&conn, inserted_post.id).unwrap();
     Community::delete(&conn, inserted_community.id).unwrap();
@@ -237,6 +233,5 @@ mod tests {
     assert_eq!(expected_mention, read_mention);
     assert_eq!(expected_mention, inserted_mention);
     assert_eq!(expected_mention, updated_mention);
-    assert_eq!(1, num_deleted);
   }
 }

@@ -1,20 +1,7 @@
-use crate::{
-  api::{
-    comment::*,
-    community::*,
-    community_settings::*,
-    post::*,
-    report::*,
-    site::*,
-    user::*,
-    Oper,
-    Perform,
-  },
-  rate_limit::RateLimit,
-  routes::{ChatServerParam, DbPoolParam},
-  websocket::WebsocketInfo,
-};
-use actix_web::{client::Client, error::ErrorBadRequest, *};
+use crate::{api::Perform, LemmyContext};
+use actix_web::{error::ErrorBadRequest, *};
+use lemmy_api_structs::{comment::*, community::*, post::*, site::*, user::*};
+use lemmy_rate_limit::RateLimit;
 use serde::Serialize;
 
 pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
@@ -146,6 +133,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
             "/resolve_report",
             web::post().to(route_post::<ResolveCommentReport>),
           ),
+          .route("/list", web::get().to(route_get::<GetComments>)),
       )
       // Private Message
       .service(
@@ -158,6 +146,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
         web::scope("/private_message")
           .wrap(rate_limit.message())
           .route("/list", web::get().to(route_get::<GetPrivateMessages>))
+          .route("", web::post().to(route_post::<CreatePrivateMessage>))
           .route("", web::put().to(route_post::<EditPrivateMessage>))
           .route(
             "/delete",
@@ -192,6 +181,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
             "/followed_communities",
             web::get().to(route_get::<GetFollowedCommunities>),
           )
+          .route("/join", web::post().to(route_post::<UserJoin>))
           // Admin action. I don't like that it's in /user
           .route("/ban", web::post().to(route_post::<BanUser>))
           // Account actions. I don't like that they're in /user maybe /accounts
@@ -238,23 +228,14 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
 
 async fn perform<Request>(
   data: Request,
-  client: &Client,
-  db: DbPoolParam,
-  chat_server: ChatServerParam,
+  context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error>
 where
-  Oper<Request>: Perform,
+  Request: Perform,
   Request: Send + 'static,
 {
-  let ws_info = WebsocketInfo {
-    chatserver: chat_server.get_ref().to_owned(),
-    id: None,
-  };
-
-  let oper: Oper<Request> = Oper::new(data, client.clone());
-
-  let res = oper
-    .perform(&db, Some(ws_info))
+  let res = data
+    .perform(&context, None)
     .await
     .map(|json| HttpResponse::Ok().json(json))
     .map_err(ErrorBadRequest)?;
@@ -263,26 +244,20 @@ where
 
 async fn route_get<Data>(
   data: web::Query<Data>,
-  client: web::Data<Client>,
-  db: DbPoolParam,
-  chat_server: ChatServerParam,
+  context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error>
 where
-  Data: Serialize + Send + 'static,
-  Oper<Data>: Perform,
+  Data: Serialize + Send + 'static + Perform,
 {
-  perform::<Data>(data.0, &client, db, chat_server).await
+  perform::<Data>(data.0, context).await
 }
 
 async fn route_post<Data>(
   data: web::Json<Data>,
-  client: web::Data<Client>,
-  db: DbPoolParam,
-  chat_server: ChatServerParam,
+  context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error>
 where
-  Data: Serialize + Send + 'static,
-  Oper<Data>: Perform,
+  Data: Serialize + Send + 'static + Perform,
 {
-  perform::<Data>(data.0, &client, db, chat_server).await
+  perform::<Data>(data.0, context).await
 }

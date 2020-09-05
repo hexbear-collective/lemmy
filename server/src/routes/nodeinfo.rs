@@ -1,8 +1,8 @@
-use crate::{blocking, routes::DbPoolParam, version, LemmyError};
+use crate::{blocking, version, LemmyContext};
 use actix_web::{body::Body, error::ErrorBadRequest, *};
 use anyhow::anyhow;
 use lemmy_db::site_view::SiteView;
-use lemmy_utils::{get_apub_protocol_string, settings::Settings};
+use lemmy_utils::{get_apub_protocol_string, settings::Settings, LemmyError};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -26,8 +26,8 @@ async fn node_info_well_known() -> Result<HttpResponse<Body>, LemmyError> {
   Ok(HttpResponse::Ok().json(node_info))
 }
 
-async fn node_info(db: DbPoolParam) -> Result<HttpResponse, Error> {
-  let site_view = blocking(&db, SiteView::read)
+async fn node_info(context: web::Data<LemmyContext>) -> Result<HttpResponse, Error> {
+  let site_view = blocking(context.pool(), SiteView::read)
     .await?
     .map_err(|_| ErrorBadRequest(LemmyError::from(anyhow!("not_found"))))?;
 
