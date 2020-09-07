@@ -1,11 +1,5 @@
 use crate::{
   apub::{
-<<<<<<< HEAD
-    activities::{generate_activity_id, send_activity},
-    create_tombstone,
-    fetcher::get_or_fetch_and_upsert_user,
-    insert_activity,
-=======
     activities::generate_activity_id,
     activity_queue::send_activity,
     check_actor_domain,
@@ -14,18 +8,13 @@ use crate::{
     fetcher::get_or_fetch_and_upsert_user,
     insert_activity,
     ActorType,
->>>>>>> 11149ba0
     ApubObjectType,
     FromApub,
     ToApub,
   },
   blocking,
   DbPool,
-<<<<<<< HEAD
-  LemmyError,
-=======
   LemmyContext,
->>>>>>> 11149ba0
 };
 use activitystreams::{
   activity::{
@@ -35,10 +24,6 @@ use activitystreams::{
     Undo,
     Update,
   },
-<<<<<<< HEAD
-  context,
-=======
->>>>>>> 11149ba0
   object::{kind::NoteType, Note, Tombstone},
   prelude::*,
 };
@@ -91,28 +76,14 @@ impl FromApub for PrivateMessageForm {
   /// Parse an ActivityPub note received from another instance into a Lemmy Private message
   async fn from_apub(
     note: &Note,
-<<<<<<< HEAD
-    client: &Client,
-    pool: &DbPool,
-=======
     context: &LemmyContext,
     expected_domain: Option<Url>,
->>>>>>> 11149ba0
   ) -> Result<PrivateMessageForm, LemmyError> {
     let creator_actor_id = note
       .attributed_to()
       .context(location_info!())?
       .clone()
       .single_xsd_any_uri()
-<<<<<<< HEAD
-      .unwrap();
-
-    let creator = get_or_fetch_and_upsert_user(&creator_actor_id, client, pool).await?;
-
-    let recipient_actor_id = note.to().unwrap().clone().single_xsd_any_uri().unwrap();
-
-    let recipient = get_or_fetch_and_upsert_user(&recipient_actor_id, client, pool).await?;
-=======
       .context(location_info!())?;
 
     let creator = get_or_fetch_and_upsert_user(&creator_actor_id, context).await?;
@@ -125,7 +96,6 @@ impl FromApub for PrivateMessageForm {
     let recipient = get_or_fetch_and_upsert_user(&recipient_actor_id, context).await?;
     let ap_id = note.id_unchecked().context(location_info!())?.to_string();
     check_is_apub_id_valid(&Url::parse(&ap_id)?)?;
->>>>>>> 11149ba0
 
     Ok(PrivateMessageForm {
       creator_id: creator.id,
@@ -140,11 +110,7 @@ impl FromApub for PrivateMessageForm {
       updated: note.updated().map(|u| u.to_owned().naive_local()),
       deleted: None,
       read: None,
-<<<<<<< HEAD
-      ap_id: note.id_unchecked().unwrap().to_string(),
-=======
       ap_id: Some(check_actor_domain(note, expected_domain)?),
->>>>>>> 11149ba0
       local: false,
     })
   }
@@ -153,18 +119,8 @@ impl FromApub for PrivateMessageForm {
 #[async_trait::async_trait(?Send)]
 impl ApubObjectType for PrivateMessage {
   /// Send out information about a newly created private message
-<<<<<<< HEAD
-  async fn send_create(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let note = self.to_apub(pool).await?;
-=======
   async fn send_create(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
     let note = self.to_apub(context.pool()).await?;
->>>>>>> 11149ba0
 
     let recipient_id = self.recipient_id;
     let recipient = blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
@@ -172,11 +128,7 @@ impl ApubObjectType for PrivateMessage {
     let mut create = Create::new(creator.actor_id.to_owned(), note.into_any_base()?);
     let to = recipient.get_inbox_url()?;
     create
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(CreateType::Create)?)
       .set_to(to.clone());
 
@@ -187,18 +139,8 @@ impl ApubObjectType for PrivateMessage {
   }
 
   /// Send out information about an edited post, to the followers of the community.
-<<<<<<< HEAD
-  async fn send_update(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let note = self.to_apub(pool).await?;
-=======
   async fn send_update(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
     let note = self.to_apub(context.pool()).await?;
->>>>>>> 11149ba0
 
     let recipient_id = self.recipient_id;
     let recipient = blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
@@ -206,11 +148,7 @@ impl ApubObjectType for PrivateMessage {
     let mut update = Update::new(creator.actor_id.to_owned(), note.into_any_base()?);
     let to = recipient.get_inbox_url()?;
     update
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UpdateType::Update)?)
       .set_to(to.clone());
 
@@ -220,18 +158,8 @@ impl ApubObjectType for PrivateMessage {
     Ok(())
   }
 
-<<<<<<< HEAD
-  async fn send_delete(
-    &self,
-    creator: &User_,
-    client: &Client,
-    pool: &DbPool,
-  ) -> Result<(), LemmyError> {
-    let note = self.to_apub(pool).await?;
-=======
   async fn send_delete(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
     let note = self.to_apub(context.pool()).await?;
->>>>>>> 11149ba0
 
     let recipient_id = self.recipient_id;
     let recipient = blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
@@ -239,11 +167,7 @@ impl ApubObjectType for PrivateMessage {
     let mut delete = Delete::new(creator.actor_id.to_owned(), note.into_any_base()?);
     let to = recipient.get_inbox_url()?;
     delete
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(to.clone());
 
@@ -258,11 +182,7 @@ impl ApubObjectType for PrivateMessage {
     creator: &User_,
     context: &LemmyContext,
   ) -> Result<(), LemmyError> {
-<<<<<<< HEAD
-    let note = self.to_apub(pool).await?;
-=======
     let note = self.to_apub(context.pool()).await?;
->>>>>>> 11149ba0
 
     let recipient_id = self.recipient_id;
     let recipient = blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
@@ -270,22 +190,14 @@ impl ApubObjectType for PrivateMessage {
     let mut delete = Delete::new(creator.actor_id.to_owned(), note.into_any_base()?);
     let to = recipient.get_inbox_url()?;
     delete
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(to.clone());
 
     // Undo that fake activity
     let mut undo = Undo::new(creator.actor_id.to_owned(), delete.into_any_base()?);
     undo
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(to.clone());
 

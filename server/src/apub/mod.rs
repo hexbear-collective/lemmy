@@ -19,11 +19,7 @@ use crate::{
   request::{retry, RecvError},
   routes::webfinger::WebFingerResponse,
   DbPool,
-<<<<<<< HEAD
-  LemmyError,
-=======
   LemmyContext,
->>>>>>> 11149ba0
 };
 use activitystreams::{
   activity::Follow,
@@ -34,13 +30,8 @@ use activitystreams::{
   prelude::*,
 };
 use activitystreams_ext::{Ext1, Ext2};
-<<<<<<< HEAD
-use actix_web::{body::Body, client::Client, HttpResponse};
-use anyhow::anyhow;
-=======
 use actix_web::{body::Body, HttpResponse};
 use anyhow::{anyhow, Context};
->>>>>>> 11149ba0
 use chrono::NaiveDateTime;
 use lemmy_db::{activity::do_insert_activity, user::User_};
 use lemmy_utils::{
@@ -84,8 +75,6 @@ where
 
 // Checks if the ID has a valid format, correct scheme, and is in the allowed instance list.
 fn check_is_apub_id_valid(apub_id: &Url) -> Result<(), LemmyError> {
-<<<<<<< HEAD
-=======
   let settings = Settings::get();
   let domain = apub_id.domain().context(location_info!())?.to_string();
   let local_instance = settings
@@ -110,36 +99,10 @@ fn check_is_apub_id_valid(apub_id: &Url) -> Result<(), LemmyError> {
     };
   }
 
->>>>>>> 11149ba0
   if apub_id.scheme() != get_apub_protocol_string() {
     return Err(anyhow!("invalid apub id scheme: {:?}", apub_id.scheme()).into());
   }
 
-<<<<<<< HEAD
-  let mut allowed_instances: Vec<String> = Settings::get()
-    .federation
-    .allowed_instances
-    .split(',')
-    .map(|d| d.to_string())
-    .collect();
-  // need to allow this explicitly because apub activities might contain objects from our local
-  // instance. replace is needed to remove the port in our federation test setup.
-  let settings = Settings::get();
-  let local_instance = settings.hostname.split(':').collect::<Vec<&str>>();
-  allowed_instances.push(local_instance.first().unwrap().to_string());
-
-  match apub_id.domain() {
-    Some(d) => {
-      let contains = allowed_instances.contains(&d.to_owned());
-
-      if !contains {
-        return Err(anyhow!("{} not in federation allowlist", d).into());
-      }
-
-      Ok(())
-    }
-    None => Err(anyhow!("federation allowlist is empty").into()),
-=======
   let mut allowed_instances = Settings::get().get_allowed_instances();
   let blocked_instances = Settings::get().get_blocked_instances();
 
@@ -161,7 +124,6 @@ fn check_is_apub_id_valid(apub_id: &Url) -> Result<(), LemmyError> {
     }
   } else {
     panic!("Invalid config, both allowed_instances and blocked_instances are specified");
->>>>>>> 11149ba0
   }
 }
 
@@ -209,13 +171,8 @@ pub trait FromApub {
   ///
   async fn from_apub(
     apub: &Self::ApubType,
-<<<<<<< HEAD
-    client: &Client,
-    pool: &DbPool,
-=======
     context: &LemmyContext,
     expected_domain: Option<Url>,
->>>>>>> 11149ba0
   ) -> Result<Self, LemmyError>
   where
     Self: Sized;
@@ -268,9 +225,6 @@ pub trait ActorType {
   // TODO: every actor should have a public key, so this shouldnt be an option (needs to be fixed in db)
   fn public_key(&self) -> Option<String>;
   fn private_key(&self) -> Option<String>;
-
-  /// numeric id in the database, used for insert_activity
-  fn user_id(&self) -> i32;
 
   /// numeric id in the database, used for insert_activity
   fn user_id(&self) -> i32;

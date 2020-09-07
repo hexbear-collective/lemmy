@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-use crate::LemmyError;
-=======
->>>>>>> 11149ba0
 use activitystreams::unparsed::UnparsedMutExt;
 use activitystreams_ext::UnparsedExtension;
 use diesel::PgConnection;

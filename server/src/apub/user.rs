@@ -1,9 +1,4 @@
 use crate::{
-<<<<<<< HEAD
-  apub::{
-    activities::{generate_activity_id, send_activity},
-    create_apub_response,
-=======
   api::{check_slurs, check_slurs_opt},
   apub::{
     activities::generate_activity_id,
@@ -11,7 +6,6 @@ use crate::{
     check_actor_domain,
     create_apub_response,
     fetcher::get_or_fetch_and_upsert_actor,
->>>>>>> 11149ba0
     insert_activity,
     ActorType,
     FromApub,
@@ -19,14 +13,8 @@ use crate::{
     ToApub,
   },
   blocking,
-<<<<<<< HEAD
-  routes::DbPoolParam,
-  DbPool,
-  LemmyError,
-=======
   DbPool,
   LemmyContext,
->>>>>>> 11149ba0
 };
 use activitystreams::{
   activity::{
@@ -39,12 +27,8 @@ use activitystreams::{
   prelude::*,
 };
 use activitystreams_ext::Ext1;
-<<<<<<< HEAD
-use actix_web::{body::Body, client::Client, web, HttpResponse};
-=======
 use actix_web::{body::Body, web, HttpResponse};
 use anyhow::Context;
->>>>>>> 11149ba0
 use lemmy_db::{
   naive_now,
   user::{UserForm, User_},
@@ -95,11 +79,7 @@ impl ToApub for User_ {
     let mut ap_actor = ApActor::new(self.get_inbox_url()?, person);
     ap_actor
       .set_outbox(self.get_outbox_url()?)
-<<<<<<< HEAD
-      .set_followers(self.get_followers_url().parse()?)
-=======
       .set_followers(self.get_followers_url()?)
->>>>>>> 11149ba0
       .set_following(self.get_following_url().parse()?)
       .set_liked(self.get_liked_url().parse()?)
       .set_endpoints(Endpoints {
@@ -138,20 +118,12 @@ impl ActorType for User_ {
     follow_actor_id: &Url,
     context: &LemmyContext,
   ) -> Result<(), LemmyError> {
-<<<<<<< HEAD
-    let mut follow = Follow::new(self.actor_id.to_owned(), follow_actor_id);
-    follow
-      .set_context(context())
-      .set_id(generate_activity_id(FollowType::Follow)?);
-    let to = format!("{}/inbox", follow_actor_id);
-=======
     let mut follow = Follow::new(self.actor_id.to_owned(), follow_actor_id.as_str());
     follow
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(FollowType::Follow)?);
     let follow_actor = get_or_fetch_and_upsert_actor(follow_actor_id, context).await?;
     let to = follow_actor.get_inbox_url()?;
->>>>>>> 11149ba0
 
     insert_activity(self.id, follow.clone(), true, context.pool()).await?;
 
@@ -164,29 +136,18 @@ impl ActorType for User_ {
     follow_actor_id: &Url,
     context: &LemmyContext,
   ) -> Result<(), LemmyError> {
-<<<<<<< HEAD
-    let mut follow = Follow::new(self.actor_id.to_owned(), follow_actor_id);
-    follow
-      .set_context(context())
-      .set_id(generate_activity_id(FollowType::Follow)?);
-=======
     let mut follow = Follow::new(self.actor_id.to_owned(), follow_actor_id.as_str());
     follow
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(FollowType::Follow)?);
     let follow_actor = get_or_fetch_and_upsert_actor(follow_actor_id, context).await?;
->>>>>>> 11149ba0
 
     let to = follow_actor.get_inbox_url()?;
 
     // Undo that fake activity
     let mut undo = Undo::new(Url::parse(&self.actor_id)?, follow.into_any_base()?);
     undo
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?);
 
     insert_activity(self.id, undo.clone(), true, context.pool()).await?;
@@ -240,29 +201,6 @@ impl ActorType for User_ {
 impl FromApub for UserForm {
   type ApubType = PersonExt;
   /// Parse an ActivityPub person received from another instance into a Lemmy user.
-<<<<<<< HEAD
-  async fn from_apub(person: &PersonExt, _: &Client, _: &DbPool) -> Result<Self, LemmyError> {
-    let avatar = match person.icon() {
-      Some(any_image) => Some(
-        Image::from_any_base(any_image.as_one().unwrap().clone())
-          .unwrap()
-          .unwrap()
-          .url()
-          .unwrap()
-          .as_single_xsd_any_uri()
-          .map(|u| u.to_string()),
-      ),
-      None => None,
-    };
-
-    let banner = match person.image() {
-      Some(any_image) => Some(
-        Image::from_any_base(any_image.as_one().unwrap().clone())
-          .unwrap()
-          .unwrap()
-          .url()
-          .unwrap()
-=======
   async fn from_apub(
     person: &PersonExt,
     _context: &LemmyContext,
@@ -274,7 +212,6 @@ impl FromApub for UserForm {
           .context(location_info!())?
           .url()
           .context(location_info!())?
->>>>>>> 11149ba0
           .as_single_xsd_any_uri()
           .map(|u| u.to_string()),
       ),
@@ -317,6 +254,7 @@ impl FromApub for UserForm {
       name,
       preferred_username,
       password_encrypted: "".to_string(),
+      admin: false,
       banned: false,
       email: None,
       avatar,
@@ -330,16 +268,8 @@ impl FromApub for UserForm {
       show_avatars: false,
       send_notifications_to_email: false,
       matrix_user_id: None,
-<<<<<<< HEAD
-      actor_id: person.id_unchecked().unwrap().to_string(),
-      bio: person
-        .inner
-        .summary()
-        .map(|s| s.as_single_xsd_string().unwrap().into()),
-=======
       actor_id: Some(check_actor_domain(person, expected_domain)?),
       bio,
->>>>>>> 11149ba0
       local: false,
       private_key: None,
       public_key: Some(person.ext_one.public_key.to_owned().public_key_pem),
@@ -354,11 +284,7 @@ pub async fn get_apub_user_http(
   context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse<Body>, LemmyError> {
   let user_name = info.into_inner().user_name;
-<<<<<<< HEAD
-  let user = blocking(&db, move |conn| {
-=======
   let user = blocking(context.pool(), move |conn| {
->>>>>>> 11149ba0
     User_::find_by_email_or_username(conn, &user_name)
   })
   .await??;

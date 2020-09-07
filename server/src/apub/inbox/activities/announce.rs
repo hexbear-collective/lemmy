@@ -9,35 +9,6 @@ use crate::{
       undo::receive_undo,
       update::receive_update,
     },
-<<<<<<< HEAD
-    shared_inbox::receive_unhandled_activity,
-  },
-  routes::ChatServerParam,
-  DbPool,
-  LemmyError,
-};
-use activitystreams::{activity::*, base::AnyBase, prelude::ExtendsExt};
-use actix_web::{client::Client, HttpResponse};
-
-pub async fn receive_announce(
-  activity: AnyBase,
-  client: &Client,
-  pool: &DbPool,
-  chat_server: ChatServerParam,
-) -> Result<HttpResponse, LemmyError> {
-  let announce = Announce::from_any_base(activity)?.unwrap();
-  let kind = announce.object().as_single_kind_str();
-  let object = announce.object();
-  let object2 = object.clone().one().unwrap();
-  match kind {
-    Some("Create") => receive_create(object2, client, pool, chat_server).await,
-    Some("Update") => receive_update(object2, client, pool, chat_server).await,
-    Some("Like") => receive_like(object2, client, pool, chat_server).await,
-    Some("Dislike") => receive_dislike(object2, client, pool, chat_server).await,
-    Some("Delete") => receive_delete(object2, client, pool, chat_server).await,
-    Some("Remove") => receive_remove(object2, client, pool, chat_server).await,
-    Some("Undo") => receive_undo(object2, client, pool, chat_server).await,
-=======
     shared_inbox::{get_community_id_from_activity, receive_unhandled_activity},
   },
   LemmyContext,
@@ -72,7 +43,6 @@ pub async fn receive_announce(
     Some("Delete") => receive_delete(object2, context).await,
     Some("Remove") => receive_remove(object2, context).await,
     Some("Undo") => receive_undo(object2, context).await,
->>>>>>> 11149ba0
     _ => receive_unhandled_activity(announce),
   }
 }

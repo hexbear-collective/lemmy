@@ -2,10 +2,7 @@ use crate::{
   api::check_slurs,
   apub::{
     activities::{generate_activity_id, send_activity_to_community},
-<<<<<<< HEAD
-=======
     check_actor_domain,
->>>>>>> 11149ba0
     create_apub_response,
     create_apub_tombstone_response,
     create_tombstone,
@@ -19,14 +16,8 @@ use crate::{
     ToApub,
   },
   blocking,
-<<<<<<< HEAD
-  routes::DbPoolParam,
-  DbPool,
-  LemmyError,
-=======
   DbPool,
   LemmyContext,
->>>>>>> 11149ba0
 };
 use activitystreams::{
   activity::{
@@ -39,33 +30,20 @@ use activitystreams::{
     Undo,
     Update,
   },
-<<<<<<< HEAD
-  context,
-  object::{kind::PageType, Image, Page, Tombstone},
-=======
   object::{kind::PageType, Image, Object, Page, Tombstone},
->>>>>>> 11149ba0
   prelude::*,
   public,
 };
 use activitystreams_ext::Ext1;
-<<<<<<< HEAD
-use actix_web::{body::Body, client::Client, web, HttpResponse};
-=======
 use actix_web::{body::Body, web, HttpResponse};
 use anyhow::Context;
->>>>>>> 11149ba0
 use lemmy_db::{
   community::Community,
   post::{Post, PostForm},
   user::User_,
   Crud,
 };
-<<<<<<< HEAD
-use lemmy_utils::convert_datetime;
-=======
 use lemmy_utils::{convert_datetime, location_info, remove_slurs, LemmyError};
->>>>>>> 11149ba0
 use serde::Deserialize;
 use url::Url;
 
@@ -165,8 +143,6 @@ impl ToApub for Post {
 
   fn to_tombstone(&self) -> Result<Tombstone, LemmyError> {
     create_tombstone(self.deleted, &self.ap_id, self.updated, PageType::Page)
-<<<<<<< HEAD
-=======
   }
 }
 
@@ -211,7 +187,6 @@ fn extract_embed_from_apub(
       description: None,
       html: None,
     }),
->>>>>>> 11149ba0
   }
 }
 
@@ -222,13 +197,8 @@ impl FromApub for PostForm {
   /// Parse an ActivityPub page received from another instance into a Lemmy post.
   async fn from_apub(
     page: &PageExt,
-<<<<<<< HEAD
-    client: &Client,
-    pool: &DbPool,
-=======
     context: &LemmyContext,
     expected_domain: Option<Url>,
->>>>>>> 11149ba0
   ) -> Result<PostForm, LemmyError> {
     let ext = &page.ext_one;
     let creator_actor_id = page
@@ -239,11 +209,7 @@ impl FromApub for PostForm {
       .as_single_xsd_any_uri()
       .context(location_info!())?;
 
-<<<<<<< HEAD
-    let creator = get_or_fetch_and_upsert_user(creator_actor_id, client, pool).await?;
-=======
     let creator = get_or_fetch_and_upsert_user(creator_actor_id, context).await?;
->>>>>>> 11149ba0
 
     let community_actor_id = page
       .inner
@@ -253,11 +219,7 @@ impl FromApub for PostForm {
       .as_single_xsd_any_uri()
       .context(location_info!())?;
 
-<<<<<<< HEAD
-    let community = get_or_fetch_and_upsert_community(community_actor_id, client, pool).await?;
-=======
     let community = get_or_fetch_and_upsert_community(community_actor_id, context).await?;
->>>>>>> 11149ba0
 
     let thumbnail_url = match &page.inner.image() {
       Some(any_image) => Image::from_any_base(
@@ -322,19 +284,11 @@ impl FromApub for PostForm {
       deleted: None,
       nsfw: ext.sensitive,
       stickied: Some(ext.stickied),
-<<<<<<< HEAD
-      embed_title,
-      embed_description,
-      embed_html,
-      thumbnail_url,
-      ap_id: page.inner.id_unchecked().unwrap().to_string(),
-=======
       embed_title: embed.title,
       embed_description: embed.description,
       embed_html: embed.html,
       thumbnail_url,
       ap_id: Some(check_actor_domain(page, expected_domain)?),
->>>>>>> 11149ba0
       local: false,
     })
   }
@@ -347,13 +301,6 @@ impl ApubObjectType for Post {
     let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-<<<<<<< HEAD
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
-
-    let mut create = Create::new(creator.actor_id.to_owned(), page.into_any_base()?);
-    create
-      .set_context(context())
-=======
     let community = blocking(context.pool(), move |conn| {
       Community::read(conn, community_id)
     })
@@ -362,7 +309,6 @@ impl ApubObjectType for Post {
     let mut create = Create::new(creator.actor_id.to_owned(), page.into_any_base()?);
     create
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(CreateType::Create)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -383,13 +329,6 @@ impl ApubObjectType for Post {
     let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-<<<<<<< HEAD
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
-
-    let mut update = Update::new(creator.actor_id.to_owned(), page.into_any_base()?);
-    update
-      .set_context(context())
-=======
     let community = blocking(context.pool(), move |conn| {
       Community::read(conn, community_id)
     })
@@ -398,7 +337,6 @@ impl ApubObjectType for Post {
     let mut update = Update::new(creator.actor_id.to_owned(), page.into_any_base()?);
     update
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UpdateType::Update)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -425,11 +363,7 @@ impl ApubObjectType for Post {
 
     let mut delete = Delete::new(creator.actor_id.to_owned(), page.into_any_base()?);
     delete
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -460,11 +394,7 @@ impl ApubObjectType for Post {
 
     let mut delete = Delete::new(creator.actor_id.to_owned(), page.into_any_base()?);
     delete
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -472,11 +402,7 @@ impl ApubObjectType for Post {
     // Undo that fake activity
     let mut undo = Undo::new(creator.actor_id.to_owned(), delete.into_any_base()?);
     undo
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -503,11 +429,7 @@ impl ApubObjectType for Post {
 
     let mut remove = Remove::new(mod_.actor_id.to_owned(), page.into_any_base()?);
     remove
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -534,11 +456,7 @@ impl ApubObjectType for Post {
 
     let mut remove = Remove::new(mod_.actor_id.to_owned(), page.into_any_base()?);
     remove
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -546,11 +464,7 @@ impl ApubObjectType for Post {
     // Undo that fake activity
     let mut undo = Undo::new(mod_.actor_id.to_owned(), remove.into_any_base()?);
     undo
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -573,13 +487,6 @@ impl ApubLikeableType for Post {
     let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-<<<<<<< HEAD
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
-
-    let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
-    like
-      .set_context(context())
-=======
     let community = blocking(context.pool(), move |conn| {
       Community::read(conn, community_id)
     })
@@ -588,7 +495,6 @@ impl ApubLikeableType for Post {
     let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
     like
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(LikeType::Like)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -608,13 +514,6 @@ impl ApubLikeableType for Post {
     let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-<<<<<<< HEAD
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
-
-    let mut dislike = Dislike::new(creator.actor_id.to_owned(), page.into_any_base()?);
-    dislike
-      .set_context(context())
-=======
     let community = blocking(context.pool(), move |conn| {
       Community::read(conn, community_id)
     })
@@ -623,7 +522,6 @@ impl ApubLikeableType for Post {
     let mut dislike = Dislike::new(creator.actor_id.to_owned(), page.into_any_base()?);
     dislike
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(DislikeType::Dislike)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -647,13 +545,6 @@ impl ApubLikeableType for Post {
     let page = self.to_apub(context.pool()).await?;
 
     let community_id = self.community_id;
-<<<<<<< HEAD
-    let community = blocking(pool, move |conn| Community::read(conn, community_id)).await??;
-
-    let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
-    like
-      .set_context(context())
-=======
     let community = blocking(context.pool(), move |conn| {
       Community::read(conn, community_id)
     })
@@ -662,7 +553,6 @@ impl ApubLikeableType for Post {
     let mut like = Like::new(creator.actor_id.to_owned(), page.into_any_base()?);
     like
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(LikeType::Like)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);
@@ -670,11 +560,7 @@ impl ApubLikeableType for Post {
     // Undo that fake activity
     let mut undo = Undo::new(creator.actor_id.to_owned(), like.into_any_base()?);
     undo
-<<<<<<< HEAD
-      .set_context(context())
-=======
       .set_context(activitystreams::context())
->>>>>>> 11149ba0
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
       .set_many_ccs(vec![community.get_followers_url()?]);

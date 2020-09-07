@@ -1,16 +1,8 @@
-<<<<<<< HEAD
-use crate::{apub::ActorType, LemmyError};
-use activitystreams::unparsed::UnparsedMutExt;
-use activitystreams_ext::UnparsedExtension;
-use actix_web::{client::ClientRequest, HttpRequest};
-use anyhow::anyhow;
-=======
 use crate::apub::ActorType;
 use activitystreams::unparsed::UnparsedMutExt;
 use activitystreams_ext::UnparsedExtension;
 use actix_web::{client::ClientRequest, HttpRequest};
 use anyhow::{anyhow, Context};
->>>>>>> 11149ba0
 use http_signature_normalization_actix::{
   digest::{DigestClient, SignExt},
   Config,
