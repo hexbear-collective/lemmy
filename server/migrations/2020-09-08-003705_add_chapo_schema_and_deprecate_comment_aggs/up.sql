@@ -135,7 +135,7 @@ end $BODY$;
 -- Drop existing triggers
 drop trigger if exists refresh_comment_like ON public.comment_like;
 drop trigger if exists refresh_comment ON public.comment;
-drop trigger if exists refresh_user on public.user;
+drop trigger if exists refresh_user on public.user_;
 drop trigger if exists refresh_community_user_ban on public.community_user_ban;
 
 -- Migrate stats (warning: could take time pending instance size, consider downtime)
@@ -157,7 +157,7 @@ create trigger refresh_comment_like
 
 create trigger refresh_user
     after insert or delete or update
-    on public.user
+    on public.user_
     for each row
     execute procedure chapo.refresh_user();
 

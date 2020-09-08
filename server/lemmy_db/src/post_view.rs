@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 // The faked schema since diesel doesn't do views
 table! {
-  post_view (id) {
+  chapo.post_view (id) {
     id -> Int4,
     name -> Varchar,
     url -> Nullable<Text>,
@@ -58,7 +58,7 @@ table! {
 }
 
 table! {
-  post_fast_view (id) {
+  chapo.post_fast_view (id) {
     id -> Int4,
     name -> Varchar,
     url -> Nullable<Text>,
