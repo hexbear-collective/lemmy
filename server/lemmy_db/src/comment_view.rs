@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 // The faked schema since diesel doesn't do views
 table! {
-  comment_view (id) {
+  chapo.comment_view (id) {
     id -> Int4,
     creator_id -> Int4,
     post_id -> Int4,
@@ -47,7 +47,7 @@ table! {
 }
 
 table! {
-  comment_fast_view (id) {
+  chapo.comment_fast_view (id) {
     id -> Int4,
     creator_id -> Int4,
     post_id -> Int4,
