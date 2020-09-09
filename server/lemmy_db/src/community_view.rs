@@ -4,7 +4,7 @@ use diesel::{pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 table! {
-  community_view (id) {
+  chapo.community_view (id) {
     id -> Int4,
     name -> Varchar,
     title -> Varchar,
@@ -37,7 +37,7 @@ table! {
 }
 
 table! {
-  community_fast_view (id) {
+  chapo.community_fast_view (id) {
     id -> Int4,
     name -> Varchar,
     title -> Varchar,
