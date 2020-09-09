@@ -4,40 +4,7 @@ use diesel::{pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 table! {
-  chapo.community_view (id) {
-    id -> Int4,
-    name -> Varchar,
-    title -> Varchar,
-    icon -> Nullable<Text>,
-    banner -> Nullable<Text>,
-    description -> Nullable<Text>,
-    category_id -> Int4,
-    creator_id -> Int4,
-    removed -> Bool,
-    published -> Timestamp,
-    updated -> Nullable<Timestamp>,
-    deleted -> Bool,
-    nsfw -> Bool,
-    actor_id -> Text,
-    local -> Bool,
-    last_refreshed_at -> Timestamp,
-    creator_actor_id -> Text,
-    creator_local -> Bool,
-    creator_name -> Varchar,
-    creator_preferred_username -> Nullable<Varchar>,
-    creator_avatar -> Nullable<Text>,
-    category_name -> Varchar,
-    number_of_subscribers -> BigInt,
-    number_of_posts -> BigInt,
-    number_of_comments -> BigInt,
-    hot_rank -> Int4,
-    user_id -> Nullable<Int4>,
-    subscribed -> Nullable<Bool>,
-  }
-}
-
-table! {
-  chapo.community_fast_view (id) {
+  hexbear.community_fast_view (id) {
     id -> Int4,
     name -> Varchar,
     title -> Varchar,

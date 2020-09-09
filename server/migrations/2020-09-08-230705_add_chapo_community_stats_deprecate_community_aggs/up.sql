@@ -1,5 +1,5 @@
 -- Replace the pommunity_aggregate table with a 1:1 table solely to house aggregate values
-create table chapo.community_stat
+create table hexbear.community_stat
 (
     community_id int references public.community on update cascade on delete cascade primary key,
     number_of_subscribers int not null default 0,
@@ -8,18 +8,18 @@ create table chapo.community_stat
     hot_rank int
 );
 
--- Create new trigger functions under 'chapo' for altered functionality
-create or replace function chapo.refresh_post()
+-- Create new trigger functions under 'hexbear' for altered functionality
+create or replace function hexbear.refresh_post()
   returns trigger
   language 'plpgsql'
 as $BODY$
 begin
 IF (TG_OP = 'DELETE') THEN
     -- Update community number of posts
-    update chapo.community_stat set number_of_posts = number_of_posts - 1 where community_id = OLD.community_id;
+    update hexbear.community_stat set number_of_posts = number_of_posts - 1 where community_id = OLD.community_id;
   ELSIF (TG_OP = 'UPDATE') THEN
   -- only hot ranks actually depend on a post update
-    update chapo.post_stat
+    update hexbear.post_stat
     set
       hot_rank = hot_rank(coalesce(score, 1::bigint)::numeric, NEW.published),
       hot_rank_active = hot_rank(coalesce(score, 1::bigint)::numeric, 
@@ -30,7 +30,7 @@ IF (TG_OP = 'DELETE') THEN
 
   ELSIF (TG_OP = 'INSERT') THEN
 
-    insert into chapo.post_stat (post_id, hot_rank, hot_rank_active, newest_activity_time)
+    insert into hexbear.post_stat (post_id, hot_rank, hot_rank_active, newest_activity_time)
     values (
       NEW.id,
       hot_rank(0::numeric, NEW.published),
@@ -46,13 +46,13 @@ IF (TG_OP = 'DELETE') THEN
     insert into user_fast select * from user_view where id = NEW.creator_id;
   
     -- Update community number of posts
-    update chapo.community_stat set number_of_posts = number_of_posts + 1 where community_id = NEW.community_id;
+    update hexbear.community_stat set number_of_posts = number_of_posts + 1 where community_id = NEW.community_id;
   END IF;
 
   return null;
 end $BODY$;
 
-create or replace function chapo.refresh_comment()
+create or replace function hexbear.refresh_comment()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
@@ -60,12 +60,12 @@ begin
   IF (TG_OP = 'DELETE') THEN
 
     -- Update community number of comments
-    update chapo.community_stat as ccs
+    update hexbear.community_stat as ccs
     set number_of_comments = number_of_comments - 1
     from post as p
     where ccs.community_id = p.community_id and p.id = OLD.post_id;
 
-    update chapo.post_stat
+    update hexbear.post_stat
     set
       number_of_comments = number_of_comments - 1
     where post_id = OLD.post_id;
@@ -73,7 +73,7 @@ begin
   -- Update hotrank on comment update
   ELSIF (TG_OP = 'UPDATE') THEN
 
-    update chapo.comment_stat
+    update hexbear.comment_stat
     set
       hot_rank = hot_rank(coalesce(score, 1)::numeric, (select published from post where id = NEW.post_id)),
       hot_rank_active = hot_rank(coalesce(score, 1)::numeric, NEW.published)
@@ -81,14 +81,14 @@ begin
 
   ELSIF (TG_OP = 'INSERT') THEN
 
-    insert into chapo.comment_stat (comment_id, hot_rank, hot_rank_active)
+    insert into hexbear.comment_stat (comment_id, hot_rank, hot_rank_active)
     values (
       NEW.id,
       hot_rank(0::numeric, (select published from post where id = NEW.post_id)),
       hot_rank(0::numeric, NEW.published)
     );
 
-    update chapo.post_stat
+    update hexbear.post_stat
     set
       number_of_comments = number_of_comments + 1,
       newest_activity_time = NEW.published
@@ -100,7 +100,7 @@ begin
     where id = NEW.creator_id;
 
     -- Update community number of comments
-    update chapo.community_stat as ccs
+    update hexbear.community_stat as ccs
     set number_of_comments = number_of_comments + 1
     from post as p
     where ccs.community_id = p.community_id and p.id = NEW.post_id;
@@ -110,14 +110,14 @@ begin
   return null;
 end $BODY$;
 
-create or replace function chapo.refresh_community()
+create or replace function hexbear.refresh_community()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
 begin
   IF (TG_OP = 'UPDATE') THEN
 
-    update chapo.community_stat
+    update hexbear.community_stat
     set
       hot_rank = hot_rank(number_of_subs::numeric, NEW.published)
     where community_id = NEW.id;
@@ -127,7 +127,7 @@ begin
     
   -- TODO make sure this shows up in the users page ?
   ELSIF (TG_OP = 'INSERT') THEN
-    insert into chapo.community_stat (community_id, hot_rank)
+    insert into hexbear.community_stat (community_id, hot_rank)
     values (
       NEW.id,
       hot_rank(0::numeric, NEW.published)
@@ -137,15 +137,15 @@ begin
   return null;
 end $BODY$;
 
-create or replace function chapo.refresh_community_follower()
+create or replace function hexbear.refresh_community_follower()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
 begin
   IF (TG_OP = 'DELETE') THEN
-    update chapo.community_stat set number_of_subscribers = number_of_subscribers - 1 where community_id = OLD.community_id;
+    update hexbear.community_stat set number_of_subscribers = number_of_subscribers - 1 where community_id = OLD.community_id;
   ELSIF (TG_OP = 'INSERT') THEN
-    update chapo.community_stat set number_of_subscribers = number_of_subscribers + 1 where community_id = NEW.community_id;
+    update hexbear.community_stat set number_of_subscribers = number_of_subscribers + 1 where community_id = NEW.community_id;
   END IF;
 
   return null;
@@ -157,7 +157,7 @@ drop trigger if exists refresh_community on public.community;
 drop trigger if exists refresh_community_follower on public.community_follower;
 
 -- Migrate stats (warning: could take time pending instance size, consider downtime)
-insert into chapo.community_stat (community_id, number_of_subscribers, number_of_posts, number_of_comments, hot_rank)
+insert into hexbear.community_stat (community_id, number_of_subscribers, number_of_posts, number_of_comments, hot_rank)
 select id, number_of_subscribers, number_of_posts, number_of_comments, hot_rank from community_aggregates_fast;
 
 -- Add new triggers
@@ -165,27 +165,27 @@ create trigger refresh_comment
     after insert or delete or update
     on public.comment
     for each row
-    execute procedure chapo.refresh_comment();
+    execute procedure hexbear.refresh_comment();
   
 create trigger refresh_post
     after insert or delete or update
     on public.post
     for each row
-    execute procedure chapo.refresh_post();
+    execute procedure hexbear.refresh_post();
 
 create trigger refresh_community
     after insert or update
     on public.community
     for each row
-    execute procedure chapo.refresh_community();
+    execute procedure hexbear.refresh_community();
 
 create trigger refresh_community_follower
     after insert or delete
     on public.community_follower
     for each row
-    execute procedure chapo.refresh_community_follower();
+    execute procedure hexbear.refresh_community_follower();
 
-CREATE OR REPLACE VIEW chapo.community_fast_view
+CREATE OR REPLACE VIEW hexbear.community_fast_view
  AS
  SELECT ac.id,
     ac.name,
@@ -248,7 +248,7 @@ CREATE OR REPLACE VIEW chapo.community_fast_view
 	   FROM community c
 		 LEFT JOIN user_ u ON c.creator_id = u.id
 		 LEFT JOIN category cat ON c.category_id = cat.id
-		 LEFT JOIN chapo.community_stat ccs on ccs.community_id = c.id
+		 LEFT JOIN hexbear.community_stat ccs on ccs.community_id = c.id
 	) ac
 	 
 UNION ALL
@@ -283,4 +283,4 @@ UNION ALL
   FROM community c
     LEFT JOIN user_ u ON c.creator_id = u.id
     LEFT JOIN category cat ON c.category_id = cat.id
-    LEFT JOIN chapo.community_stat ccs on ccs.community_id = c.id;
+    LEFT JOIN hexbear.community_stat ccs on ccs.community_id = c.id;

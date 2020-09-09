@@ -14,7 +14,7 @@ create trigger refresh_comment_like
 
 create trigger refresh_user
     after insert or delete or update
-    on public.user
+    on public.user_
     for each row
     execute procedure public.refresh_user();
 

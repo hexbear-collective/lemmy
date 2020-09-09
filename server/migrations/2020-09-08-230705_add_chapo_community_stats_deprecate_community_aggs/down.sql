@@ -1,11 +1,11 @@
-drop table chapo.community_stat;
+drop table hexbear.community_stat cascade;
 
 drop trigger if exists refresh_post ON public.post;
 drop trigger if exists refresh_comment on public.comment;
 drop trigger if exists refresh_community on public.community;
 drop trigger if exists refresh_community_follower on public.community_follower;
 
-drop function if exists chapo.refresh_community_follower();
+drop function if exists hexbear.refresh_community_follower();
 
 insert into community_aggregates_fast
 select * from community_aggregates_view
@@ -14,9 +14,9 @@ set
 hot_rank = EXCLUDED.hot_rank, 
 number_of_comments = EXCLUDED.number_of_comments,
 number_of_posts = EXCLUDED.number_of_posts,
-number_of_subscribers = EXCLUDED.number_of_subscribers
+number_of_subscribers = EXCLUDED.number_of_subscribers;
 
-create or replace function chapo.refresh_post()
+create or replace function hexbear.refresh_post()
   returns trigger
   language 'plpgsql'
 as $BODY$
@@ -26,7 +26,7 @@ IF (TG_OP = 'DELETE') THEN
     update community_aggregates_fast set number_of_posts = number_of_posts - 1 where id = OLD.community_id;
   ELSIF (TG_OP = 'UPDATE') THEN
   -- only hot ranks actually depend on a post update
-    update chapo.post_stat
+    update hexbear.post_stat
     set
       hot_rank = hot_rank(coalesce(score, 1::bigint)::numeric, NEW.published),
       hot_rank_active = hot_rank(coalesce(score, 1::bigint)::numeric, 
@@ -37,7 +37,7 @@ IF (TG_OP = 'DELETE') THEN
 
   ELSIF (TG_OP = 'INSERT') THEN
 
-    insert into chapo.post_stat (post_id, hot_rank, hot_rank_active, newest_activity_time)
+    insert into hexbear.post_stat (post_id, hot_rank, hot_rank_active, newest_activity_time)
     values (
       NEW.id,
       hot_rank(0::numeric, NEW.published),
@@ -59,7 +59,7 @@ IF (TG_OP = 'DELETE') THEN
   return null;
 end $BODY$;
 
-create or replace function chapo.refresh_comment()
+create or replace function hexbear.refresh_comment()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
@@ -72,7 +72,7 @@ begin
     from post as p
     where caf.id = p.community_id and p.id = OLD.post_id;
 
-    update chapo.post_stat
+    update hexbear.post_stat
     set
       number_of_comments = number_of_comments - 1
     where post_id = OLD.post_id;
@@ -80,7 +80,7 @@ begin
   -- Update hotrank on comment update
   ELSIF (TG_OP = 'UPDATE') THEN
 
-    update chapo.comment_stat
+    update hexbear.comment_stat
     set
       hot_rank = hot_rank(coalesce(score, 1)::numeric, (select published from post where id = NEW.post_id)),
       hot_rank_active = hot_rank(coalesce(score, 1)::numeric, NEW.published)
@@ -88,14 +88,14 @@ begin
 
   ELSIF (TG_OP = 'INSERT') THEN
 
-    insert into chapo.comment_stat (comment_id, hot_rank, hot_rank_active)
+    insert into hexbear.comment_stat (comment_id, hot_rank, hot_rank_active)
     values (
       NEW.id,
       hot_rank(0::numeric, (select published from post where id = NEW.post_id)),
       hot_rank(0::numeric, NEW.published)
     );
 
-    update chapo.post_stat
+    update hexbear.post_stat
     set
       number_of_comments = number_of_comments + 1,
       newest_activity_time = NEW.published
@@ -118,7 +118,7 @@ begin
 end $BODY$;
 
 
-create or replace function chapo.refresh_community()
+create or replace function hexbear.refresh_community()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
@@ -145,20 +145,20 @@ create trigger refresh_comment
     after insert or delete or update
     on public.comment
     for each row
-    execute procedure chapo.refresh_comment();
+    execute procedure hexbear.refresh_comment();
   
 
 create trigger refresh_post
     after insert or delete or update
     on public.post
     for each row
-    execute procedure chapo.refresh_post();
+    execute procedure hexbear.refresh_post();
 
 create trigger refresh_community
     after insert or update
     on public.community
     for each row
-    execute procedure chapo.refresh_community();
+    execute procedure hexbear.refresh_community();
 
 create trigger refresh_community_follower
     after insert or delete

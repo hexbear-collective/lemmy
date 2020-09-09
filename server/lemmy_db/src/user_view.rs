@@ -5,7 +5,7 @@ use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 table! {
-  chapo.user_view (id) {
+  hexbear.user_view (id) {
     id -> Int4,
     actor_id -> Text,
     name -> Varchar,

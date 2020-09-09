@@ -1,4 +1,4 @@
-drop table chapo.post_stat cascade;
+drop table hexbear.post_stat cascade;
 
 drop trigger if exists refresh_post_like ON public.post_like;
 drop trigger if exists refresh_post ON public.post;
@@ -6,10 +6,10 @@ drop trigger if exists refresh_user on public.user_;
 drop trigger if exists refresh_comment on public.comment;
 drop trigger if exists refresh_community on public.community;
 
-drop function if exists chapo.refresh_post;
-drop function if exists chapo.refresh_post_like;
+drop function if exists hexbear.refresh_post;
+drop function if exists hexbear.refresh_post_like;
 
-create or replace function chapo.refresh_comment()
+create or replace function hexbear.refresh_comment()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
@@ -25,7 +25,7 @@ begin
   -- Update hotrank on comment update
   ELSIF (TG_OP = 'UPDATE') THEN
 
-    update chapo.comment_stat
+    update hexbear.comment_stat
     set
       hot_rank = hot_rank(coalesce(score, 1)::numeric, (select published from post where id = NEW.post_id)),
       hot_rank_active = hot_rank(coalesce(score, 1)::numeric, NEW.published)
@@ -33,7 +33,7 @@ begin
 
   ELSIF (TG_OP = 'INSERT') THEN
 
-    insert into chapo.comment_stat (comment_id, hot_rank, hot_rank_active)
+    insert into hexbear.comment_stat (comment_id, hot_rank, hot_rank_active)
     values (
       NEW.id,
       hot_rank(0::numeric, (select published from post where id = NEW.post_id)),
@@ -61,7 +61,7 @@ begin
   return null;
 end $BODY$;
 
-create or replace function chapo.refresh_user()
+create or replace function hexbear.refresh_user()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
@@ -83,7 +83,7 @@ begin
   return null;
 end $BODY$;
 
-create or replace function chapo.refresh_community_user_ban()
+create or replace function hexbear.refresh_community_user_ban()
     RETURNS trigger
     LANGUAGE 'plpgsql'
 AS $BODY$
@@ -102,7 +102,7 @@ create trigger refresh_comment
     after insert or delete or update
     on public.comment
     for each row
-    execute procedure chapo.refresh_comment();
+    execute procedure hexbear.refresh_comment();
 
 create trigger refresh_post
     after insert or delete or update
@@ -120,13 +120,13 @@ create trigger refresh_user
     after insert or delete or update
     on public.user_
     for each row
-    execute procedure chapo.refresh_user();
+    execute procedure hexbear.refresh_user();
 
 create trigger refresh_community_user_ban
     after insert or delete
     on public.community_user_ban
     for each row
-    execute procedure chapo.refresh_community_user_ban();
+    execute procedure hexbear.refresh_community_user_ban();
 
 create trigger refresh_community
     after insert or delete or update
