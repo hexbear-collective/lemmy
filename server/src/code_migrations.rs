@@ -1,8 +1,9 @@
 // This is for db migrations that require code
 use diesel::{
-  sql_types::{Nullable, Text},
+//  sql_types::{Nullable, Text},
   *,
 };
+/*
 use lemmy_db::{
   comment::Comment,
   community::{Community, CommunityForm},
@@ -21,18 +22,18 @@ use lemmy_utils::{
   LemmyError,
 };
 use log::info;
-
+*/
 pub fn run_advanced_migrations(conn: &PgConnection) -> Result<(), LemmyError> {
-  user_updates_2020_04_02(&conn)?;
-  community_updates_2020_04_02(&conn)?;
-  post_updates_2020_04_03(&conn)?;
-  comment_updates_2020_04_03(&conn)?;
-  private_message_updates_2020_05_05(&conn)?;
-  post_thumbnail_url_updates_2020_07_27(&conn)?;
+  // user_updates_2020_04_02(&conn)?;
+  // community_updates_2020_04_02(&conn)?;
+  // post_updates_2020_04_03(&conn)?;
+  // comment_updates_2020_04_03(&conn)?;
+  // private_message_updates_2020_05_05(&conn)?;
+  // post_thumbnail_url_updates_2020_07_27(&conn)?;
 
   Ok(())
 }
-
+/*
 fn user_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
   use lemmy_db::schema::user_::dsl::*;
 
@@ -229,3 +230,4 @@ fn post_thumbnail_url_updates_2020_07_27(conn: &PgConnection) -> Result<(), Lemm
 
   Ok(())
 }
+*/

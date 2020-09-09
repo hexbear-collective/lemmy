@@ -8,6 +8,10 @@ use bcrypt::{hash, DEFAULT_COST};
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
 
+// TextOrNullableText is a marker trait for Text or Nullable<Text>
+// if/when it is eventuly removed form diesel this needs to be changed
+sql_function!(fn lower<TT: TextOrNullableText>(x: TT) -> sql_types::Text);
+
 #[derive(Clone, Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
 #[table_name = "user_"]
 pub struct User_ {
@@ -45,6 +49,8 @@ pub struct UserForm {
   pub name: String,
   pub preferred_username: Option<String>,
   pub password_encrypted: String,
+  pub admin: bool,
+  pub sitemod: bool,
   pub banned: bool,
   pub email: Option<Option<String>>,
   pub avatar: Option<Option<String>>,
@@ -185,6 +191,8 @@ mod tests {
       name: "thommy".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -214,6 +222,8 @@ mod tests {
       name: "thommy".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -257,6 +267,8 @@ mod tests {
       name: "creator".into(),
       preferred_username: None,
       password_encrypted: "creator".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -282,6 +294,8 @@ mod tests {
       name: "moderator".into(),
       preferred_username: None,
       password_encrypted: "mod".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -307,6 +321,8 @@ mod tests {
       name: "not_moderator".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,

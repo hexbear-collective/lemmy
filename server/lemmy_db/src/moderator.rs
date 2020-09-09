@@ -426,11 +426,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-<<<<<<< HEAD
-      actor_id: "changeme_829398".into(),
-=======
       actor_id: None,
->>>>>>> 11149ba0
       bio: None,
       local: true,
       private_key: None,

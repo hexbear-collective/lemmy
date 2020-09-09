@@ -13,7 +13,7 @@ use diesel::{
   r2d2::{ConnectionManager, Pool},
   PgConnection,
 };
-use lemmy_api_structs::{comment::*, community::*, post::*, site::*, user::*, APIError};
+use lemmy_api_structs::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, APIError};
 use lemmy_rate_limit::RateLimit;
 use lemmy_utils::{location_info, CommunityId, ConnectionId, IPAddr, LemmyError, PostId, UserId};
 use rand::rngs::ThreadRng;
@@ -66,9 +66,6 @@ pub struct ChatServer {
 
   /// A list of the current captchas
   pub(super) captchas: Vec<CaptchaItem>,
-
-  /// A list of the current captchas
-  captchas: Vec<CaptchaItem>,
 
   /// An HTTP Client
   client: Client,

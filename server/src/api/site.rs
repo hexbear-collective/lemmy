@@ -5,6 +5,7 @@ use crate::{
     get_user_from_jwt,
     get_user_from_jwt_opt,
     is_admin,
+    is_mod_or_admin,
     Perform,
   },
   apub::fetcher::search_by_apub_id,
@@ -72,15 +73,15 @@ impl Perform for GetModlog {
     let community_id = data.community_id;
 
     let anon_log: bool = match &data.auth {
-      Some(auth) => match get_user_from_jwt(&auth, pool).await {
+      Some(auth) => match get_user_from_jwt(&auth, context.pool()).await {
         Ok(user) => {
           if let Some(c_id) = community_id {
-            match is_mod_or_admin(pool, user.id, c_id).await {
+            match is_mod_or_admin(context.pool(), user.id, c_id).await {
               Ok(_) => false,
               Err(_e) => true,
             }
           } else {
-            match is_admin(pool, user.id).await {
+            match is_admin(context.pool(), user.id).await {
               Ok(_) => false,
               Err(_e) => true,
             }
@@ -94,32 +95,32 @@ impl Perform for GetModlog {
     let mod_user_id = data.mod_user_id;
     let page = data.page;
     let limit = data.limit;
-    let removed_posts = blocking(pool, move |conn| {
+    let removed_posts = blocking(context.pool(), move |conn| {
       ModRemovePostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
-    let locked_posts = blocking(pool, move |conn| {
+    let locked_posts = blocking(context.pool(), move |conn| {
       ModLockPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
-    let stickied_posts = blocking(pool, move |conn| {
+    let stickied_posts = blocking(context.pool(), move |conn| {
       ModStickyPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
-    let removed_comments = blocking(pool, move |conn| {
+    let removed_comments = blocking(context.pool(), move |conn| {
       ModRemoveCommentView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
-    let banned_from_community = blocking(pool, move |conn| {
+    let banned_from_community = blocking(context.pool(), move |conn| {
       ModBanFromCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
 
-    let added_to_community = blocking(pool, move |conn| {
+    let added_to_community = blocking(context.pool(), move |conn| {
       ModAddCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
     })
     .await??;
@@ -276,6 +277,7 @@ impl Perform for GetSite {
         email: setup.admin_email.to_owned(),
         password: setup.admin_password.to_owned(),
         password_verify: setup.admin_password.to_owned(),
+        admin: true,
         show_nsfw: true,
         hcaptcha_id: None,
         pronouns: None,
@@ -335,13 +337,6 @@ impl Perform for GetSite {
         u
       });
 
-    let my_user = get_user_from_jwt_opt(&data.auth, pool).await?.map(|mut u| {
-      u.password_encrypted = "".to_string();
-      u.private_key = None;
-      u.public_key = None;
-      u
-    });
-
     Ok(GetSiteResponse {
       site: site_view,
       admins,
@@ -349,6 +344,7 @@ impl Perform for GetSite {
       banned,
       online,
       version: version::SEMVER_LIGHTWEIGHT.to_string(),
+      my_user,
       federated_instances: Settings::get().get_allowed_instances(),
     })
   }
@@ -564,7 +560,7 @@ impl Perform for TransferSite {
     let site_view = blocking(context.pool(), move |conn| SiteView::read(conn)).await??;
 
     let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
-    let sitemods = blocking(context.pool, move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
     let creator_index = admins
       .iter()
       .position(|r| r.id == site_view.creator_id)
@@ -634,18 +630,19 @@ impl Perform for SaveSiteConfig {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<GetSiteModerators> {
+impl Perform for GetSiteModerators {
   type Response = GetSiteModeratorsResponse;
-  async fn perform(
+
+    async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetSiteModeratorsResponse, LemmyError> {
-    let data: &GetSiteModerators = &self.data;
+    let data: &GetSiteModerators = &self;
     let page = data.page;
     let limit = data.limit;
 
-    let communities = blocking(pool, move |conn| {
+    let communities = blocking(context.pool(), move |conn| {
       CommunityQueryBuilder::create(conn)
         .page(page)
         .limit(limit)
@@ -656,7 +653,7 @@ impl Perform for Oper<GetSiteModerators> {
     let mut community_mods: Vec<CommunityModerators> = Vec::with_capacity(communities.len());
     for c in communities {
       let id = c.id;
-      let mod_view = blocking(pool, move |conn| {
+      let mod_view = blocking(context.pool(), move |conn| {
         CommunityModeratorView::for_community(conn, id)
       })
       .await??;

@@ -1,5 +1,5 @@
 use crate::{
-  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, Perform},
+  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, is_within_message_char_limit, Perform},
   apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
@@ -20,7 +20,7 @@ use lemmy_db::{
   comment::*,
   comment_view::*,
   community::*,
-  community_settings::CommunitySettings,
+  community_settings::*,
   community_view::*,
   diesel_option_overwrite,
   moderator::*,
@@ -39,6 +39,7 @@ use lemmy_db::{
   user_view::*,
   Crud,
   Followable,
+  Joinable,
   ListingType,
   SortType,
 };
@@ -62,15 +63,15 @@ use std::str::FromStr;
 use std::collections::BTreeMap;
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<SetUserTag> {
+impl Perform for SetUserTag {
   type Response = UserTagResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<UserTagResponse, LemmyError> {
-    let data: &SetUserTag = &self.data;
+    let data: &SetUserTag = &self;
     let key = data.tag.clone();
     let value = data.value.clone();
     let mut tags = BTreeMap::new();
@@ -86,7 +87,7 @@ impl Perform for Oper<SetUserTag> {
       tags.insert(key.clone(), v);
     }
 
-    match blocking(pool, move |conn| UserTag::set_key(conn, user, key, value)).await? {
+    match blocking(context.pool(), move |conn| UserTag::set_key(conn, user, key, value)).await? {
       Ok(usertag) => Ok(UserTagResponse {
         user,
         community: None,
@@ -98,26 +99,26 @@ impl Perform for Oper<SetUserTag> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<GetUserTag> {
+impl Perform for GetUserTag {
   type Response = UserTagResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<UserTagResponse, LemmyError> {
-    let data: &GetUserTag = &self.data;
+    let data: &GetUserTag = &self;
     let user = data.user;
 
     // Check if user exists
-    let user_exists = blocking(pool, move |conn| User_::read(conn, user))
+    let user_exists = blocking(context.pool(), move |conn| User_::read(conn, user))
       .await?
       .is_ok();
     if !user_exists {
       return Err(APIError::err("user_doesnt_exist").into());
     }
 
-    match blocking(pool, move |conn| UserTag::read(conn, user)).await? {
+    match blocking(context.pool(), move |conn| UserTag::read(conn, user)).await? {
       Ok(usertag) => Ok(UserTagResponse {
         user,
         community: None,
@@ -142,9 +143,6 @@ impl Perform for Oper<GetUserTag> {
   }
 }
 
-=======
-
->>>>>>> 11149ba0
 #[async_trait::async_trait(?Send)]
 impl Perform for Login {
   type Response = LoginResponse;
@@ -214,7 +212,7 @@ impl Perform for Register {
 
     // If its not the admin, check the captcha
     if !data.admin && Settings::get().captcha.enabled {
-      match captcha_settings.provider.as_str() {
+      match Settings::get().captcha.provider.as_str() {
         "hcaptcha" => {
           if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
             if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
@@ -224,28 +222,25 @@ impl Perform for Register {
           } else {
             return Err(APIError::err("missing_hcaptcha_id").into());
           }
-        }
-        _ => match websocket_info {
-          Some(ws) => {
-            let check = ws
-              .chatserver
-              .send(CheckCaptcha {
-                uuid: data
-                  .captcha_uuid
-                  .to_owned()
-                  .unwrap_or_else(|| "".to_string()),
-                answer: data
-                  .captcha_answer
-                  .to_owned()
-                  .unwrap_or_else(|| "".to_string()),
-              })
-              .await?;
-            if !check {
-              return Err(APIError::err("captcha_incorrect").into());
-            }
-          }
-          None => return Err(APIError::err("captcha_incorrect").into()),
         },
+        _ => {
+          let check = context
+            .chat_server()
+            .send(CheckCaptcha {
+              uuid: data
+                .captcha_uuid
+                .to_owned()
+                .unwrap_or_else(|| "".to_string()),
+              answer: data
+                .captcha_answer
+                .to_owned()
+                .unwrap_or_else(|| "".to_string()),
+            })
+            .await?;
+          if !check {
+            return Err(APIError::err("captcha_incorrect").into());
+          }
+        }
       }
     }
 
@@ -266,11 +261,13 @@ impl Perform for Register {
       }
       None => None,
     };
-
+    
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
       email: Some(data.email.to_owned()),
+      admin: data.admin,
+      sitemod: false,
       matrix_user_id: None,
       avatar: None,
       banner: None,
@@ -360,6 +357,12 @@ impl Perform for Register {
       return Err(APIError::err("community_follower_already_exists").into());
     };
 
+    // subscribe the user to all communities that have allow_as_default enabled
+    let default_communities = blocking(context.pool(), move |conn| {
+      CommunitySettings::list_allowed_as_default(conn)
+    })
+    .await??;
+
     // Sign up new users for a set of default communities
     for comm in default_communities.into_iter() {
       let community_follower_form = CommunityFollowerForm {
@@ -367,7 +370,7 @@ impl Perform for Register {
         user_id: inserted_user.id,
       };
 
-      let _ = blocking(pool, move |conn: &'_ _| {
+      let _ = blocking(context.pool(), move |conn: &'_ _| {
         CommunityFollower::follow(conn, &community_follower_form)
       })
       .await;
@@ -381,7 +384,7 @@ impl Perform for Register {
       };
 
       let join = move |conn: &'_ _| CommunityModerator::join(conn, &community_moderator_form);
-      if blocking(pool, join).await?.is_err() {
+      if blocking(context.pool(), join).await?.is_err() {
         return Err(APIError::err("community_moderator_already_exists").into());
       }
     }
@@ -390,7 +393,7 @@ impl Perform for Register {
     // Add their pronouns if they specified at account registration
     if let Some(pronouns) = data.pronouns.clone() {
       let user_id = inserted_user.id;
-      blocking(pool, move |conn| {
+      blocking(context.pool(), move |conn| {
         UserTag::set_key(conn, user_id, "pronouns".to_string(), Some(pronouns))
       })
       .await??;
@@ -458,6 +461,7 @@ impl Perform for GetCaptcha {
 
         Ok(GetCaptchaResponse {
           ok: Some(CaptchaResponse { png, uuid, wav }),
+          hcaptcha: None,
         })
       }
     }
@@ -545,6 +549,8 @@ impl Perform for SaveUserSettings {
     let user_form = UserForm {
       name: read_user.name,
       email,
+      admin: read_user.admin,
+      sitemod: read_user.sitemod,
       matrix_user_id: data.matrix_user_id.to_owned(),
       avatar,
       banner,
@@ -630,7 +636,7 @@ impl Perform for GetUserDetails {
       }
     };
 
-    let user_view = blocking(context.pool(), move |conn| {
+    let mut user_view = blocking(context.pool(), move |conn| {
       UserView::get_user_secure(conn, user_details_id)
     })
     .await??;
@@ -681,14 +687,14 @@ impl Perform for GetUserDetails {
     .await??;
 
     let site_creator_id =
-      blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
+      blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
-    let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
     // If its not the same user, remove the email, and settings
     // TODO an if let chain would be better here, but can't figure it out
@@ -770,57 +776,51 @@ impl Perform for AddAdmin {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<AddSitemod> {
+impl Perform for AddSitemod {
   type Response = AddSitemodResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<AddSitemodResponse, LemmyError> {
-    let data: &AddSitemod = &self.data;
-
-    let claims = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims,
-      Err(_e) => return Err(APIError::err("not_logged_in").into()),
-    };
-
-    let user_id = claims.id;
+    let data: &AddSitemod = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     // Make sure user is an admin
-    is_admin(pool, claims.id).await?;
+    is_admin(context.pool(), user.id).await?;
 
     let added = data.added;
     let added_user_id = data.user_id;
     let add_sitemod = move |conn: &'_ _| User_::add_sitemod(conn, added_user_id, added);
-    if blocking(pool, add_sitemod).await?.is_err() {
+    if blocking(context.pool(), add_sitemod).await?.is_err() {
       return Err(APIError::err("couldnt_update_user").into());
     }
 
     // Mod tables
     let form = ModAddForm {
-      mod_user_id: user_id,
+      mod_user_id: user.id,
       other_user_id: data.user_id,
       removed: Some(!data.added),
     };
 
-    blocking(pool, move |conn| ModAdd::create(conn, &form)).await??;
+    blocking(context.pool(), move |conn| ModAdd::create(conn, &form)).await??;
 
-    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
     let res = AddSitemodResponse { sitemods };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendAllMessage {
-        op: UserOperation::AddSitemod,
-        response: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server.do_send(SendAllMessage {
+      op: UserOperation::AddSitemod,
+      response: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
+
+#[async_trait::async_trait(?Send)]
 impl Perform for BanUser {
   type Response = BanUserResponse;
 
@@ -837,7 +837,7 @@ impl Perform for BanUser {
 
     let banned_user_id = data.user_id;
     // Make sure target user is not an admin or sitemod
-    let target = blocking(pool, move |conn| User_::read(&conn, banned_user_id)).await??;
+    let target = blocking(context.pool(), move |conn| User_::read(&conn, banned_user_id)).await??;
     if target.admin || target.sitemod {
       return Err(APIError::err("couldnt_update_user").into());
     }

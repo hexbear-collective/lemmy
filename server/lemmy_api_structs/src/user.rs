@@ -250,51 +250,51 @@ pub struct UserJoinResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct HCaptchaResponse {
-  site_key: String,
-  verify_url: String,
+  pub site_key: String,
+  pub verify_url: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct AddSitemod {
-  user_id: i32,
-  added: bool,
-  auth: String,
+  pub user_id: i32,
+  pub added: bool,
+  pub auth: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AddSitemodResponse {
-  sitemods: Vec<UserView>,
+  pub sitemods: Vec<UserView>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GetUserTag {
-  user: i32,
-  community: Option<i32>,
+  pub user: i32,
+  pub community: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SetUserTag {
-  tag: String,
-  value: Option<String>,
-  auth: String,
+  pub tag: String,
+  pub value: Option<String>,
+  pub auth: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UserTagResponse {
-  user: i32,
+  pub user: i32,
   #[serde(skip_serializing_if = "Option::is_none")]
-  community: Option<i32>,
-  tags: UserTagsSchema,
+  pub community: Option<i32>,
+  pub tags: UserTagsSchema,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct UserTagsSchema {
+pub struct UserTagsSchema {
   #[serde(skip_serializing_if = "Option::is_none")]
-  pronouns: Option<String>,
+  pub pronouns: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  tendency: Option<String>,
+  pub tendency: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  favorite_food: Option<String>,
+  pub favorite_food: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  flair: Option<String>,
+  pub flair: Option<String>,
 }

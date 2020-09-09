@@ -16,6 +16,8 @@ pub struct GetCommunityResponse {
   pub community: CommunityView,
   pub moderators: Vec<CommunityModeratorView>,
   pub online: usize,
+  pub admins: Vec<UserView>,   // hexbear
+  pub sitemods: Vec<UserView>, // hexbear
 }
 
 #[derive(Serialize, Deserialize)]

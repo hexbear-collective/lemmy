@@ -75,4 +75,5 @@ pub enum UserOperation {
   GetSiteModerators,
   GetUserTag,
   SetUserTag,
+  AddSitemod,
 }

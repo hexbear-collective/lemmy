@@ -2,6 +2,7 @@ use lemmy_db::{
   comment_view::CommentView,
   community_view::{CommunityModeratorView, CommunityView},
   post_view::PostView,
+  user_view::UserView,
 };
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +34,8 @@ pub struct GetPostResponse {
   pub community: CommunityView,
   pub moderators: Vec<CommunityModeratorView>,
   pub online: usize,
+  pub admins: Vec<UserView>,   // Hexbear
+  pub sitemods: Vec<UserView>, // Hexbear
 }
 
 #[derive(Serialize, Deserialize, Debug)]

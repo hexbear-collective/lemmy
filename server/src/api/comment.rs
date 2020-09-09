@@ -87,14 +87,14 @@ impl Perform for CreateComment {
 
     // Check community settings
     let community_id = post.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
     let community_id = post.community_id;
     let user_id = user.id;
-    let privileged = blocking(pool, move |conn| {
+    let privileged = blocking(context.pool(), move |conn| {
       let user = User_::read(conn, user_id)?;
       user.is_moderator(conn, community_id)
     })
@@ -122,7 +122,7 @@ impl Perform for CreateComment {
 
     // Check for a community ban
     let post_id = data.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = blocking(context.pool(), move |conn| Post::read(conn, post_id)).await??;
     check_community_ban(user.id, post.community_id, context.pool()).await?;
 
     // Create the comment
@@ -231,13 +231,13 @@ impl Perform for EditComment {
 
     // Do the update
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
-    let community_id = orig_community_id;
-    let settings = blocking(pool, move |conn| {
+    let community_id = orig_comment.community_id;
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
-    let community_id = orig_community_id;
+    let community_id = orig_comment.community_id;
     let user_id = user.id;
     let privileged = is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
     let num_images: i32 = num_md_images(&content_slurs_removed); // replaced content_pii_removed
@@ -726,14 +726,14 @@ impl Perform for GetComments {
 
     // Check community settings
     if let Some(community_id) = data.community_id {
-      let settings = blocking(pool, move |conn| {
+      let settings = blocking(context.pool(), move |conn| {
         CommunitySettings::read_from_community_id(conn, community_id)
       })
       .await??;
 
       let privileged = {
         if let Some(id) = user_id {
-          blocking(pool, move |conn| {
+          blocking(context.pool(), move |conn| {
             let user = User_::read(conn, id)?;
             user.is_moderator(conn, community_id)
           })

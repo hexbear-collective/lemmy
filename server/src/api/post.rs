@@ -30,6 +30,7 @@ use lemmy_db::{
   post::*,
   post_view::*,
   site_view::*,
+  user_view::*,
   Crud,
   Likeable,
   ListingType,
@@ -76,7 +77,7 @@ impl Perform for CreatePost {
 
     let user_id = user.id;
     let community_id = data.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
@@ -84,20 +85,20 @@ impl Perform for CreatePost {
     let mut moderators: Vec<i32> = vec![];
 
     moderators.append(
-      &mut blocking(pool, move |conn| {
+      &mut blocking(context.pool(), move |conn| {
         CommunityModeratorView::for_community(conn, community_id)
           .map(|v| v.into_iter().map(|m| m.user_id).collect())
       })
       .await??,
     );
     moderators.append(
-      &mut blocking(pool, move |conn| {
+      &mut blocking(context.pool(), move |conn| {
         UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
     moderators.append(
-      &mut blocking(pool, move |conn| {
+      &mut blocking(context.pool(), move |conn| {
         UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
       })
       .await??,
@@ -118,7 +119,7 @@ impl Perform for CreatePost {
       check_community_ban(user.id, data.community_id, context.pool()).await?;
     }
     
-    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+    let user_view = blocking(context.pool(), move |conn| UserView::read(conn, user_id)).await??;
     let score = user_view.post_score + user_view.comment_score;
 
     // no upstream, dessalines wants to leverage rate limiting
@@ -264,14 +265,14 @@ impl Perform for GetPost {
       let mut moderators: Vec<i32> = vec![];
 
       moderators.append(
-        &mut blocking(pool, move |conn| {
+        &mut blocking(context.pool(), move |conn| {
           CommunityModeratorView::for_community(conn, community_id)
             .map(|v| v.into_iter().map(|m| m.user_id).collect())
         })
         .await??,
       );
       moderators.append(
-        &mut blocking(pool, move |conn| {
+        &mut blocking(context.pool(), move |conn| {
           UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
         })
         .await??,
@@ -289,17 +290,17 @@ impl Perform for GetPost {
     }
 
     let post_id = data.id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = blocking(context.pool(), move |conn| Post::read(conn, post_id)).await??;
 
     // Check community settings
     let community_id = post.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
     let community_id = post.community_id;
-    let privileged = blocking(pool, move |conn| {
+    let privileged = blocking(context.pool(), move |conn| {
       if let Some(u_id) = user_id {
         let user = User_::read(conn, u_id)?;
         user.is_moderator(conn, community_id)
@@ -335,14 +336,14 @@ impl Perform for GetPost {
     .await??;
 
     let community_id = post_view.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
     let community_id = post_view.community_id;
     if let Some(user_id) = user_id {
-      let privileged = blocking(pool, move |conn| {
+      let privileged = blocking(context.pool(), move |conn| {
         let user = User_::read(conn, user_id)?;
         user.is_moderator(conn, community_id)
       })
@@ -353,14 +354,14 @@ impl Perform for GetPost {
     }
 
     let site_creator_id =
-      blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
+      blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
-    let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
     if let Some(id) = websocket_id {
       context.chat_server().do_send(JoinPostRoom {
@@ -479,14 +480,14 @@ impl Perform for CreatePostLike {
 
     // Check community settings
     let community_id = post.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
     let community_id = post.community_id;
     let user_id = user.id;
-    let privileged = blocking(pool, move |conn| {
+    let privileged = blocking(context.pool(), move |conn| {
       let user = User_::read(conn, user_id)?;
       user.is_moderator(conn, community_id)
     })

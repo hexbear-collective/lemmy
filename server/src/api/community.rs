@@ -8,7 +8,6 @@ use crate::{
     is_mod_or_admin,
     Perform,
   },
-  apub::ActorType,
   blocking,
   websocket::{
     messages::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},
@@ -23,6 +22,7 @@ use lemmy_db::{
   comment::Comment,
   comment_view::CommentQueryBuilder,
   community::*,
+  community_settings::*,
   community_view::*,
   diesel_option_overwrite,
   moderator::*,
@@ -47,6 +47,7 @@ use lemmy_utils::{
   LemmyError,
 };
 use std::str::FromStr;
+use std::time::Duration;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for GetCommunity {
@@ -94,8 +95,8 @@ impl Perform for GetCommunity {
       Err(_e) => return Err(APIError::err("couldnt_find_community").into()),
     };
 
-    let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
-    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
         if let Some(id) = websocket_id {
       context
@@ -147,10 +148,10 @@ impl Perform for CreateCommunity {
     let user_id = user.id;
 
     // Check if site settings allow for communities to be created...
-    let site: Site = blocking(pool, move |conn| Site::read(conn, 1)).await??;
+    let site: Site = blocking(context.pool(), move |conn| Site::read(conn, 1)).await??;
     if !site.enable_create_communities {
       // ...but let admins/sitemods create them anyway
-      if is_admin(user_id).await.is_err() {
+      if is_admin(context.pool(), user_id).await.is_err() {
         return Err(APIError::err("create_community_disabled").into());
       }
     }
@@ -209,7 +210,7 @@ impl Perform for CreateCommunity {
       allow_as_default: true,
     };
 
-    let _inserted_settings = blocking(pool, move |conn| {
+    let _inserted_settings = blocking(context.pool(), move |conn| {
       CommunitySettings::create(conn, &community_settings_form)
     })
     .await??;
@@ -263,28 +264,8 @@ impl Perform for EditCommunity {
     check_slurs(&data.title)?;
     check_slurs_opt(&data.description)?;
 
-    // Verify its a mod (only mods can edit it)
-    let edit_id = data.edit_id;
-    let mods: Vec<i32> = blocking(context.pool(), move |conn| {
-      CommunityModeratorView::for_community(conn, edit_id)
-        .map(|v| v.into_iter().map(|m| m.user_id).collect())
-    })
-    .await??;
-    if !mods.contains(&user.id) {
-      return Err(APIError::err("not_a_moderator").into());
-    }
-
     // Verify it's a mod or admin
-    let edit_id = data.edit_id;
-    let user_id = user.id;
-    let _: Result<(), LemmyError> = blocking(pool, move |conn| {
-      if !User_::read(&conn, user_id)?.is_moderator(&conn, edit_id)? {
-        Ok(())
-      } else {
-        Err(APIError::err("no_community_edit_allowed").into())
-      }
-    })
-    .await?;
+    is_mod_or_admin(context.pool(), user.id, data.edit_id).await?;
 
     let edit_id = data.edit_id;
     let read_community =
@@ -397,19 +378,6 @@ impl Perform for DeleteCommunity {
     };
 
     send_community_websocket(&res, context, websocket_id, UserOperation::DeleteCommunity);
-
-    let edit_id = data.edit_id;
-    let user_id = user.id;
-    let community_view = blocking(pool, move |conn| {
-      CommunityView::read(conn, edit_id, Some(user_id))
-    })
-    .await??;
-
-    let res = CommunityResponse {
-      community: community_view,
-    };
-
-    send_community_websocket(&res, websocket_info, UserOperation::RemoveCommunity);
 
     Ok(res)
   }
@@ -813,7 +781,7 @@ impl Perform for TransferCommunity {
 
     let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
 
-    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
     let creator_index = admins
       .iter()
       .position(|r| r.id == site_creator_id)

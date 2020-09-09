@@ -1,9 +1,10 @@
 use super::post::Post;
 use crate::{
   naive_now,
-  schema::{comment, comment_like, comment_saved},
+  schema::{comment, comment_like, comment_report, comment_saved},
   Crud,
   Likeable,
+  Reportable,
   Saveable,
 };
 use diesel::{dsl::*, result::Error, *};
@@ -177,46 +178,6 @@ impl Comment {
       .on_conflict(ap_id)
       .do_update()
       .set(comment_form)
-      .get_result::<Self>(conn)
-  }
-
-  pub fn update_deleted(
-    conn: &PgConnection,
-    comment_id: i32,
-    new_deleted: bool,
-  ) -> Result<Self, Error> {
-    use crate::schema::comment::dsl::*;
-    diesel::update(comment.find(comment_id))
-      .set((deleted.eq(new_deleted), updated.eq(naive_now())))
-      .get_result::<Self>(conn)
-  }
-
-  pub fn update_removed(
-    conn: &PgConnection,
-    comment_id: i32,
-    new_removed: bool,
-  ) -> Result<Self, Error> {
-    use crate::schema::comment::dsl::*;
-    diesel::update(comment.find(comment_id))
-      .set((removed.eq(new_removed), updated.eq(naive_now())))
-      .get_result::<Self>(conn)
-  }
-
-  pub fn update_read(conn: &PgConnection, comment_id: i32, new_read: bool) -> Result<Self, Error> {
-    use crate::schema::comment::dsl::*;
-    diesel::update(comment.find(comment_id))
-      .set(read.eq(new_read))
-      .get_result::<Self>(conn)
-  }
-
-  pub fn update_content(
-    conn: &PgConnection,
-    comment_id: i32,
-    new_content: &str,
-  ) -> Result<Self, Error> {
-    use crate::schema::comment::dsl::*;
-    diesel::update(comment.find(comment_id))
-      .set((content.eq(new_content), updated.eq(naive_now())))
       .get_result::<Self>(conn)
   }
 }

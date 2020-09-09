@@ -44,6 +44,7 @@ pub struct GetModlog {
   pub community_id: Option<i32>,
   pub page: Option<i64>,
   pub limit: Option<i64>,
+  pub auth: Option<String>,      // hexbear
 }
 
 #[derive(Serialize, Deserialize)]
@@ -81,6 +82,7 @@ pub struct EditSite {
   pub open_registration: bool,
   pub enable_nsfw: bool,
   pub auth: String,
+  pub enable_create_communities: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -102,6 +104,7 @@ pub struct GetSiteResponse {
   pub version: String,
   pub my_user: Option<User_>,
   pub federated_instances: Vec<String>,
+  pub sitemods: Vec<UserView>,           // hexbear
 }
 
 #[derive(Serialize, Deserialize)]
@@ -124,4 +127,23 @@ pub struct GetSiteConfigResponse {
 pub struct SaveSiteConfig {
   pub config_hjson: String,
   pub auth: String,
+}
+
+// Hexbear ----------------------------------------
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CommunityModerators {
+  pub community: CommunityView,
+  pub moderators: Vec<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetSiteModerators {
+  pub page: Option<i64>,
+  pub limit: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetSiteModeratorsResponse {
+  pub communities: Vec<CommunityModerators>,
 }

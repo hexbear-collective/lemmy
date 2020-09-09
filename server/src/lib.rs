@@ -30,12 +30,6 @@ pub mod routes;
 pub mod version;
 pub mod websocket;
 
-<<<<<<< HEAD
-use crate::request::{retry, RecvError};
-use actix_web::{client::Client, dev::ConnectionInfo};
-use anyhow::anyhow;
-use lemmy_utils::{get_apub_protocol_string, settings::Settings};
-=======
 use crate::{
   request::{retry, RecvError},
   websocket::chat_server::ChatServer,
@@ -44,7 +38,6 @@ use actix::Addr;
 use anyhow::anyhow;
 use background_jobs::QueueHandle;
 use lemmy_utils::{get_apub_protocol_string, settings::Settings, LemmyError};
->>>>>>> 11149ba0
 use log::error;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::Client;
