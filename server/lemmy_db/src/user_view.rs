@@ -1,36 +1,11 @@
-use super::user_view::user_fast::BoxedQuery;
+use super::user_view::user_view::BoxedQuery;
 use crate::{fuzzy_search, limit_and_offset, MaybeOptional, SortType};
 
 use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 table! {
-  user_view (id) {
-    id -> Int4,
-    actor_id -> Text,
-    name -> Varchar,
-    preferred_username -> Nullable<Varchar>,
-    avatar -> Nullable<Text>,
-    banner -> Nullable<Text>,
-    email -> Nullable<Text>,
-    matrix_user_id -> Nullable<Text>,
-    bio -> Nullable<Text>,
-    local -> Bool,
-    admin -> Bool,
-    sitemod -> Bool,
-    banned -> Bool,
-    show_avatars -> Bool,
-    send_notifications_to_email -> Bool,
-    published -> Timestamp,
-    number_of_posts -> BigInt,
-    post_score -> BigInt,
-    number_of_comments -> BigInt,
-    comment_score -> BigInt,
-  }
-}
-
-table! {
-  user_fast (id) {
+  chapo.user_view (id) {
     id -> Int4,
     actor_id -> Text,
     name -> Varchar,
@@ -57,7 +32,7 @@ table! {
 #[derive(
   Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize, QueryableByName, Clone,
 )]
-#[table_name = "user_fast"]
+#[table_name = "user_view"]
 pub struct UserView {
   pub id: i32,
   pub actor_id: String,
@@ -91,9 +66,9 @@ pub struct UserQueryBuilder<'a> {
 
 impl<'a> UserQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection) -> Self {
-    use super::user_view::user_fast::dsl::*;
+    use super::user_view::user_view::dsl::*;
 
-    let query = user_fast.into_boxed();
+    let query = user_view.into_boxed();
 
     UserQueryBuilder {
       conn,
@@ -110,7 +85,7 @@ impl<'a> UserQueryBuilder<'a> {
   }
 
   pub fn search_term<T: MaybeOptional<String>>(mut self, search_term: T) -> Self {
-    use super::user_view::user_fast::dsl::*;
+    use super::user_view::user_view::dsl::*;
     if let Some(search_term) = search_term.get_optional() {
       self.query = self.query.filter(name.ilike(fuzzy_search(&search_term)));
     }
@@ -128,7 +103,7 @@ impl<'a> UserQueryBuilder<'a> {
   }
 
   pub fn list(self) -> Result<Vec<UserView>, Error> {
-    use super::user_view::user_fast::dsl::*;
+    use super::user_view::user_view::dsl::*;
 
     let mut query = self.query;
 
@@ -164,14 +139,14 @@ impl<'a> UserQueryBuilder<'a> {
 
 impl UserView {
   pub fn read(conn: &PgConnection, from_user_id: i32) -> Result<Self, Error> {
-    use super::user_view::user_fast::dsl::*;
-    user_fast.find(from_user_id).first::<Self>(conn)
+    use super::user_view::user_view::dsl::*;
+    user_view.find(from_user_id).first::<Self>(conn)
   }
 
   pub fn admins(conn: &PgConnection) -> Result<Vec<Self>, Error> {
-    use super::user_view::user_fast::dsl::*;
+    use super::user_view::user_view::dsl::*;
     use diesel::sql_types::{Nullable, Text};
-    user_fast
+    user_view
       // The select is necessary here to not get back emails
       .select((
         id,
@@ -201,9 +176,9 @@ impl UserView {
   }
 
   pub fn sitemods(conn: &PgConnection) -> Result<Vec<Self>, Error> {
-    use super::user_view::user_fast::dsl::*;
+    use super::user_view::user_view::dsl::*;
     use diesel::sql_types::{Nullable, Text};
-    user_fast
+    user_view
       // The select is necessary here to not get back emails
       .select((
         id,
@@ -233,9 +208,9 @@ impl UserView {
   }
 
   pub fn banned(conn: &PgConnection) -> Result<Vec<Self>, Error> {
-    use super::user_view::user_fast::dsl::*;
+    use super::user_view::user_view::dsl::*;
     use diesel::sql_types::{Nullable, Text};
-    user_fast
+    user_view
       .select((
         id,
         actor_id,
