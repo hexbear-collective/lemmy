@@ -22,7 +22,9 @@ use lemmy_utils::{
   LemmyError,
 };
 use log::info;
-*/
+ */
+use lemmy_utils::LemmyError;
+
 pub fn run_advanced_migrations(conn: &PgConnection) -> Result<(), LemmyError> {
   // user_updates_2020_04_02(&conn)?;
   // community_updates_2020_04_02(&conn)?;

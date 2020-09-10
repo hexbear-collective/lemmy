@@ -225,18 +225,6 @@ pub async fn is_image_content_type(client: &Client, test: &str) -> Result<(), Le
   }
 }
 
-pub fn get_ip(conn_info: &ConnectionInfo) -> String {
-  conn_info
-    .realip_remote_addr()
-    .and_then(|real_ip| {
-      real_ip
-        .parse::<IpAddr>()
-        .or_else(|_| real_ip.parse::<SocketAddr>().map(|sa| sa.ip()))
-        .ok()
-    })
-    .map_or("0.0.0.0".to_string(), |ip_addr| ip_addr.to_string())
-}
-
 pub async fn blocking<F, T>(pool: &DbPool, f: F) -> Result<T, LemmyError>
 where
   F: FnOnce(&diesel::PgConnection) -> T + Send + 'static,
@@ -251,23 +239,6 @@ where
   .await?;
 
   Ok(res)
-}
-
-pub fn is_within_post_title_char_limit(title: &str) -> bool {
-  title.len() <= 160
-}
-
-// This should possibly be raised to accomodate essays or creative writing
-pub fn is_within_post_body_char_limit(body: &str) -> bool {
-  body.len() <= 20000
-}
-
-pub fn is_within_comment_char_limit(content: &str) -> bool {
-  content.len() <= 10000
-}
-
-pub fn is_within_message_char_limit(content: &str) -> bool {
-  content.len() <= 4000
 }
 
 pub fn captcha_espeak_wav_base64(captcha: &str) -> Result<String, LemmyError> {
@@ -316,6 +287,24 @@ pub fn espeak_wav_base64(text: &str) -> Result<String, LemmyError> {
 
   Ok(base64)
 }
+
+pub fn is_within_post_title_char_limit(title: &str) -> bool {
+  title.len() <= 160
+}
+
+// This should possibly be raised to accomodate essays or creative writing
+pub fn is_within_post_body_char_limit(body: &str) -> bool {
+  body.len() <= 20000
+}
+
+pub fn is_within_comment_char_limit(content: &str) -> bool {
+  content.len() <= 10000
+}
+
+pub fn is_within_message_char_limit(content: &str) -> bool {
+  content.len() <= 4000
+}
+
 
 #[cfg(test)]
 mod tests {

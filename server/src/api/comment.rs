@@ -5,6 +5,7 @@ use crate::{
     get_user_from_jwt,
     get_user_from_jwt_opt,
     is_mod_or_admin,
+    APIError,
     Perform,
   },
   apub::{ApubLikeableType, ApubObjectType},
@@ -18,7 +19,7 @@ use crate::{
   LemmyContext,
 };
 use actix_web::web::Data;
-use lemmy_api_structs::{comment::*, APIError};
+use lemmy_api_structs::comment::*;
 use lemmy_db::{
   comment::*,
   comment_view::*,
@@ -92,13 +93,9 @@ impl Perform for CreateComment {
     })
     .await??;
 
-    let community_id = post.community_id;
-    let user_id = user.id;
-    let privileged = blocking(context.pool(), move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let privileged =
+      is_mod_or_admin(context.pool(), user.id, post.community_id).await.is_ok();
+
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
@@ -115,7 +112,7 @@ impl Perform for CreateComment {
       let user_id = user.id;
       let community_id = post.community_id;
 
-      if is_mod_or_admin(pool, user_id, community_id).await.is_err() {
+      if is_mod_or_admin(context.pool(), user_id, community_id).await.is_err() {
         return Err(APIError::err("locked").into());
       }
     }
@@ -722,27 +719,21 @@ impl Perform for GetComments {
   ) -> Result<GetCommentsResponse, LemmyError> {
     let data: &GetComments = &self;
     let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
-    let user_id = user.map(|u| u.id);
 
     // Check community settings
     if let Some(community_id) = data.community_id {
-      let settings = blocking(context.pool(), move |conn| {
-        CommunitySettings::read_from_community_id(conn, community_id)
-      })
-      .await??;
-
-      let privileged = {
-        if let Some(id) = user_id {
-          blocking(context.pool(), move |conn| {
-            let user = User_::read(conn, id)?;
-            user.is_moderator(conn, community_id)
-          })
-          .await??
-        } else {
-          false
+      if let Some(user) = user {
+        let settings = blocking(context.pool(), move |conn| {
+          CommunitySettings::read_from_community_id(conn, community_id)
+        })
+        .await??;
+        
+        let privileged =
+          is_mod_or_admin(context.pool(), user.id, community_id).await.is_ok();
+        if settings.private && !privileged {
+          return Err(APIError::err("community_is_private").into());
         }
-      };
-      if settings.private && !privileged {
+      } else {
         return Err(APIError::err("community_is_private").into());
       }
     }
@@ -751,17 +742,21 @@ impl Perform for GetComments {
     let sort = SortType::from_str(&data.sort)?;
 
     let community_id = data.community_id;
+    let user_id = match user {
+      Some(user) => Some(user.id),
+      None => None,
+    };
     let page = data.page;
     let limit = data.limit;
     let comments = blocking(context.pool(), move |conn| {
-      CommentQueryBuilder::create(conn)
+      let query = CommentQueryBuilder::create(conn)
         .listing_type(type_)
         .sort(&sort)
         .for_community_id(community_id)
         .my_user_id(user_id)
         .page(page)
         .limit(limit)
-        .list()
+        .list();
     })
     .await?;
     let comments = match comments {

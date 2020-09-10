@@ -255,6 +255,7 @@ impl FromApub for UserForm {
       preferred_username,
       password_encrypted: "".to_string(),
       admin: false,
+      sitemod: false,
       banned: false,
       email: None,
       avatar,

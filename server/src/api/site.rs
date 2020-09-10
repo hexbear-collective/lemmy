@@ -305,7 +305,7 @@ impl Perform for GetSite {
     };
 
     let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
-    let mut sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
 
     // Make sure the site creator is the top admin

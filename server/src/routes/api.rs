@@ -1,6 +1,14 @@
 use crate::{api::Perform, LemmyContext};
 use actix_web::{error::ErrorBadRequest, *};
-use lemmy_api_structs::{comment::*, community::*, post::*, site::*, user::*};
+use lemmy_api_structs::{
+  comment::*,
+  community::*,
+  community_settings::*,
+  post::*,
+  report::*,
+  site::*,
+  user::*,
+};
 use lemmy_rate_limit::RateLimit;
 use serde::Serialize;
 
@@ -132,7 +140,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route(
             "/resolve_report",
             web::post().to(route_post::<ResolveCommentReport>),
-          ),
+          )
           .route("/list", web::get().to(route_get::<GetComments>)),
       )
       // Private Message

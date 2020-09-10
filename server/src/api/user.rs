@@ -1,8 +1,9 @@
 use crate::{
-  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, is_within_message_char_limit, Perform},
+  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, Perform},
   apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
+  is_within_message_char_limit,
   hcaptcha::hcaptcha_verify,
   websocket::{
     messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
@@ -58,7 +59,7 @@ use lemmy_utils::{
   EndpointType,
   LemmyError,
 };
-use log::error;
+use log::{error, info};
 use std::str::FromStr;
 use std::collections::BTreeMap;
 

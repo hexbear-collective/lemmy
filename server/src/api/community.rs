@@ -8,6 +8,7 @@ use crate::{
     is_mod_or_admin,
     Perform,
   },
+  apub::ActorType,
   blocking,
   websocket::{
     messages::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},

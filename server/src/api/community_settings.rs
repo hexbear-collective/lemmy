@@ -23,7 +23,6 @@ use lemmy_utils::{
 };
 use lemmy_api_structs::community_settings::*;
 use actix_web::web::Data;
-use serde::{Deserialize, Serialize};
 
 #[async_trait::async_trait(?Send)]
 impl Perform for GetCommunitySettings {
