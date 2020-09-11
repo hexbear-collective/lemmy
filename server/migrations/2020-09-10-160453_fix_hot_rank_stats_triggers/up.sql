@@ -1,4 +1,4 @@
-create index concurrently if not exists "idx_post_published" on public.post (published desc);
+create index if not exists "idx_post_published" on public.post (published desc);
 
 create or replace function hexbear.refresh_post()
   returns trigger
