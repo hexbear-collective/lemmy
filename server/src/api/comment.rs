@@ -719,17 +719,21 @@ impl Perform for GetComments {
   ) -> Result<GetCommentsResponse, LemmyError> {
     let data: &GetComments = &self;
     let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
+    let user_id = match user {
+      Some(user) => Some(user.id),
+      None => None
+    };
 
     // Check community settings
     if let Some(community_id) = data.community_id {
-      if let Some(user) = user {
+      if let Some(user_id) = user_id {
         let settings = blocking(context.pool(), move |conn| {
           CommunitySettings::read_from_community_id(conn, community_id)
         })
         .await??;
         
         let privileged =
-          is_mod_or_admin(context.pool(), user.id, community_id).await.is_ok();
+          is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
         if settings.private && !privileged {
           return Err(APIError::err("community_is_private").into());
         }
@@ -742,27 +746,19 @@ impl Perform for GetComments {
     let sort = SortType::from_str(&data.sort)?;
 
     let community_id = data.community_id;
-    let user_id = match user {
-      Some(user) => Some(user.id),
-      None => None,
-    };
     let page = data.page;
     let limit = data.limit;
     let comments = blocking(context.pool(), move |conn| {
-      let query = CommentQueryBuilder::create(conn)
+      CommentQueryBuilder::create(conn)
         .listing_type(type_)
         .sort(&sort)
         .for_community_id(community_id)
         .my_user_id(user_id)
         .page(page)
         .limit(limit)
-        .list();
+        .list()
     })
-    .await?;
-    let comments = match comments {
-      Ok(comments) => comments,
-      Err(_) => return Err(APIError::err("couldnt_get_comments").into()),
-    };
+    .await??;
 
     if let Some(id) = websocket_id {
       // You don't need to join the specific community room, bc this is already handled by

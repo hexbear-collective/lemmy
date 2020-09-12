@@ -31,7 +31,6 @@ use lemmy_db::{
   post_view::*,
   site::*,
   site_view::*,
-  user::*,
   user_view::*,
   Crud,
   Likeable,
@@ -248,7 +247,10 @@ impl Perform for GetPost {
   ) -> Result<GetPostResponse, LemmyError> {
     let data: &GetPost = &self;
     let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
-    let user_id = user.map(|u| u.id);
+    let user_id = match user {
+      Some(user) => Some(user.id),
+      None => None
+    };
 
     let id = data.id;
     let post_view = match blocking(context.pool(), move |conn| {
@@ -302,15 +304,12 @@ impl Perform for GetPost {
     .await??;
 
     let community_id = post.community_id;
-    let privileged = blocking(context.pool(), move |conn| {
-      if let Some(u_id) = user_id {
-        let user = User_::read(conn, u_id)?;
-        user.is_moderator(conn, community_id)
-      } else {
-        Ok(false)
-      }
-    })
-    .await??;
+    let privileged = match user_id {
+      Some(user_id) => {
+        is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok()
+      },
+      None => false
+    };
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
@@ -342,18 +341,6 @@ impl Perform for GetPost {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
-
-    let community_id = post_view.community_id;
-    if let Some(user_id) = user_id {
-      let privileged = blocking(context.pool(), move |conn| {
-        let user = User_::read(conn, user_id)?;
-        user.is_moderator(conn, community_id)
-      })
-      .await??;
-      if settings.private && !privileged {
-        return Err(APIError::err("community_is_private").into());
-      }
-    }
 
     let site_creator_id =
       blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
@@ -489,11 +476,8 @@ impl Perform for CreatePostLike {
 
     let community_id = post.community_id;
     let user_id = user.id;
-    let privileged = blocking(context.pool(), move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let privileged =
+      is_mod_or_admin(context.pool(), user.id, community_id).await.is_ok();
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }

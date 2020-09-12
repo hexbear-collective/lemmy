@@ -25,21 +25,6 @@ use std::{
   str::FromStr,
 };
 
-#[derive(Message, Debug)]
-#[rtype(result = "()")]
-pub struct CaptchaItem {
-  pub uuid: String,
-  pub answer: String,
-  pub expires: chrono::NaiveDateTime,
-}
-
-#[derive(Message)]
-#[rtype(bool)]
-pub struct CheckCaptcha {
-  pub uuid: String,
-  pub answer: String,
-}
-
 /// `ChatServer` manages chat rooms and responsible for coordinating chat
 /// session.
 pub struct ChatServer {
