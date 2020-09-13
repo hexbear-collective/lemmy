@@ -418,7 +418,7 @@ CREATE OR REPLACE VIEW hexbear.user_mention_fast_view
 	u.actor_id as recipient_actor_id,
 	u.local as recipient_local
    FROM user_mention um
-     LEFT JOIN hexbear.comment_fast_view_2 ac ON um.comment_id = ac.id
+     LEFT JOIN hexbear.comment_fast_view ac ON um.comment_id = ac.id
 	 left join user_ u on u.id = um.recipient_id
 UNION ALL
  SELECT ac.id,
@@ -457,5 +457,5 @@ UNION ALL
 	u.actor_id as recipient_actor_id,
 	u.local as recipient_local
    FROM user_mention um
-     LEFT JOIN hexbear.comment_fast_view_2 ac ON um.comment_id = ac.id
+     LEFT JOIN hexbear.comment_fast_view ac ON um.comment_id = ac.id
 	 left join user_ u on u.id = um.recipient_id
