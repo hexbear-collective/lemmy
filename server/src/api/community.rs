@@ -5,26 +5,16 @@ use crate::{
   blocking,
   websocket::{
     server::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
   DbPool,
 };
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  diesel_option_overwrite,
-  naive_now,
-  Bannable,
-  Crud,
-  Followable,
-  Joinable,
-  SortType,
+  diesel_option_overwrite, naive_now, Bannable, Crud, Followable, Joinable, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  is_valid_community_name,
-  make_apub_endpoint,
-  naive_from_unix,
+  generate_actor_keypair, is_valid_community_name, make_apub_endpoint, naive_from_unix,
   EndpointType,
 };
 use log::debug;
@@ -773,8 +763,8 @@ impl Perform for Oper<BanFromCommunity> {
     is_mod_or_admin(pool, user.id, community_id).await?;
 
     match is_mod_or_admin(pool, data.user_id, community_id).await {
-      Ok(_) => (),
-      Err(_e) => return Err(APIError::err("couldnt_ban_privilaged_user").into()),
+      Ok(_) => return Err(APIError::err("couldnt_ban_privilaged_user").into()),
+      Err(_e) => (),
     };
 
     let community_user_ban_form = CommunityUserBanForm {
