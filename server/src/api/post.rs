@@ -120,7 +120,9 @@ impl Perform for CreatePost {
       check_community_ban(user.id, data.community_id, context.pool()).await?;
     }
     
-    let user_view = blocking(context.pool(), move |conn| UserView::read(conn, user_id)).await??;
+    let user_view =
+      blocking(context.pool(),
+               move |conn| UserView::get_user_secure(conn, user_id)).await??;
     let score = user_view.post_score + user_view.comment_score;
 
     // no upstream, dessalines wants to leverage rate limiting
