@@ -80,13 +80,13 @@ fn get_feed_all_data(conn: &PgConnection, sort_type: &SortType) -> Result<String
 }
 
 async fn get_feed(
-  path: web::Path<(String, String)>,
+  web::Path((r_type, name)): web::Path<(String, String)>,
   info: web::Query<Params>,
   context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error> {
   let sort_type = get_sort_type(info).map_err(ErrorBadRequest)?;
 
-  let request_type = match path.0.as_ref() {
+  let request_type = match r_type.as_str() {
     "u" => RequestType::User,
     "c" => RequestType::Community,
     "front" => RequestType::Front,
@@ -94,7 +94,7 @@ async fn get_feed(
     _ => return Err(ErrorBadRequest(LemmyError::from(anyhow!("wrong_type")))),
   };
 
-  let param = path.1.to_owned();
+  let param = name.to_owned();
 
   let builder = blocking(context.pool(), move |conn| match request_type {
     RequestType::User => get_feed_user(conn, &sort_type, param),

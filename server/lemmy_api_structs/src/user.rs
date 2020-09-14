@@ -34,9 +34,9 @@ pub struct GetCaptcha {}
 #[derive(Serialize, Deserialize)]
 pub struct GetCaptchaResponse {
   #[serde(skip_serializing_if = "Option::is_none")]
-  ok: Option<CaptchaResponse>,
+  pub ok: Option<CaptchaResponse>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  hcaptcha: Option<HCaptchaResponse>,
+  pub hcaptcha: Option<HCaptchaResponse>,
 }
 
 #[derive(Serialize, Deserialize)]
