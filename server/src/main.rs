@@ -22,7 +22,7 @@ use lemmy_rate_limit::{rate_limiter::RateLimiter, RateLimit};
 use lemmy_server::{
   apub::activity_queue::create_activity_queue,
   blocking,
-  code_migrations::run_advanced_migrations,
+  // code_migrations::run_advanced_migrations,
   routes::*,
   websocket::chat_server::ChatServer,
   LemmyContext,
@@ -59,7 +59,8 @@ async fn main() -> Result<(), LemmyError> {
   // Run the migrations from code
   blocking(&pool, move |conn| {
     embedded_migrations::run(conn)?;
-    run_advanced_migrations(conn)?;
+    // uncomment if there's an advanced migration we need to run
+    // run_advanced_migrations(conn)?;
     Ok(()) as Result<(), LemmyError>
   })
   .await??;

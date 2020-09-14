@@ -3,48 +3,9 @@ use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 // The faked schema since diesel doesn't do views
-table! {
-  user_mention_view (id) {
-    id -> Int4,
-    user_mention_id -> Int4,
-    creator_id -> Int4,
-    creator_actor_id -> Text,
-    creator_local -> Bool,
-    post_id -> Int4,
-    post_name -> Varchar,
-    parent_id -> Nullable<Int4>,
-    content -> Text,
-    removed -> Bool,
-    read -> Bool,
-    published -> Timestamp,
-    updated -> Nullable<Timestamp>,
-    deleted -> Bool,
-    community_id -> Int4,
-    community_actor_id -> Text,
-    community_local -> Bool,
-    community_name -> Varchar,
-    community_icon -> Nullable<Text>,
-    banned -> Bool,
-    banned_from_community -> Bool,
-    creator_name -> Varchar,
-    creator_preferred_username -> Nullable<Varchar>,
-    creator_avatar -> Nullable<Text>,
-    score -> BigInt,
-    upvotes -> BigInt,
-    downvotes -> BigInt,
-    hot_rank -> Int4,
-    hot_rank_active -> Int4,
-    user_id -> Nullable<Int4>,
-    my_vote -> Nullable<Int4>,
-    saved -> Nullable<Bool>,
-    recipient_id -> Int4,
-    recipient_actor_id -> Text,
-    recipient_local -> Bool,
-  }
-}
 
 table! {
-  user_mention_fast_view (id) {
+  hexbear.user_mention_fast_view (id) {
     id -> Int4,
     user_mention_id -> Int4,
     creator_id -> Int4,
