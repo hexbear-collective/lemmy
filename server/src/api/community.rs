@@ -5,26 +5,16 @@ use crate::{
   blocking,
   websocket::{
     server::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
   DbPool,
 };
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  diesel_option_overwrite,
-  naive_now,
-  Bannable,
-  Crud,
-  Followable,
-  Joinable,
-  SortType,
+  diesel_option_overwrite, naive_now, Bannable, Crud, Followable, Joinable, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  is_valid_community_name,
-  make_apub_endpoint,
-  naive_from_unix,
+  generate_actor_keypair, is_valid_community_name, make_apub_endpoint, naive_from_unix,
   EndpointType,
 };
 use log::debug;

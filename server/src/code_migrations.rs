@@ -14,10 +14,7 @@ use lemmy_db::{
   Crud,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  get_apub_protocol_string,
-  make_apub_endpoint,
-  settings::Settings,
+  generate_actor_keypair, get_apub_protocol_string, make_apub_endpoint, settings::Settings,
   EndpointType,
 };
 use log::info;
