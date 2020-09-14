@@ -1283,6 +1283,7 @@ impl Perform for Oper<RemoveUserContent> {
       };
 
       blocking(pool, move |conn| ModRemovePost::create(conn, &form)).await??;
+      blocking(pool, move |conn| Post::permadelete(conn, post_id)).await??;
     }
 
     for comment_id in comment_id_list {
@@ -1294,6 +1295,7 @@ impl Perform for Oper<RemoveUserContent> {
       };
 
       blocking(pool, move |conn| ModRemoveComment::create(conn, &form)).await??;
+      blocking(pool, move |conn| Comment::permadelete(conn, comment_id)).await??;
     }
 
     let user_id = data.user_id;
