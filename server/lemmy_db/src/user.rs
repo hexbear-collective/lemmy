@@ -200,6 +200,7 @@ impl User_ {
         where p.creator_id = $1 and c.creator_id <> p.creator_id and c.read is false
         and c.deleted is false and c.removed is false
         and p.deleted is false and p.removed is false
+        and c.parent_id is null
       ),
       comment_replies as (
         select count(c2.id)
