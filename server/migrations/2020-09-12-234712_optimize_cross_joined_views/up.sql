@@ -257,8 +257,8 @@ CREATE OR REPLACE VIEW hexbear.comment_fast_view
              LEFT JOIN community_user_ban cb ON ct.creator_id = cb.user_id AND p.id = ct.post_id AND p.community_id = cb.community_id
              LEFT JOIN hexbear.comment_stat ccs ON ccs.comment_id = ct.id
 		 	cross join user_ me
-			 LEFT JOIN comment_like cl ON me.id = cl.user_id AND cl.comment_id = c.id
-             LEFT JOIN comment_saved cs ON me.id = cs.user_id AND cs.comment_id = c.id
+			 LEFT JOIN comment_like cl ON me.id = cl.user_id AND cl.comment_id = ct.id
+             LEFT JOIN comment_saved cs ON me.id = cs.user_id AND cs.comment_id = ct.id
              LEFT JOIN community_follower cf ON me.id = cf.user_id AND p.community_id = cf.community_id ) cav
 UNION ALL
  SELECT ct.id,
