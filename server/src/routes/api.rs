@@ -220,7 +220,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
             web::put().to(route_post::<SaveUserSettings>),
           )
           .route("/tags", web::get().to(route_get::<GetUserTag>))
-          .route("/tags", web::post().to(route_post::<SetUserTag>)),
+          .route("/tags", web::post().to(route_post::<SetUserTag>))
+          .route("/unread_notifs", web::get().to(route_get::<GetUnreadCount>))
       )
       // Admin Actions
       .service(

@@ -324,6 +324,16 @@ struct UserTagsSchema {
   flair: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct GetUnreadCount {
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetUnreadCountResponse {
+  unreads: i32,
+}
+
 #[async_trait::async_trait(?Send)]
 impl Perform for Oper<SetUserTag> {
   type Response = UserTagResponse;
@@ -1958,5 +1968,26 @@ impl Perform for Oper<UserJoin> {
     }
 
     Ok(UserJoinResponse { user_id: user.id })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetUnreadCount> {
+  type Response = GetUnreadCountResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<GetUnreadCountResponse, LemmyError> {
+    let data: &GetUnreadCount = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let user_id = user.id;
+
+    let unread_notifs = blocking(pool, move |conn| {
+      User_::get_unread_notifs(conn, user_id)
+    }).await??;
+
+    Ok(GetUnreadCountResponse { unreads: unread_notifs.unreads })
   }
 }
