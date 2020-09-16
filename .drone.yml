@@ -7,10 +7,9 @@
     branch:
       - dev
       - prod
-    trigger:
-      event:
-        exclude:
-        - pull_request
+    event:
+      exclude:
+      - pull_request
   
   globals: 
     - &docker_settings
