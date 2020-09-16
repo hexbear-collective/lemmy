@@ -1,65 +1,29 @@
 use crate::{
   api::{
-    check_slurs,
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    APIError,
-    Oper,
-    Perform,
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_admin_or_sitemod, APIError, Oper, Perform,
   },
-  blocking,
-  captcha_espeak_wav_base64,
+  blocking, captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use bcrypt::verify;
 use captcha::{gen, Difficulty};
 use chrono::Duration;
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community::*,
-  community_settings::{CommunitySettings, CommunitySettingsForm},
-  community_view::*,
-  moderator::*,
-  naive_now,
-  password_reset_request::*,
-  post::*,
-  post_view::*,
-  private_message::*,
-  private_message_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  user_mention_view::*,
-  user_tag::*,
-  user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  comment::*, comment_view::*, community::*, community_settings::CommunitySettings,
+  community_view::*, moderator::*, naive_now, password_reset_request::*, post::*, post_view::*,
+  private_message::*, private_message_view::*, site::*, site_view::*, user::*, user_mention::*,
+  user_mention_view::*, user_tag::*, user_view::*, Crud, Followable, ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_username,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  EndpointType,
+  generate_actor_keypair, generate_random_string, is_valid_username, make_apub_endpoint,
+  naive_from_unix, remove_slurs, send_email, settings::Settings, EndpointType,
 };
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -77,8 +41,6 @@ pub struct Register {
   pub email: Option<String>,
   pub password: String,
   pub password_verify: String,
-  pub admin: bool,
-  pub sitemod: bool,
   pub show_nsfw: bool,
   pub pronouns: Option<String>,
   pub captcha_uuid: Option<String>,
@@ -211,6 +173,15 @@ pub struct BanUser {
 pub struct BanUserResponse {
   user: UserView,
   banned: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RemoveUserContent {
+  user_id: i32,
+  time: Option<i32>,
+  community_id: Option<i32>,
+  reason: Option<String>,
+  auth: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -353,6 +324,16 @@ struct UserTagsSchema {
   flair: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct GetUnreadCount {
+  auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetUnreadCountResponse {
+  unreads: i32,
+}
+
 #[async_trait::async_trait(?Send)]
 impl Perform for Oper<SetUserTag> {
   type Response = UserTagResponse;
@@ -483,13 +464,13 @@ impl Perform for Oper<Register> {
     // Make sure there are no admins
     // We put this first because there is no captcha when setting up the site.
     // We bypass captcha check if an admin is legitimately being created
-    let any_admins = blocking(pool, move |conn| {
-      UserView::admins(conn).map(|a| a.is_empty())
-    })
-    .await??;
-    if data.admin && !any_admins {
-      return Err(APIError::err("admin_already_created").into());
-    }
+    // let any_admins = blocking(pool, move |conn| {
+    //   UserView::admins(conn).map(|a| a.is_empty())
+    // })
+    // .await??;
+    // if data.admin && !any_admins {
+    //   return Err(APIError::err("admin_already_created").into());
+    // }
 
     // Make sure site has open registration
     if let Ok(site) = blocking(pool, move |conn| SiteView::read(conn)).await? {
@@ -505,7 +486,7 @@ impl Perform for Oper<Register> {
     }
 
     // If its not the admin, check the captcha
-    if !data.admin && captcha_settings.enabled {
+    if captcha_settings.enabled {
       match captcha_settings.provider.as_str() {
         "hcaptcha" => {
           if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
@@ -544,13 +525,13 @@ impl Perform for Oper<Register> {
     check_slurs(&data.username)?;
 
     // Make sure there are no admins
-    let any_admins = blocking(pool, move |conn| {
-      UserView::admins(conn).map(|a| a.is_empty())
-    })
-    .await??;
-    if data.admin && !any_admins {
-      return Err(APIError::err("admin_already_created").into());
-    }
+    // let any_admins = blocking(pool, move |conn| {
+    //   UserView::admins(conn).map(|a| a.is_empty())
+    // })
+    // .await??;
+    // if data.admin && !any_admins {
+    //   return Err(APIError::err("admin_already_created").into());
+    // }
 
     let user_keypair = generate_actor_keypair()?;
     if !is_valid_username(&data.username) {
@@ -578,8 +559,6 @@ impl Perform for Oper<Register> {
       password_encrypted: data.password.to_owned(),
       preferred_username: None,
       updated: None,
-      admin: data.admin,
-      sitemod: data.sitemod,
       banned: false,
       show_nsfw: data.show_nsfw,
       theme: "darkly".into(),
@@ -612,53 +591,53 @@ impl Perform for Oper<Register> {
       }
     };
 
-    let main_community_keypair = generate_actor_keypair()?;
+    // let main_community_keypair = generate_actor_keypair()?;
 
-    // Create the main community if it doesn't exist
-    let main_community = match blocking(pool, move |conn| Community::read(conn, 2)).await? {
-      Ok(c) => c,
-      Err(_e) => {
-        let default_community_name = "main";
-        let community_form = CommunityForm {
-          name: default_community_name.to_string(),
-          title: "The Default Community".to_string(),
-          description: Some("The Default Community".to_string()),
-          category_id: 1,
-          nsfw: false,
-          creator_id: inserted_user.id,
-          removed: None,
-          deleted: None,
-          updated: None,
-          actor_id: make_apub_endpoint(EndpointType::Community, default_community_name).to_string(),
-          local: true,
-          private_key: Some(main_community_keypair.private_key),
-          public_key: Some(main_community_keypair.public_key),
-          last_refreshed_at: None,
-          published: None,
-          icon: None,
-          banner: None,
-        };
-        let main_community =
-          blocking(pool, move |conn| Community::create(conn, &community_form)).await??;
-        // Initialize community settings
-        let community_id = main_community.id;
-        let community_settings_form = CommunitySettingsForm {
-          id: community_id,
-          read_only: false,
-          private: false,
-          post_links: true,
-          comment_images: 1,
-          allow_as_default: true,
-        };
+    // // Create the main community if it doesn't exist
+    // let main_community = match blocking(pool, move |conn| Community::read(conn, 2)).await? {
+    //   Ok(c) => c,
+    //   Err(_e) => {
+    //     let default_community_name = "main";
+    //     let community_form = CommunityForm {
+    //       name: default_community_name.to_string(),
+    //       title: "The Default Community".to_string(),
+    //       description: Some("The Default Community".to_string()),
+    //       category_id: 1,
+    //       nsfw: false,
+    //       creator_id: inserted_user.id,
+    //       removed: None,
+    //       deleted: None,
+    //       updated: None,
+    //       actor_id: make_apub_endpoint(EndpointType::Community, default_community_name).to_string(),
+    //       local: true,
+    //       private_key: Some(main_community_keypair.private_key),
+    //       public_key: Some(main_community_keypair.public_key),
+    //       last_refreshed_at: None,
+    //       published: None,
+    //       icon: None,
+    //       banner: None,
+    //     };
+    //     let main_community =
+    //       blocking(pool, move |conn| Community::create(conn, &community_form)).await??;
+    //     // Initialize community settings
+    //     let community_id = main_community.id;
+    //     let community_settings_form = CommunitySettingsForm {
+    //       id: community_id,
+    //       read_only: false,
+    //       private: false,
+    //       post_links: true,
+    //       comment_images: 1,
+    //       allow_as_default: true,
+    //     };
 
-        let _inserted_settings = blocking(pool, move |conn| {
-          CommunitySettings::create(conn, &community_settings_form)
-        })
-        .await??;
+    //     let _inserted_settings = blocking(pool, move |conn| {
+    //       CommunitySettings::create(conn, &community_settings_form)
+    //     })
+    //     .await??;
 
-        main_community
-      }
-    };
+    //     main_community
+    //   }
+    // };
 
     // subscribe the user to all communities that have allow_as_default enabled
     let default_communities = blocking(pool, move |conn| {
@@ -679,17 +658,17 @@ impl Perform for Oper<Register> {
     }
 
     // If its an admin, add them as a mod and follower to main
-    if data.admin {
-      let community_moderator_form = CommunityModeratorForm {
-        community_id: main_community.id,
-        user_id: inserted_user.id,
-      };
+    // if data.admin {
+    //   let community_moderator_form = CommunityModeratorForm {
+    //     community_id: main_community.id,
+    //     user_id: inserted_user.id,
+    //   };
 
-      let join = move |conn: &'_ _| CommunityModerator::join(conn, &community_moderator_form);
-      if blocking(pool, join).await?.is_err() {
-        return Err(APIError::err("community_moderator_already_exists").into());
-      }
-    }
+    //   let join = move |conn: &'_ _| CommunityModerator::join(conn, &community_moderator_form);
+    //   if blocking(pool, join).await?.is_err() {
+    //     return Err(APIError::err("community_moderator_already_exists").into());
+    //   }
+    // }
 
     // Add their pronouns if they specified at account registration
     if let Some(pronouns) = data.pronouns.clone() {
@@ -868,8 +847,6 @@ impl Perform for Oper<SaveUserSettings> {
       password_encrypted,
       preferred_username,
       updated: Some(naive_now()),
-      admin: read_user.admin,
-      sitemod: read_user.sitemod,
       banned: read_user.banned,
       show_nsfw: data.show_nsfw,
       theme: data.theme.to_owned(),
@@ -1153,6 +1130,13 @@ impl Perform for Oper<BanUser> {
       return Err(APIError::err("not_an_admin").into());
     }
 
+    let banned_user_id = data.user_id;
+    // Make sure target user is not an admin or sitemod
+    let target = blocking(pool, move |conn| User_::read(&conn, banned_user_id)).await??;
+    if target.admin || target.sitemod {
+      return Err(APIError::err("couldnt_update_user").into());
+    }
+
     let ban = data.ban;
     let banned_user_id = data.user_id;
     let ban_user = move |conn: &'_ _| User_::ban_user(conn, banned_user_id, ban);
@@ -1187,6 +1171,155 @@ impl Perform for Oper<BanUser> {
     if let Some(ws) = websocket_info {
       ws.chatserver.do_send(SendAllMessage {
         op: UserOperation::BanUser,
+        response: res.clone(),
+        my_id: ws.id,
+      });
+    }
+
+    Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<RemoveUserContent> {
+  type Response = BanUserResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    websocket_info: Option<WebsocketInfo>,
+  ) -> Result<BanUserResponse, LemmyError> {
+    let data: &RemoveUserContent = &self.data;
+
+    // Permissions checks
+    let user = get_user_from_jwt(data.auth.as_str(), pool).await?;
+    let admin = is_admin_or_sitemod(pool, user.id).await.is_ok();
+
+    // Gather a list of communities the user moderates
+    let uid = user.id;
+    let mod_communities = blocking(pool, move |conn| {
+      CommunityModeratorView::for_user(conn, uid)
+    })
+    .await??
+    .iter()
+    .map(|c| c.id)
+    .collect::<Vec<i32>>();
+
+    let remove_communities = match data.community_id {
+      Some(community_id) => {
+        if mod_communities.contains(&community_id) {
+          Ok(vec![community_id])
+        } else {
+          Err(LemmyError::from(APIError::err("couldnt_update_user")))
+        }
+      }
+      None => {
+        if admin {
+          Ok(Vec::new())
+        } else if !mod_communities.is_empty() {
+          Ok(mod_communities)
+        } else {
+          Err(LemmyError::from(APIError::err("couldnt_update_user")))
+        }
+      }
+    }?;
+
+    let mut post_id_list: Vec<i32> = Vec::new();
+    let mut comment_id_list: Vec<i32> = Vec::new();
+    let remove_user_id = data.user_id;
+    let reason = "USER CONTENT MASS REMOVED";
+    if let Some(given_reason) = data.reason.to_owned() {
+      [reason, &given_reason].join(": ");
+    }
+    if remove_communities.is_empty() {
+      let time = data.time;
+      blocking(pool, move |conn| {
+        let posts_query = PostQueryBuilder::create(conn)
+          .for_creator_id(remove_user_id)
+          .max_age(time);
+        posts_query.list()
+      })
+      .await??
+      .iter()
+      .for_each(|pv| post_id_list.push(pv.id));
+
+      let time = data.time;
+      blocking(pool, move |conn| {
+        let comments_query = CommentQueryBuilder::create(conn)
+          .for_creator_id(remove_user_id)
+          .max_age(time);
+        comments_query.list()
+      })
+      .await??
+      .iter()
+      .for_each(|cv| comment_id_list.push(cv.id));
+    } else {
+      for community_id in remove_communities {
+        blocking(pool, move |conn| {
+          let posts_query = PostQueryBuilder::create(conn)
+            .for_creator_id(remove_user_id)
+            .for_community_id(community_id);
+          /*
+          let time = data.time;
+          if time != 0 {
+              posts_query.query.filter(published.gt(now - time.hours()))
+          }
+          */
+          posts_query.list()
+        })
+        .await??
+        .iter()
+        .for_each(|pv| post_id_list.push(pv.id));
+
+        blocking(pool, move |conn| {
+          let comments_query = CommentQueryBuilder::create(conn)
+            .for_creator_id(remove_user_id)
+            .for_community_id(community_id);
+
+          comments_query.list()
+        })
+        .await??
+        .iter()
+        .for_each(|cv| comment_id_list.push(cv.id));
+      }
+    }
+
+    for post_id in post_id_list {
+      let form = ModRemovePostForm {
+        mod_user_id: user.id,
+        post_id,
+        reason: Some(reason.to_string()),
+        removed: Some(true),
+      };
+
+      blocking(pool, move |conn| ModRemovePost::create(conn, &form)).await??;
+      blocking(pool, move |conn| Post::permadelete(conn, post_id)).await??;
+    }
+
+    for comment_id in comment_id_list {
+      let form = ModRemoveCommentForm {
+        mod_user_id: user.id,
+        comment_id,
+        reason: Some(reason.to_string()),
+        removed: Some(true),
+      };
+
+      blocking(pool, move |conn| ModRemoveComment::create(conn, &form)).await??;
+      blocking(pool, move |conn| Comment::permadelete(conn, comment_id)).await??;
+    }
+
+    let user_id = data.user_id;
+    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+
+    let banned = user_view.banned;
+    let res = BanUserResponse {
+      user: user_view,
+      banned,
+    };
+
+    if let Some(ws) = websocket_info {
+      ws.chatserver.do_send(SendAllMessage {
+        op: UserOperation::RemoveUserContent,
         response: res.clone(),
         my_id: ws.id,
       });
@@ -1835,5 +1968,26 @@ impl Perform for Oper<UserJoin> {
     }
 
     Ok(UserJoinResponse { user_id: user.id })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Oper<GetUnreadCount> {
+  type Response = GetUnreadCountResponse;
+
+  async fn perform(
+    &self,
+    pool: &DbPool,
+    _websocket_info: Option<WebsocketInfo>,
+  ) -> Result<GetUnreadCountResponse, LemmyError> {
+    let data: &GetUnreadCount = &self.data;
+    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let user_id = user.id;
+
+    let unread_notifs = blocking(pool, move |conn| {
+      User_::get_unread_notifs(conn, user_id)
+    }).await??;
+
+    Ok(GetUnreadCountResponse { unreads: unread_notifs.unreads })
   }
 }

@@ -14,10 +14,7 @@ use lemmy_db::{
   Crud,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  get_apub_protocol_string,
-  make_apub_endpoint,
-  settings::Settings,
+  generate_actor_keypair, get_apub_protocol_string, make_apub_endpoint, settings::Settings,
   EndpointType,
 };
 use log::info;
@@ -58,8 +55,6 @@ fn user_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
       password_encrypted: cuser.password_encrypted.to_owned(),
       preferred_username: cuser.preferred_username.to_owned(),
       updated: None,
-      admin: cuser.admin,
-      sitemod: cuser.sitemod,
       banned: cuser.banned,
       show_nsfw: cuser.show_nsfw,
       theme: cuser.theme.to_owned(),

@@ -1,43 +1,21 @@
 use super::user::Register;
 use crate::{
   api::{
-    check_slurs,
-    check_slurs_opt,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    is_mod_or_admin,
-    APIError,
-    Oper,
-    Perform,
+    check_slurs, check_slurs_opt, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_mod_or_admin, APIError, Oper, Perform,
   },
   apub::fetcher::search_by_apub_id,
-  blocking,
-  version,
+  blocking, version,
   websocket::{
     server::{GetUsersOnline, SendAllMessage},
-    UserOperation,
-    WebsocketInfo,
+    UserOperation, WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use lemmy_db::{
-  category::*,
-  comment_view::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  moderator_views::*,
-  naive_now,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_view::*,
-  Crud,
-  SearchType,
-  SortType,
+  category::*, comment_view::*, community_view::*, diesel_option_overwrite, moderator::*,
+  moderator_views::*, naive_now, post_view::*, site::*, site_view::*, user::*, user_view::*, Crud,
+  SearchType, SortType,
 };
 use lemmy_utils::settings::Settings;
 use log::{debug, info};
@@ -414,8 +392,6 @@ impl Perform for Oper<GetSite> {
         email: setup.admin_email.to_owned(),
         password: setup.admin_password.to_owned(),
         password_verify: setup.admin_password.to_owned(),
-        admin: true,
-        sitemod: true,
         show_nsfw: true,
         hcaptcha_id: None,
         pronouns: None,
@@ -651,6 +627,10 @@ impl Perform for Oper<Search> {
         .await??;
       }
     };
+
+    for u in &mut users {
+      u.email = None;
+    }
 
     // Return the jwt
     Ok(SearchResponse {

@@ -4,61 +4,9 @@ use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 // The faked schema since diesel doesn't do views
-table! {
-  post_view (id) {
-    id -> Int4,
-    name -> Varchar,
-    url -> Nullable<Text>,
-    body -> Nullable<Text>,
-    creator_id -> Int4,
-    community_id -> Int4,
-    removed -> Bool,
-    locked -> Bool,
-    published -> Timestamp,
-    updated -> Nullable<Timestamp>,
-    deleted -> Bool,
-    nsfw -> Bool,
-    stickied -> Bool,
-    embed_title -> Nullable<Text>,
-    embed_description -> Nullable<Text>,
-    embed_html -> Nullable<Text>,
-    thumbnail_url -> Nullable<Text>,
-    ap_id -> Text,
-    local -> Bool,
-    creator_actor_id -> Text,
-    creator_local -> Bool,
-    creator_name -> Varchar,
-    creator_preferred_username -> Nullable<Varchar>,
-    creator_published -> Timestamp,
-    creator_avatar -> Nullable<Text>,
-    creator_tags -> Nullable<Jsonb>,
-    creator_community_tags -> Nullable<Jsonb>,
-    banned -> Bool,
-    banned_from_community -> Bool,
-    community_actor_id -> Text,
-    community_local -> Bool,
-    community_name -> Varchar,
-    community_icon -> Nullable<Text>,
-    community_removed -> Bool,
-    community_deleted -> Bool,
-    community_nsfw -> Bool,
-    number_of_comments -> BigInt,
-    score -> BigInt,
-    upvotes -> BigInt,
-    downvotes -> BigInt,
-    hot_rank -> Int4,
-    hot_rank_active -> Int4,
-    newest_activity_time -> Timestamp,
-    user_id -> Nullable<Int4>,
-    my_vote -> Nullable<Int4>,
-    subscribed -> Nullable<Bool>,
-    read -> Nullable<Bool>,
-    saved -> Nullable<Bool>,
-  }
-}
 
 table! {
-  post_fast_view (id) {
+  hexbear.post_fast_view (id) {
     id -> Int4,
     name -> Varchar,
     url -> Nullable<Text>,
@@ -179,6 +127,7 @@ pub struct PostQueryBuilder<'a> {
   show_nsfw: bool,
   saved_only: bool,
   unread_only: bool,
+  max_age: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
 }
@@ -203,6 +152,7 @@ impl<'a> PostQueryBuilder<'a> {
       show_nsfw: true,
       saved_only: false,
       unread_only: false,
+      max_age: None,
       page: None,
       limit: None,
     }
@@ -260,6 +210,11 @@ impl<'a> PostQueryBuilder<'a> {
 
   pub fn unread_only(mut self, unread_only: bool) -> Self {
     self.unread_only = unread_only;
+    self
+  }
+
+  pub fn max_age<T: MaybeOptional<i32>>(mut self, max_age: T) -> Self {
+    self.max_age = max_age.get_optional();
     self
   }
 
@@ -359,6 +314,10 @@ impl<'a> PostQueryBuilder<'a> {
       query = query.filter(read.eq(false));
     };
 
+    if let Some(max_age) = self.max_age {
+      query = query.filter(published.gt(now - max_age.days()))
+    };
+
     let (limit, offset) = limit_and_offset(self.page, self.limit);
     query = query
       .limit(limit)
@@ -425,8 +384,6 @@ mod tests {
       avatar: None,
       banner: None,
       updated: None,
-      admin: false,
-      sitemod: false,
       banned: false,
       show_nsfw: false,
       theme: "darkly".into(),

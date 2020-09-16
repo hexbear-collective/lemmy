@@ -3,51 +3,8 @@ use crate::{fuzzy_search, limit_and_offset, ListingType, MaybeOptional, SortType
 use diesel::{dsl::*, pg::Pg, result::Error, *};
 use serde::{Deserialize, Serialize};
 
-// The faked schema since diesel doesn't do views
 table! {
-  comment_view (id) {
-    id -> Int4,
-    creator_id -> Int4,
-    post_id -> Int4,
-    post_name -> Varchar,
-    parent_id -> Nullable<Int4>,
-    content -> Text,
-    removed -> Bool,
-    read -> Bool,
-    published -> Timestamp,
-    updated -> Nullable<Timestamp>,
-    deleted -> Bool,
-    ap_id -> Text,
-    local -> Bool,
-    community_id -> Int4,
-    community_actor_id -> Text,
-    community_local -> Bool,
-    community_name -> Varchar,
-    community_icon -> Nullable<Text>,
-    banned -> Bool,
-    banned_from_community -> Bool,
-    creator_actor_id -> Text,
-    creator_local -> Bool,
-    creator_name -> Varchar,
-    creator_preferred_username -> Nullable<Varchar>,
-    creator_published -> Timestamp,
-    creator_avatar -> Nullable<Text>,
-    creator_tags -> Nullable<Jsonb>,
-    creator_community_tags -> Nullable<Jsonb>,
-    score -> BigInt,
-    upvotes -> BigInt,
-    downvotes -> BigInt,
-    hot_rank -> Int4,
-    hot_rank_active -> Int4,
-    user_id -> Nullable<Int4>,
-    my_vote -> Nullable<Int4>,
-    subscribed -> Nullable<Bool>,
-    saved -> Nullable<Bool>,
-  }
-}
-
-table! {
-  comment_fast_view (id) {
+  hexbear.comment_fast_view (id) {
     id -> Int4,
     creator_id -> Int4,
     post_id -> Int4,
@@ -143,6 +100,7 @@ pub struct CommentQueryBuilder<'a> {
   search_term: Option<String>,
   my_user_id: Option<i32>,
   saved_only: bool,
+  max_age: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
 }
@@ -164,6 +122,7 @@ impl<'a> CommentQueryBuilder<'a> {
       search_term: None,
       my_user_id: None,
       saved_only: false,
+      max_age: None,
       page: None,
       limit: None,
     }
@@ -206,6 +165,11 @@ impl<'a> CommentQueryBuilder<'a> {
 
   pub fn saved_only(mut self, saved_only: bool) -> Self {
     self.saved_only = saved_only;
+    self
+  }
+
+  pub fn max_age<T: MaybeOptional<i32>>(mut self, max_age: T) -> Self {
+    self.max_age = max_age.get_optional();
     self
   }
 
@@ -254,6 +218,10 @@ impl<'a> CommentQueryBuilder<'a> {
     if self.saved_only {
       query = query.filter(saved.eq(true));
     }
+
+    if let Some(max_age) = self.max_age {
+      query = query.filter(published.gt(now - max_age.days()))
+    };
 
     query = match self.sort {
       SortType::Hot => query
@@ -315,7 +283,7 @@ impl CommentView {
 
 // The faked schema since diesel doesn't do views
 table! {
-  reply_fast_view (id) {
+  hexbear.reply_fast_view (id) {
     id -> Int4,
     creator_id -> Int4,
     post_id -> Int4,
@@ -517,8 +485,6 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
-      admin: false,
-      sitemod: false,
       banned: false,
       updated: None,
       show_nsfw: false,

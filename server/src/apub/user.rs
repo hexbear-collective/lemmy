@@ -1,23 +1,16 @@
 use crate::{
   apub::{
     activities::{generate_activity_id, send_activity},
-    create_apub_response,
-    insert_activity,
-    ActorType,
-    FromApub,
-    PersonExt,
-    ToApub,
+    create_apub_response, insert_activity, ActorType, FromApub, PersonExt, ToApub,
   },
   blocking,
   routes::DbPoolParam,
-  DbPool,
-  LemmyError,
+  DbPool, LemmyError,
 };
 use activitystreams::{
   activity::{
     kind::{FollowType, UndoType},
-    Follow,
-    Undo,
+    Follow, Undo,
   },
   actor::{ApActor, Endpoints, Person},
   context,
@@ -249,8 +242,6 @@ impl FromApub for UserForm {
         .to_string(),
       preferred_username: person.inner.preferred_username().map(|u| u.to_string()),
       password_encrypted: "".to_string(),
-      admin: false,
-      sitemod: false,
       banned: false,
       email: None,
       avatar,

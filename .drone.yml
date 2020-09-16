@@ -3,13 +3,12 @@
   type: docker
   name: default
 
-  clone:
-    skip_verify: true
+  trigger:
+    branch:
+      - chapo-dev
   
-  steps:
-  - name: docker
-    image: plugins/docker
-    settings:
+  globals: 
+    - &docker_settings
       username:
         from_secret: CHAPO_REGISTRY_USER
       password:
@@ -18,9 +17,36 @@
         from_secret: CHAPO_REGISTRY_URL
       repo:
         from_secret: CHAPO_REGISTRY_URL_REPO
+
+  clone:
+    skip_verify: true
+  
+  steps:
+  - name: prepare
+    image: busybox
+    commands:
+      - mkdir -p /cache/${DRONE_REPO}/docker
+    volumes:
+      - name: cache
+        path: /cache
+      
+  - name: docker
+    image: plugins/docker
+    settings:
+      create_repository: true
+      use_cache: true
       dockerfile: docker/prod/Dockerfile
       tags: drone-test
+      <<: *docker_settings
+    volumes:
+      - name: docker
+        path: /var/lib/docker
 
-  trigger:
-    branch:
-      - chapo-dev
+  volumes:
+    - name: cache
+      host:
+        path: /var/cache
+    - name: docker
+      host:
+        path: /var/cache/${DRONE_REPO}/docker
+
