@@ -13,13 +13,14 @@ WORKDIR /app/server
 COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
 COPY server/lemmy_db ./lemmy_db
 COPY server/lemmy_utils ./lemmy_utils
-COPY .git/ ./.git/
 RUN mkdir -p ./src/bin \
    && echo 'fn main() { println!("Dummy") }' > ./src/bin/main.rs
 RUN cargo build --release
 RUN find target/$CARGO_BUILD_TARGET/$RUSTRELEASEDIR -type f -name "$(echo "lemmy_server" | tr '-' '_')*" -exec touch -t 200001010000 {} +
 COPY server/src ./src/
 COPY server/migrations ./migrations/
+
+COPY .git/ ./.git/
 
 # build for release
 # workaround for https://github.com/rust-lang/rust/issues/62896
