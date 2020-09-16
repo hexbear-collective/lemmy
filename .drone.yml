@@ -7,6 +7,10 @@
     branch:
       - dev
       - prod
+    trigger:
+      event:
+        exclude:
+        - pull_request
   
   globals: 
     - &docker_settings
@@ -37,10 +41,10 @@
       create_repository: true
       use_cache: true
       dockerfile: docker/prod/Dockerfile
+      <<: *docker_settings
       tags:
         - ${DRONE_BRANCH}-latest
         - ${DRONE_COMMIT_SHA:0:8}
-      <<: *docker_settings
     volumes:
       - name: docker
         path: /var/lib/docker
