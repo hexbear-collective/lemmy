@@ -492,8 +492,6 @@ impl Perform for Oper<Search> {
   ) -> Result<SearchResponse, LemmyError> {
     let data: &Search = &self.data;
 
-    dbg!(&data);
-
     match search_by_apub_id(&data.q, &self.client, pool).await {
       Ok(r) => return Ok(r),
       Err(e) => debug!("Failed to resolve search query as activitypub ID: {}", e),
