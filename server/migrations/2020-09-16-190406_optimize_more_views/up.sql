@@ -302,24 +302,24 @@ CREATE OR REPLACE VIEW public.site_view
     u.name AS creator_name,
     u.preferred_username AS creator_preferred_username,
     u.avatar AS creator_avatar,
-    ( SELECT (reltuples/relpages) * (
-    	pg_relation_size('user_') /
-    	(current_setting('block_size')::integer))
+    ( SELECT (reltuples/NULLIF(relpages, 0)) * (
+    	   pg_relation_size('user_') /
+    	    NULLIF((current_setting('block_size')::integer), 0))
 		FROM pg_class where relname = 'user_'
 	)::bigint AS number_of_users,
-    ( SELECT (reltuples/relpages) * (
-   		 pg_relation_size('post') /
-		(current_setting('block_size')::integer))
+    ( SELECT (reltuples/NULLIF(relpages, 0)) * (
+   	   pg_relation_size('post') /
+		    NULLIF((current_setting('block_size')::integer), 0))
 	 	FROM pg_class where relname = 'post'
 	)::bigint AS number_of_posts,
-    ( SELECT (reltuples/relpages) * (
-		pg_relation_size('comment') /
-    	(current_setting('block_size')::integer))
+    ( SELECT (reltuples/NULLIF(relpages, 0)) * (
+		   pg_relation_size('comment') /
+    	    NULLIF((current_setting('block_size')::integer), 0))
 	 	FROM pg_class where relname = 'comment'
 	)::bigint AS number_of_comments,
-    ( SELECT (reltuples/relpages) * (
-    	pg_relation_size('community') /
-   	 (current_setting('block_size')::integer))
+    ( SELECT (reltuples/NULLIF(relpages, 0)) * (
+    	   pg_relation_size('community') /
+   	    NULLIF((current_setting('block_size')::integer), 0))
 		FROM pg_class where relname = 'community'
 	)::bigint AS number_of_communities
    FROM site s
