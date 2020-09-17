@@ -97,7 +97,7 @@ CREATE OR REPLACE VIEW hexbear.user_mention_fast_view
     u.actor_id AS recipient_actor_id,
     u.local AS recipient_local
    FROM user_mention um
-     LEFT JOIN hexbear.comment_fast_view_2 ac ON um.comment_id = ac.id
+     LEFT JOIN hexbear.comment_fast_view ac ON um.comment_id = ac.id
      LEFT JOIN user_ u ON u.id = um.recipient_id
 UNION ALL
  SELECT ac.id,
@@ -136,7 +136,7 @@ UNION ALL
     u.actor_id AS recipient_actor_id,
     u.local AS recipient_local
    FROM user_mention um
-     LEFT JOIN hexbear.comment_fast_view_2 ac ON um.comment_id = ac.id
+     LEFT JOIN hexbear.comment_fast_view ac ON um.comment_id = ac.id
      LEFT JOIN user_ u ON u.id = um.recipient_id;
 
 CREATE OR REPLACE VIEW public.mod_add_community_view
