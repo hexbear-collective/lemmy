@@ -33,6 +33,7 @@ pub struct Post {
   pub thumbnail_url: Option<String>,
   pub ap_id: String,
   pub local: bool,
+  pub featured: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -50,6 +51,7 @@ pub struct PostForm {
   pub deleted: Option<bool>,
   pub nsfw: bool,
   pub stickied: Option<bool>,
+  pub featured: Option<bool>,
   pub embed_title: Option<String>,
   pub embed_description: Option<String>,
   pub embed_html: Option<String>,
@@ -466,6 +468,7 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       nsfw: false,
       updated: None,
       embed_title: None,
@@ -490,6 +493,7 @@ mod tests {
       removed: false,
       locked: false,
       stickied: false,
+      featured: false,
       nsfw: false,
       deleted: false,
       updated: None,

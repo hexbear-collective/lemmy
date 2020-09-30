@@ -20,6 +20,7 @@ table! {
     deleted -> Bool,
     nsfw -> Bool,
     stickied -> Bool,
+    featured -> Bool,
     embed_title -> Nullable<Text>,
     embed_description -> Nullable<Text>,
     embed_html -> Nullable<Text>,
@@ -76,6 +77,7 @@ pub struct PostView {
   pub deleted: bool,
   pub nsfw: bool,
   pub stickied: bool,
+  pub featured: bool,
   pub embed_title: Option<String>,
   pub embed_description: Option<String>,
   pub embed_html: Option<String>,
@@ -127,6 +129,7 @@ pub struct PostQueryBuilder<'a> {
   show_nsfw: bool,
   saved_only: bool,
   unread_only: bool,
+  featured: bool,
   max_age: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
@@ -152,6 +155,7 @@ impl<'a> PostQueryBuilder<'a> {
       show_nsfw: true,
       saved_only: false,
       unread_only: false,
+      featured: false,
       max_age: None,
       page: None,
       limit: None,
@@ -205,6 +209,11 @@ impl<'a> PostQueryBuilder<'a> {
 
   pub fn saved_only(mut self, saved_only: bool) -> Self {
     self.saved_only = saved_only;
+    self
+  }
+
+  pub fn featured(mut self, featured: bool) -> Self {
+    self.featured = featured;
     self
   }
 
@@ -314,6 +323,10 @@ impl<'a> PostQueryBuilder<'a> {
 
     if self.unread_only {
       query = query.filter(read.eq(false));
+    };
+
+    if self.featured {
+      query = query.filter(featured.eq(true));
     };
 
     if let Some(max_age) = self.max_age {
@@ -437,6 +450,7 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       updated: None,
       nsfw: false,
       embed_title: None,
@@ -507,6 +521,7 @@ mod tests {
       deleted: false,
       locked: false,
       stickied: false,
+      featured: false,
       community_name: community_name.to_owned(),
       community_icon: None,
       community_removed: false,
@@ -548,6 +563,7 @@ mod tests {
       deleted: false,
       locked: false,
       stickied: false,
+      featured: false,
       creator_id: inserted_user.id,
       creator_name: user_name,
       creator_preferred_username: None,

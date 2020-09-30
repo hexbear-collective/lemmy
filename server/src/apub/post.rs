@@ -284,6 +284,7 @@ impl FromApub for PostForm {
       deleted: None,
       nsfw: ext.sensitive,
       stickied: Some(ext.stickied),
+      featured: None,
       embed_title: embed.title,
       embed_description: embed.description,
       embed_html: embed.html,
