@@ -54,6 +54,7 @@ pub enum UserOperation {
   AddAdmin,
   AddSitemod,
   BanUser,
+  RemoveUserContent,
   Search,
   MarkAllAsRead,
   SaveUserSettings,

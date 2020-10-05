@@ -180,6 +180,19 @@ impl Comment {
       .set(comment_form)
       .get_result::<Self>(conn)
   }
+
+  pub fn permadelete(conn: &PgConnection, comment_id: i32) -> Result<Self, Error> {
+    use crate::schema::comment::dsl::*;
+
+    diesel::update(comment.find(comment_id))
+        .set((
+          content.eq("*Permananently Deleted*"),
+          deleted.eq(true),
+          updated.eq(naive_now()),
+        ))
+        .get_result::<Self>(conn)
+  }
+
 }
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug, Clone)]

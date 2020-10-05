@@ -1,14 +1,16 @@
-use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 use actix_web::web::Data;
+
 use lemmy_api_structs::APIError;
 use lemmy_db::{
   community::Community,
   community_view::CommunityUserBanView,
+  Crud,
   post::Post,
   user::User_,
-  Crud,
 };
-use lemmy_utils::{slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
+use lemmy_utils::{ConnectionId, LemmyError, slur_check, slurs_vec_to_str};
+
+use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 
 pub mod claims;
 pub mod comment;
@@ -47,6 +49,14 @@ pub(in crate::api) async fn is_mod_or_admin(
 pub async fn is_admin(pool: &DbPool, user_id: i32) -> Result<(), LemmyError> {
   let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
   if !user.admin {
+    return Err(APIError::err("not_an_admin").into());
+  }
+  Ok(())
+}
+
+pub async fn is_admin_or_sitemod(pool: &DbPool, user_id: i32) -> Result<(), LemmyError> {
+  let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
+  if !(user.admin || user.sitemod) {
     return Err(APIError::err("not_an_admin").into());
   }
   Ok(())

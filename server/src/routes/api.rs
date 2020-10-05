@@ -192,6 +192,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/join", web::post().to(route_post::<UserJoin>))
           // Admin action. I don't like that it's in /user
           .route("/ban", web::post().to(route_post::<BanUser>))
+          .route("/purge", web::post().to(route_post::<RemoveUserContent>))
           // Account actions. I don't like that they're in /user maybe /accounts
           .route("/login", web::post().to(route_post::<Login>))
           .route("/get_captcha", web::get().to(route_post::<GetCaptcha>))
@@ -217,7 +218,8 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
             web::put().to(route_post::<SaveUserSettings>),
           )
           .route("/tags", web::get().to(route_get::<GetUserTag>))
-          .route("/tags", web::post().to(route_post::<SetUserTag>)),
+          .route("/tags", web::post().to(route_post::<SetUserTag>))
+          .route("/unread_notifs", web::get().to(route_get::<GetUnreadCount>))
       )
       // Admin Actions
       .service(

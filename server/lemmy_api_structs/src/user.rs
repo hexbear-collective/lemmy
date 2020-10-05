@@ -298,3 +298,22 @@ pub struct UserTagsSchema {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub flair: Option<String>,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct RemoveUserContent {
+  pub user_id: i32,
+  pub time: Option<i32>,
+  pub community_id: Option<i32>,
+  pub reason: Option<String>,
+  pub auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetUnreadCount {
+  pub auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetUnreadCountResponse {
+  pub unreads: i32,
+}

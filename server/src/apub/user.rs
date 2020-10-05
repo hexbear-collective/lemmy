@@ -19,8 +19,7 @@ use crate::{
 use activitystreams::{
   activity::{
     kind::{FollowType, UndoType},
-    Follow,
-    Undo,
+    Follow, Undo,
   },
   actor::{ApActor, Endpoints, Person},
   object::{Image, Tombstone},

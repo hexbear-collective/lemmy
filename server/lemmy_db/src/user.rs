@@ -5,7 +5,7 @@ use crate::{
   Crud,
 };
 use bcrypt::{hash, DEFAULT_COST};
-use diesel::{dsl::*, result::Error, *};
+use diesel::{dsl::*, result::Error, sql_types::Integer, *};
 use serde::{Deserialize, Serialize};
 
 // TextOrNullableText is a marker trait for Text or Nullable<Text>
@@ -70,6 +70,12 @@ pub struct UserForm {
   pub public_key: Option<String>,
   pub last_refreshed_at: Option<chrono::NaiveDateTime>,
   pub banner: Option<Option<String>>,
+}
+
+#[derive(QueryableByName)]
+pub struct UserUnreadCount {
+    #[sql_type = "Integer"]
+    pub unreads: i32,
 }
 
 impl Crud<UserForm> for User_ {
@@ -176,6 +182,33 @@ impl User_ {
       .do_update()
       .set(user_form)
       .get_result::<Self>(conn)
+  }
+
+  pub fn get_unread_notifs(conn: &PgConnection, user_id: i32) -> Result<UserUnreadCount, Error> {
+    sql_query(
+      "with post_replies as (
+        select count(c.id)
+        from post p
+        join comment c on c.post_id = p.id
+        where p.creator_id = $1 and c.creator_id <> p.creator_id and c.read is false
+        and c.deleted is false and c.removed is false
+        and p.deleted is false and p.removed is false
+        and c.parent_id is null
+      ),
+      comment_replies as (
+        select count(c2.id)
+        from comment c
+        join comment c2 on c.id = c2.parent_id
+        where c.creator_id = $1 and c.creator_id <> c2.creator_id and c2.read is false
+        and c.deleted is false and c.removed is false
+        and c2.deleted is false and c2.removed is false
+      )
+      select
+        coalesce((select count(*) from public.private_message where read is false and recipient_id = $1) +
+        (select count(*) from public.user_mention where read is false and recipient_id = $1) +
+        (select count from post_replies) + (select count from comment_replies), 0)::int as \"unreads\"")
+    .bind::<Integer,_>(user_id)
+    .get_result::<UserUnreadCount>(conn)
   }
 }
 

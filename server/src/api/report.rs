@@ -1,13 +1,6 @@
-use crate::{
-  api::{
-    check_community_ban,
-    get_user_from_jwt,
-    APIError,
-    Perform
-  },
-  blocking,
-  LemmyContext,
-};
+use actix_web::web::Data;
+
+use lemmy_api_structs::{APIError, report::*};
 use lemmy_db::{
   comment::*,
   comment_view::*,
@@ -20,15 +13,23 @@ use lemmy_db::{
     PostReportQueryBuilder,
     PostReportView,
   },
-  user_view::UserView,
   Reportable,
+  user_view::UserView,
 };
 use lemmy_utils::{
   ConnectionId,
   LemmyError,
 };
-use actix_web::web::Data;
-use lemmy_api_structs::report::*;
+
+use crate::{
+  api::{
+    check_community_ban,
+    get_user_from_jwt,
+    Perform
+  },
+  blocking,
+  LemmyContext,
+};
 
 const MAX_REPORT_LEN: usize = 1000;
 
@@ -39,7 +40,7 @@ impl Perform for CreateCommentReport {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<CommentReportResponse, LemmyError> {
     let data: &CreateCommentReport = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -88,7 +89,7 @@ impl Perform for CreatePostReport {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<PostReportResponse, LemmyError> {
     let data: &CreatePostReport = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -118,7 +119,7 @@ impl Perform for CreatePostReport {
     let report_form = PostReportForm {
       time: None, // column defaults to now() in table
       reason,
-      resolved: None, // columb defaults to false
+      resolved: None, // column defaults to false
       user_id: user.id,
       post_id,
       post_name: post.name,
@@ -139,7 +140,7 @@ impl Perform for GetReportCount {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetReportCountResponse, LemmyError> {
     let data: &GetReportCount = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -205,7 +206,7 @@ impl Perform for ListCommentReports {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<ListCommentReportResponse, LemmyError> {
     let data: &ListCommentReports = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -260,7 +261,7 @@ impl Perform for ListPostReports {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<ListPostReportResponse, LemmyError> {
     let data: &ListPostReports = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -315,7 +316,7 @@ impl Perform for ResolveCommentReport {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<ResolveCommentReportResponse, LemmyError> {
     let data: &ResolveCommentReport = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -365,7 +366,7 @@ impl Perform for ResolvePostReport {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<ResolvePostReportResponse, LemmyError> {
     let data: &ResolvePostReport = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;

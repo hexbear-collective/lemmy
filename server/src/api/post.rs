@@ -1,3 +1,35 @@
+use std::str::FromStr;
+use std::time::Duration;
+
+use actix_web::web::Data;
+use url::Url;
+
+use lemmy_api_structs::{APIError, post::*};
+use lemmy_db::{
+  comment_view::*,
+  community_settings::*,
+  community_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  moderator::*,
+  naive_now,
+  post::*,
+  post_view::*,
+  Saveable,
+  site::*,
+  site_view::*,
+  SortType,
+  user_view::*,
+};
+use lemmy_utils::{
+  ConnectionId,
+  EndpointType,
+  is_valid_post_title,
+  LemmyError,
+  make_apub_endpoint,
+};
+
 use crate::{
   api::{
     check_community_ban,
@@ -13,41 +45,12 @@ use crate::{
   fetch_iframely_and_pictrs_data,
   is_within_post_body_char_limit,
   is_within_post_title_char_limit,
+  LemmyContext,
   websocket::{
     messages::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
     UserOperation,
   },
-  LemmyContext,
 };
-use actix_web::web::Data;
-use lemmy_api_structs::{post::*, APIError};
-use lemmy_db::{
-  comment_view::*,
-  community_settings::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  post::*,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user_view::*,
-  Crud,
-  Likeable,
-  ListingType,
-  Saveable,
-  SortType,
-};
-use lemmy_utils::{
-  is_valid_post_title,
-  make_apub_endpoint,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
-};
-use std::str::FromStr;
-use std::time::Duration;
-use url::Url;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for CreatePost {
@@ -338,12 +341,6 @@ impl Perform for GetPost {
     })
     .await??;
 
-    let community_id = post_view.community_id;
-    let settings = blocking(context.pool(), move |conn| {
-      CommunitySettings::read_from_community_id(conn, community_id)
-    })
-    .await??;
-
     let site_creator_id =
       blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
@@ -479,7 +476,7 @@ impl Perform for CreatePostLike {
     let community_id = post.community_id;
     let user_id = user.id;
     let privileged =
-      is_mod_or_admin(context.pool(), user.id, community_id).await.is_ok();
+      is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }

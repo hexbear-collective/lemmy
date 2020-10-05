@@ -1,29 +1,25 @@
-use crate::{
-  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, Perform},
-  apub::ApubObjectType,
-  blocking,
-  captcha_espeak_wav_base64,
-  is_within_message_char_limit,
-  hcaptcha::hcaptcha_verify,
-  websocket::{
-    messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
-    UserOperation,
-  },
-  LemmyContext,
-};
+use std::collections::BTreeMap;
+use std::str::FromStr;
+
 use actix_web::web::Data;
 use anyhow::Context;
 use bcrypt::verify;
-use captcha::{gen, Difficulty};
+use captcha::{Difficulty, gen};
 use chrono::Duration;
-use lemmy_api_structs::{user::*, APIError};
+use log::{error, info};
+
+use lemmy_api_structs::{APIError, user::*};
 use lemmy_db::{
   comment::*,
   comment_view::*,
   community::*,
   community_settings::*,
   community_view::*,
+  Crud,
   diesel_option_overwrite,
+  Followable,
+  Joinable,
+  ListingType,
   moderator::*,
   naive_now,
   password_reset_request::*,
@@ -33,35 +29,43 @@ use lemmy_db::{
   private_message_view::*,
   site::*,
   site_view::*,
+  SortType,
   user::*,
   user_mention::*,
   user_mention_view::*,
   user_tag::*,
   user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
 };
 use lemmy_utils::{
+  ConnectionId,
+  EndpointType,
   generate_actor_keypair,
   generate_random_string,
   is_valid_preferred_username,
   is_valid_username,
+  LemmyError,
   location_info,
   make_apub_endpoint,
   naive_from_unix,
   remove_slurs,
   send_email,
   settings::Settings,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
 };
-use log::{error, info};
-use std::str::FromStr;
-use std::collections::BTreeMap;
+
+use crate::{
+  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, Perform},
+  apub::ApubObjectType,
+  blocking,
+  captcha_espeak_wav_base64,
+  hcaptcha::hcaptcha_verify,
+  is_within_message_char_limit,
+  LemmyContext,
+  websocket::{
+    messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
+    UserOperation,
+  },
+};
+use crate::api::is_admin_or_sitemod;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -106,7 +110,7 @@ impl Perform for GetUserTag {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<UserTagResponse, LemmyError> {
     let data: &GetUserTag = &self;
     let user = data.user;
@@ -266,8 +270,8 @@ impl Perform for Register {
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
-      email: Some(data.email.to_owned()),
-      admin: data.admin,
+      email: Some(email.to_owned()),
+      admin: false,
       sitemod: false,
       matrix_user_id: None,
       avatar: None,
@@ -495,7 +499,7 @@ impl Perform for SaveUserSettings {
       None => read_user.bio,
     };
 
-    // temporarily disable avitars
+    // temporarily disable avatars
     // let avatar = diesel_option_overwrite(&data.avatar);
     // let banner = diesel_option_overwrite(&data.banner);
     let avatar: Option<Option<String>> = None;
@@ -704,7 +708,7 @@ impl Perform for GetUserDetails {
       user_view.email = None;
     }
 
-    // temporarily disable avitars
+    // temporarily disable avatars
     user_view.avatar = None;
 
     // Return the jwt
@@ -1525,5 +1529,173 @@ impl Perform for UserJoin {
     }
 
     Ok(UserJoinResponse { user_id: user.id })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for GetUnreadCount {
+  type Response = GetUnreadCountResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
+  ) -> Result<GetUnreadCountResponse, LemmyError> {
+    let data: &GetUnreadCount = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+    let user_id = user.id;
+
+    let unread_notifs = blocking(context.pool(), move |conn| {
+      User_::get_unread_notifs(conn, user_id)
+    }).await??;
+
+    Ok(GetUnreadCountResponse { unreads: unread_notifs.unreads })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for RemoveUserContent {
+  type Response = BanUserResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
+  ) -> Result<BanUserResponse, LemmyError> {
+    let data: &RemoveUserContent = &self;
+
+    // Permissions checks
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+    let admin = is_admin_or_sitemod(context.pool(), user.id).await.is_ok();
+
+    // Gather a list of communities the user moderates
+    let uid = user.id;
+    let mod_communities = blocking(context.pool(), move |conn| {
+      CommunityModeratorView::for_user(conn, uid)
+    })
+        .await??
+        .iter()
+        .map(|c| c.id)
+        .collect::<Vec<i32>>();
+
+    let remove_communities = match data.community_id {
+      Some(community_id) => {
+        if mod_communities.contains(&community_id) {
+          Ok(vec![community_id])
+        } else {
+          Err(LemmyError::from(APIError::err("couldnt_update_user")))
+        }
+      }
+      None => {
+        if admin {
+          Ok(Vec::new())
+        } else if !mod_communities.is_empty() {
+          Ok(mod_communities)
+        } else {
+          Err(LemmyError::from(APIError::err("couldnt_update_user")))
+        }
+      }
+    }?;
+
+    let mut post_id_list: Vec<i32> = Vec::new();
+    let mut comment_id_list: Vec<i32> = Vec::new();
+    let remove_user_id = data.user_id;
+    let reason = "USER CONTENT MASS REMOVED";
+    if let Some(given_reason) = data.reason.to_owned() {
+      [reason, &given_reason].join(": ");
+    }
+    if remove_communities.is_empty() {
+      let time = data.time;
+      blocking(context.pool(), move |conn| {
+        let posts_query = PostQueryBuilder::create(conn)
+            .for_creator_id(remove_user_id)
+            .max_age(time);
+        posts_query.list()
+      })
+          .await??
+          .iter()
+          .for_each(|pv| post_id_list.push(pv.id));
+
+      let time = data.time;
+      blocking(context.pool(), move |conn| {
+        let comments_query = CommentQueryBuilder::create(conn)
+            .for_creator_id(remove_user_id)
+            .max_age(time);
+        comments_query.list()
+      })
+          .await??
+          .iter()
+          .for_each(|cv| comment_id_list.push(cv.id));
+    } else {
+      for community_id in remove_communities {
+        blocking(context.pool(), move |conn| {
+          let posts_query = PostQueryBuilder::create(conn)
+              .for_creator_id(remove_user_id)
+              .for_community_id(community_id);
+          /*
+          let time = data.time;
+          if time != 0 {
+              posts_query.query.filter(published.gt(now - time.hours()))
+          }
+          */
+          posts_query.list()
+        })
+            .await??
+            .iter()
+            .for_each(|pv| post_id_list.push(pv.id));
+
+        blocking(context.pool(), move |conn| {
+          let comments_query = CommentQueryBuilder::create(conn)
+              .for_creator_id(remove_user_id)
+              .for_community_id(community_id);
+
+          comments_query.list()
+        })
+            .await??
+            .iter()
+            .for_each(|cv| comment_id_list.push(cv.id));
+      }
+    }
+
+    for post_id in post_id_list {
+      let form = ModRemovePostForm {
+        mod_user_id: user.id,
+        post_id,
+        reason: Some(reason.to_string()),
+        removed: Some(true),
+      };
+
+      blocking(context.pool(), move |conn| ModRemovePost::create(conn, &form)).await??;
+      blocking(context.pool(), move |conn| Post::permadelete(conn, post_id)).await??;
+    }
+
+    for comment_id in comment_id_list {
+      let form = ModRemoveCommentForm {
+        mod_user_id: user.id,
+        comment_id,
+        reason: Some(reason.to_string()),
+        removed: Some(true),
+      };
+
+      blocking(context.pool(), move |conn| ModRemoveComment::create(conn, &form)).await??;
+      blocking(context.pool(), move |conn| Comment::permadelete(conn, comment_id)).await??;
+    }
+
+    let user_id = data.user_id;
+    let user_view = blocking(context.pool(), move |conn| UserView::read(conn, user_id)).await??;
+
+    let banned = user_view.banned;
+    let res = BanUserResponse {
+      user: user_view,
+      banned,
+    };
+
+    context.chat_server().do_send(SendAllMessage {
+      op: UserOperation::RemoveUserContent,
+      response: res.clone(),
+      websocket_id,
+    });
+
+    Ok(res)
   }
 }

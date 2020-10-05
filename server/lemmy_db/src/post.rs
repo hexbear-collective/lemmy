@@ -189,6 +189,24 @@ impl Post {
       .set(post_form)
       .get_result::<Self>(conn)
   }
+
+  pub fn permadelete(conn: &PgConnection, post_id: i32) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+
+    let perma_deleted = "*Permananently Deleted*";
+    let perma_deleted_url = "https://deleted.com";
+
+    diesel::update(post.find(post_id))
+        .set((
+          name.eq(perma_deleted),
+          url.eq(perma_deleted_url),
+          body.eq(perma_deleted),
+          deleted.eq(true),
+          updated.eq(naive_now()),
+        ))
+        .get_result::<Self>(conn)
+  }
+
 }
 
 impl Crud<PostForm> for Post {

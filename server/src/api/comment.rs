@@ -1,3 +1,37 @@
+use std::str::FromStr;
+
+use actix_web::web::Data;
+use log::error;
+
+use lemmy_api_structs::{APIError, comment::*};
+use lemmy_db::{
+  comment::*,
+  comment_view::*,
+  community_settings::*,
+  Crud,
+  Likeable,
+  ListingType,
+  moderator::*,
+  post::*,
+  Saveable,
+  site_view::*,
+  SortType,
+  user::*,
+  user_mention::*,
+};
+use lemmy_utils::{
+  ConnectionId,
+  EndpointType,
+  LemmyError,
+  make_apub_endpoint,
+  MentionData,
+  num_md_images,
+  remove_slurs,
+  scrape_text_for_mentions,
+  send_email,
+  settings::Settings,
+};
+
 use crate::{
   api::{
     check_community_ban,
@@ -5,50 +39,18 @@ use crate::{
     get_user_from_jwt,
     get_user_from_jwt_opt,
     is_mod_or_admin,
-    APIError,
     Perform,
   },
   apub::{ApubLikeableType, ApubObjectType},
   blocking,
+  DbPool,
   is_within_comment_char_limit,
+  LemmyContext,
   websocket::{
     messages::{JoinCommunityRoom, SendComment},
     UserOperation,
   },
-  DbPool,
-  LemmyContext,
 };
-use actix_web::web::Data;
-use lemmy_api_structs::comment::*;
-use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community_settings::*,
-  moderator::*,
-  post::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  Crud,
-  Likeable,
-  ListingType,
-  Saveable,
-  SortType,
-};
-use lemmy_utils::{
-  make_apub_endpoint,
-  num_md_images,
-  remove_slurs,
-  scrape_text_for_mentions,
-  send_email,
-  settings::Settings,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
-  MentionData,
-};
-use log::error;
-use std::str::FromStr;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for CreateComment {

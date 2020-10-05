@@ -1,28 +1,29 @@
-use crate::{
-  api::{
-    get_user_from_jwt,
-    is_mod_or_admin,
-    APIError,
-    Perform
-  },
-  blocking,
-  websocket::{
-    messages::SendCommunityRoomMessage,
-    UserOperation,
-  },
-  LemmyContext,
-};
+use actix_web::web::Data;
+
+use lemmy_api_structs::{APIError, community_settings::*};
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now,
   Crud,
+  naive_now,
 };
 use lemmy_utils::{
   ConnectionId,
   LemmyError,
 };
-use lemmy_api_structs::community_settings::*;
-use actix_web::web::Data;
+
+use crate::{
+  api::{
+    get_user_from_jwt,
+    is_mod_or_admin,
+    Perform
+  },
+  blocking,
+  LemmyContext,
+  websocket::{
+    messages::SendCommunityRoomMessage,
+    UserOperation,
+  },
+};
 
 #[async_trait::async_trait(?Send)]
 impl Perform for GetCommunitySettings {
@@ -31,7 +32,7 @@ impl Perform for GetCommunitySettings {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_id: Option<ConnectionId>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetCommunitySettingsResponse, LemmyError> {
     let data: &GetCommunitySettings = &self;
 

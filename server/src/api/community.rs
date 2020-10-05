@@ -1,3 +1,39 @@
+use std::str::FromStr;
+use std::time::Duration;
+
+use actix_web::web::Data;
+use anyhow::Context;
+
+use lemmy_api_structs::{APIError, community::*};
+use lemmy_db::{
+  Bannable,
+  comment::Comment,
+  comment_view::CommentQueryBuilder,
+  community::*,
+  community_settings::*,
+  community_view::*,
+  Crud,
+  diesel_option_overwrite,
+  Followable,
+  Joinable,
+  moderator::*,
+  naive_now,
+  post::Post,
+  site::*,
+  SortType,
+  user_view::*,
+};
+use lemmy_utils::{
+  ConnectionId,
+  EndpointType,
+  generate_actor_keypair,
+  is_valid_community_name,
+  LemmyError,
+  location_info,
+  make_apub_endpoint,
+  naive_from_unix,
+};
+
 use crate::{
   api::{
     check_slurs,
@@ -10,45 +46,12 @@ use crate::{
   },
   apub::ActorType,
   blocking,
+  LemmyContext,
   websocket::{
     messages::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},
     UserOperation,
   },
-  LemmyContext,
 };
-use actix_web::web::Data;
-use anyhow::Context;
-use lemmy_api_structs::{community::*, APIError};
-use lemmy_db::{
-  comment::Comment,
-  comment_view::CommentQueryBuilder,
-  community::*,
-  community_settings::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  naive_now,
-  post::Post,
-  site::*,
-  user_view::*,
-  Bannable,
-  Crud,
-  Followable,
-  Joinable,
-  SortType,
-};
-use lemmy_utils::{
-  generate_actor_keypair,
-  is_valid_community_name,
-  location_info,
-  make_apub_endpoint,
-  naive_from_unix,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
-};
-use std::str::FromStr;
-use std::time::Duration;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for GetCommunity {
@@ -271,9 +274,6 @@ impl Perform for EditCommunity {
     let edit_id = data.edit_id;
     let read_community =
       blocking(context.pool(), move |conn| Community::read(conn, edit_id)).await??;
-
-    let icon = diesel_option_overwrite(&data.icon);
-    let banner = diesel_option_overwrite(&data.banner);
 
     let icon = diesel_option_overwrite(&data.icon);
     let banner = diesel_option_overwrite(&data.banner);
@@ -601,7 +601,7 @@ impl Perform for BanFromCommunity {
     is_mod_or_admin(context.pool(), user.id, community_id).await?;
     // Don't allow mods or admins to be banned
     match is_mod_or_admin(context.pool(), data.user_id, community_id).await {
-      Ok(_) => return Err(APIError::err("couldnt_ban_privilaged_user").into()),
+      Ok(_) => return Err(APIError::err("couldnt_ban_privileged_user").into()),
       Err(_e) => (),
     };
 

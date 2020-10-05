@@ -1,3 +1,29 @@
+use std::str::FromStr;
+use std::time::Duration;
+
+use actix_web::web::Data;
+use anyhow::Context;
+use log::{debug, info};
+
+use lemmy_api_structs::{APIError, site::*, user::Register};
+use lemmy_db::{
+  category::*,
+  comment_view::*,
+  community_view::*,
+  Crud,
+  diesel_option_overwrite,
+  moderator::*,
+  moderator_views::*,
+  naive_now,
+  post_view::*,
+  SearchType,
+  site::*,
+  site_view::*,
+  SortType,
+  user_view::*,
+};
+use lemmy_utils::{ConnectionId, LemmyError, location_info, settings::Settings};
+
 use crate::{
   api::{
     check_slurs,
@@ -10,36 +36,13 @@ use crate::{
   },
   apub::fetcher::search_by_apub_id,
   blocking,
+  LemmyContext,
   version,
   websocket::{
     messages::{GetUsersOnline, SendAllMessage},
     UserOperation,
   },
-  LemmyContext,
 };
-use actix_web::web::Data;
-use anyhow::Context;
-use lemmy_api_structs::{site::*, user::Register, APIError};
-use lemmy_db::{
-  category::*,
-  comment_view::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  moderator_views::*,
-  naive_now,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user_view::*,
-  Crud,
-  SearchType,
-  SortType,
-};
-use lemmy_utils::{location_info, settings::Settings, ConnectionId, LemmyError};
-use log::{debug, info};
-use std::str::FromStr;
-use std::time::Duration;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for ListCategories {
@@ -165,6 +168,12 @@ impl Perform for CreateSite {
   ) -> Result<SiteResponse, LemmyError> {
     let data: &CreateSite = &self;
 
+    match blocking(context.pool(), move |conn| { Site::read(conn, 1)}).await?
+    {
+      Ok(_site) => return Err(APIError::err("site_already_exists").into()),
+      Err(_e) => (),
+    };
+
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     check_slurs(&data.name)?;
@@ -215,9 +224,6 @@ impl Perform for EditSite {
     is_admin(context.pool(), user.id).await?;
 
     let found_site = blocking(context.pool(), move |conn| Site::read(conn, 1)).await??;
-
-    let icon = diesel_option_overwrite(&data.icon);
-    let banner = diesel_option_overwrite(&data.banner);
 
     let icon = diesel_option_overwrite(&data.icon);
     let banner = diesel_option_overwrite(&data.banner);
@@ -360,8 +366,6 @@ impl Perform for Search {
     _websocket_id: Option<ConnectionId>,
   ) -> Result<SearchResponse, LemmyError> {
     let data: &Search = &self;
-
-    dbg!(&data);
 
     match search_by_apub_id(&data.q, context).await {
       Ok(r) => return Ok(r),
@@ -529,6 +533,8 @@ impl Perform for TransferSite {
   ) -> Result<GetSiteResponse, LemmyError> {
     let data: &TransferSite = &self;
     let mut user = get_user_from_jwt(&data.auth, context.pool()).await?;
+
+    is_admin(context.pool(), user.id).await?;
 
     // TODO add a User_::read_safe() for this.
     user.password_encrypted = "".to_string();

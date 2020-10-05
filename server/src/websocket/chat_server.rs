@@ -391,6 +391,7 @@ impl ChatServer {
         UserOperation::PasswordChange => do_user_operation::<PasswordChange>(args).await,
         UserOperation::UserJoin => do_user_operation::<UserJoin>(args).await,
         UserOperation::SaveUserSettings => do_user_operation::<SaveUserSettings>(args).await,
+        UserOperation::RemoveUserContent => do_user_operation::<RemoveUserContent>(args).await,
 
         // Private Message ops
         UserOperation::CreatePrivateMessage => {
