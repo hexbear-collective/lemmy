@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
 
-export COMPOSE_DOCKER_CLI_BUILD=1
-export DOCKER_BUILDKIT=1
-docker-compose up -d --no-deps --build
+sudo chown -R 991:991 volumes/pictrs
+sudo docker build ../../ --file ../dev/Dockerfile -t lemmy-dev:latest
+sudo docker-compose up -d

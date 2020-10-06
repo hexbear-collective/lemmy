@@ -233,9 +233,11 @@ impl<'a> PostQueryBuilder<'a> {
 
     let mut query = self.query;
 
-    if let ListingType::Subscribed = self.listing_type {
-      query = query.filter(subscribed.eq(true));
-    }
+    query = match self.listing_type {
+      ListingType::Subscribed => query.filter(subscribed.eq(true)),
+      ListingType::Local => query.filter(community_local.eq(true)),
+      _ => query,
+    };
 
     if let Some(for_community_id) = self.for_community_id {
       query = query.filter(community_id.eq(for_community_id));
@@ -392,7 +394,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_8282738268".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -412,7 +414,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_2763".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -440,7 +442,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -460,12 +462,6 @@ mod tests {
       post_id: inserted_post.id,
       user_id: inserted_user.id,
       published: inserted_post_like.published,
-      score: 1,
-    };
-
-    let post_like_form = PostLikeForm {
-      post_id: inserted_post.id,
-      user_id: inserted_user.id,
       score: 1,
     };
 
@@ -532,7 +528,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
       creator_actor_id: inserted_user.actor_id.to_owned(),
       creator_local: true,
@@ -583,7 +579,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
       creator_actor_id: inserted_user.actor_id.to_owned(),
       creator_local: true,
@@ -591,7 +587,7 @@ mod tests {
       community_local: true,
     };
 
-    let like_removed = PostLike::remove(&conn, &post_like_form).unwrap();
+    let like_removed = PostLike::remove(&conn, inserted_user.id, inserted_post.id).unwrap();
     let num_deleted = Post::delete(&conn, inserted_post.id).unwrap();
     Community::delete(&conn, inserted_community.id).unwrap();
     User_::delete(&conn, inserted_user.id).unwrap();

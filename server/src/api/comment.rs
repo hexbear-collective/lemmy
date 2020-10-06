@@ -1,139 +1,68 @@
-use crate::{
-  api::{
-    check_community_ban,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_mod_or_admin,
-    APIError,
-    Oper,
-    Perform,
-  },
-  apub::{ApubLikeableType, ApubObjectType},
-  blocking,
-  is_within_comment_char_limit,
-  websocket::{
-    server::{JoinCommunityRoom, SendComment},
-    UserOperation,
-    WebsocketInfo,
-  },
-  DbPool,
-  LemmyError,
-};
+use std::str::FromStr;
+
+use actix_web::web::Data;
+use log::error;
+
+use lemmy_api_structs::{APIError, comment::*};
 use lemmy_db::{
   comment::*,
   comment_view::*,
   community_settings::*,
-  moderator::*,
-  post::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
   Crud,
   Likeable,
   ListingType,
+  moderator::*,
+  post::*,
   Saveable,
+  site_view::*,
   SortType,
+  user::*,
+  user_mention::*,
 };
 use lemmy_utils::{
+  ConnectionId,
+  EndpointType,
+  LemmyError,
   make_apub_endpoint,
+  MentionData,
   num_md_images,
   remove_slurs,
   scrape_text_for_mentions,
   send_email,
   settings::Settings,
-  EndpointType,
-  MentionData,
 };
-use log::error;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
-#[derive(Serialize, Deserialize)]
-pub struct CreateComment {
-  content: String,
-  parent_id: Option<i32>,
-  pub post_id: i32,
-  form_id: Option<String>,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct EditComment {
-  content: String,
-  edit_id: i32,
-  form_id: Option<String>,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DeleteComment {
-  edit_id: i32,
-  deleted: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RemoveComment {
-  edit_id: i32,
-  removed: bool,
-  reason: Option<String>,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MarkCommentAsRead {
-  edit_id: i32,
-  read: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SaveComment {
-  comment_id: i32,
-  save: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct CommentResponse {
-  pub comment: CommentView,
-  pub recipient_ids: Vec<i32>,
-  pub form_id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreateCommentLike {
-  comment_id: i32,
-  score: i16,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetComments {
-  type_: String,
-  sort: String,
-  page: Option<i64>,
-  limit: Option<i64>,
-  pub community_id: Option<i32>,
-  auth: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetCommentsResponse {
-  comments: Vec<CommentView>,
-}
+use crate::{
+  api::{
+    check_community_ban,
+    get_post,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_mod_or_admin,
+    Perform,
+  },
+  apub::{ApubLikeableType, ApubObjectType},
+  blocking,
+  DbPool,
+  is_within_comment_char_limit,
+  LemmyContext,
+  websocket::{
+    messages::{JoinCommunityRoom, SendComment},
+    UserOperation,
+  },
+};
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<CreateComment> {
+impl Perform for CreateComment {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &CreateComment = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &CreateComment = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
     // let content_pii_removed = remove_pii(&content_slurs_removed);
@@ -152,27 +81,23 @@ impl Perform for Oper<CreateComment> {
       read: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
     let post_id = data.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = get_post(post_id, context.pool()).await?;
 
     // Check community settings
     let community_id = post.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
-    let community_id = post.community_id;
-    let user_id = user.id;
-    let privileged = blocking(pool, move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let privileged =
+      is_mod_or_admin(context.pool(), user.id, post.community_id).await.is_ok();
+
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
@@ -189,28 +114,30 @@ impl Perform for Oper<CreateComment> {
       let user_id = user.id;
       let community_id = post.community_id;
 
-      match is_mod_or_admin(pool, user_id, community_id).await {
-        Ok(_) => (),
-        Err(_e) => return Err(APIError::err("post_is_locked").into()),
-      };
+      if is_mod_or_admin(context.pool(), user_id, community_id).await.is_err() {
+        return Err(APIError::err("locked").into());
+      }
     }
 
     // Check for a community ban
     let post_id = data.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
-    check_community_ban(user.id, post.community_id, pool).await?;
+    let post = blocking(context.pool(), move |conn| Post::read(conn, post_id)).await??;
+    check_community_ban(user.id, post.community_id, context.pool()).await?;
 
     // Create the comment
     let comment_form2 = comment_form.clone();
-    let inserted_comment =
-      match blocking(pool, move |conn| Comment::create(&conn, &comment_form2)).await? {
-        Ok(comment) => comment,
-        Err(_e) => return Err(APIError::err("couldnt_create_comment").into()),
-      };
+    let inserted_comment = match blocking(context.pool(), move |conn| {
+      Comment::create(&conn, &comment_form2)
+    })
+    .await?
+    {
+      Ok(comment) => comment,
+      Err(_e) => return Err(APIError::err("couldnt_create_comment").into()),
+    };
 
     // Necessary to update the ap_id
     let inserted_comment_id = inserted_comment.id;
-    let updated_comment: Comment = match blocking(pool, move |conn| {
+    let updated_comment: Comment = match blocking(context.pool(), move |conn| {
       let apub_id =
         make_apub_endpoint(EndpointType::Comment, &inserted_comment_id.to_string()).to_string();
       Comment::update_ap_id(&conn, inserted_comment_id, apub_id)
@@ -221,14 +148,19 @@ impl Perform for Oper<CreateComment> {
       Err(_e) => return Err(APIError::err("couldnt_create_comment").into()),
     };
 
-    updated_comment
-      .send_create(&user, &self.client, pool)
-      .await?;
+    updated_comment.send_create(&user, context).await?;
 
     // Scan the comment for user mentions, add those rows
     let mentions = scrape_text_for_mentions(&comment_form.content);
-    let recipient_ids =
-      send_local_notifs(mentions, updated_comment.clone(), &user, post, pool, true).await?;
+    let recipient_ids = send_local_notifs(
+      mentions,
+      updated_comment.clone(),
+      &user,
+      post,
+      context.pool(),
+      true,
+    )
+    .await?;
 
     // You like your own comment by default
     let like_form = CommentLikeForm {
@@ -239,14 +171,14 @@ impl Perform for Oper<CreateComment> {
     };
 
     let like = move |conn: &'_ _| CommentLike::like(&conn, &like_form);
-    if blocking(pool, like).await?.is_err() {
+    if blocking(context.pool(), like).await?.is_err() {
       return Err(APIError::err("couldnt_like_comment").into());
     }
 
-    updated_comment.send_like(&user, &self.client, pool).await?;
+    updated_comment.send_like(&user, context).await?;
 
     let user_id = user.id;
-    let comment_view = blocking(pool, move |conn| {
+    let comment_view = blocking(context.pool(), move |conn| {
       CommentView::read(&conn, inserted_comment.id, Some(user_id))
     })
     .await??;
@@ -257,40 +189,39 @@ impl Perform for Oper<CreateComment> {
       form_id: data.form_id.to_owned(),
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendComment {
-        op: UserOperation::CreateComment,
-        comment: res.clone(),
-        my_id: ws.id,
-      });
+    context.chat_server().do_send(SendComment {
+      op: UserOperation::CreateComment,
+      comment: res.clone(),
+      websocket_id,
+    });
 
-      // strip out the recipient_ids, so that
-      // users don't get double notifs
-      res.recipient_ids = Vec::new();
-    }
+    // strip out the recipient_ids, so that
+    // users don't get double notifs
+    res.recipient_ids = Vec::new();
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<EditComment> {
+impl Perform for EditComment {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &EditComment = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &EditComment = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_comment =
-      blocking(pool, move |conn| CommentView::read(&conn, edit_id, None)).await??;
-    let orig_community_id = orig_comment.community_id;
+    let orig_comment = blocking(context.pool(), move |conn| {
+      CommentView::read(&conn, edit_id, None)
+    })
+    .await??;
 
-    check_community_ban(user.id, orig_comment.community_id, pool).await?;
+    check_community_ban(user.id, orig_comment.community_id, context.pool()).await?;
 
     // Verify that only the creator can edit
     if user.id != orig_comment.creator_id {
@@ -299,27 +230,23 @@ impl Perform for Oper<EditComment> {
 
     // Do the update
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
-
-    let community_id = orig_community_id;
-    let settings = blocking(pool, move |conn| {
+    let community_id = orig_comment.community_id;
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
-    let community_id = orig_community_id;
+    let community_id = orig_comment.community_id;
     let user_id = user.id;
-    let privileged = blocking(pool, move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let privileged = is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
     let num_images: i32 = num_md_images(&content_slurs_removed); // replaced content_pii_removed
+
     if !privileged && settings.comment_images < num_images {
       return Err(APIError::err("community_too_many_images").into());
     }
 
     let edit_id = data.edit_id;
-    let updated_comment = match blocking(pool, move |conn| {
+    let updated_comment = match blocking(context.pool(), move |conn| {
       Comment::update_content(conn, edit_id, &content_slurs_removed)
     })
     .await?
@@ -329,22 +256,27 @@ impl Perform for Oper<EditComment> {
     };
 
     // Send the apub update
-    updated_comment
-      .send_update(&user, &self.client, pool)
-      .await?;
+    updated_comment.send_update(&user, context).await?;
 
     // Do the mentions / recipients
     let post_id = orig_comment.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = get_post(post_id, context.pool()).await?;
 
     let updated_comment_content = updated_comment.content.to_owned();
     let mentions = scrape_text_for_mentions(&updated_comment_content);
-    let recipient_ids =
-      send_local_notifs(mentions, updated_comment, &user, post, pool, false).await?;
+    let recipient_ids = send_local_notifs(
+      mentions,
+      updated_comment,
+      &user,
+      post,
+      context.pool(),
+      false,
+    )
+    .await?;
 
     let edit_id = data.edit_id;
     let user_id = user.id;
-    let comment_view = blocking(pool, move |conn| {
+    let comment_view = blocking(context.pool(), move |conn| {
       CommentView::read(conn, edit_id, Some(user_id))
     })
     .await??;
@@ -355,39 +287,39 @@ impl Perform for Oper<EditComment> {
       form_id: data.form_id.to_owned(),
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendComment {
-        op: UserOperation::EditComment,
-        comment: res.clone(),
-        my_id: ws.id,
-      });
+    context.chat_server().do_send(SendComment {
+      op: UserOperation::EditComment,
+      comment: res.clone(),
+      websocket_id,
+    });
 
-      // strip out the recipient_ids, so that
-      // users don't get double notifs
-      res.recipient_ids = Vec::new();
-    }
+    // strip out the recipient_ids, so that
+    // users don't get double notifs
+    res.recipient_ids = Vec::new();
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<DeleteComment> {
+impl Perform for DeleteComment {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &DeleteComment = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
-
+    let data: &DeleteComment = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+    
     let edit_id = data.edit_id;
-    let orig_comment =
-      blocking(pool, move |conn| CommentView::read(&conn, edit_id, None)).await??;
+    let orig_comment = blocking(context.pool(), move |conn| {
+      CommentView::read(&conn, edit_id, None)
+    })
+    .await??;
 
-    check_community_ban(user.id, orig_comment.community_id, pool).await?;
+    check_community_ban(user.id, orig_comment.community_id, context.pool()).await?;
 
     // Verify that only the creator can delete
     if user.id != orig_comment.creator_id {
@@ -396,7 +328,7 @@ impl Perform for Oper<DeleteComment> {
 
     // Do the delete
     let deleted = data.deleted;
-    let updated_comment = match blocking(pool, move |conn| {
+    let updated_comment = match blocking(context.pool(), move |conn| {
       Comment::update_deleted(conn, edit_id, deleted)
     })
     .await?
@@ -407,29 +339,32 @@ impl Perform for Oper<DeleteComment> {
 
     // Send the apub message
     if deleted {
-      updated_comment
-        .send_delete(&user, &self.client, pool)
-        .await?;
+      updated_comment.send_delete(&user, context).await?;
     } else {
-      updated_comment
-        .send_undo_delete(&user, &self.client, pool)
-        .await?;
+      updated_comment.send_undo_delete(&user, context).await?;
     }
 
     // Refetch it
     let edit_id = data.edit_id;
     let user_id = user.id;
-    let comment_view = blocking(pool, move |conn| {
+    let comment_view = blocking(context.pool(), move |conn| {
       CommentView::read(conn, edit_id, Some(user_id))
     })
     .await??;
 
     // Build the recipients
     let post_id = comment_view.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = get_post(post_id, context.pool()).await?;
     let mentions = vec![];
-    let recipient_ids =
-      send_local_notifs(mentions, updated_comment, &user, post, pool, false).await?;
+    let recipient_ids = send_local_notifs(
+      mentions,
+      updated_comment,
+      &user,
+      post,
+      context.pool(),
+      false,
+    )
+    .await?;
 
     let mut res = CommentResponse {
       comment: comment_view,
@@ -437,46 +372,46 @@ impl Perform for Oper<DeleteComment> {
       form_id: None,
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendComment {
-        op: UserOperation::DeleteComment,
-        comment: res.clone(),
-        my_id: ws.id,
-      });
+    context.chat_server().do_send(SendComment {
+      op: UserOperation::DeleteComment,
+      comment: res.clone(),
+      websocket_id,
+    });
 
-      // strip out the recipient_ids, so that
-      // users don't get double notifs
-      res.recipient_ids = Vec::new();
-    }
+    // strip out the recipient_ids, so that
+    // users don't get double notifs
+    res.recipient_ids = Vec::new();
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<RemoveComment> {
+impl Perform for RemoveComment {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &RemoveComment = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &RemoveComment = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_comment =
-      blocking(pool, move |conn| CommentView::read(&conn, edit_id, None)).await??;
+    let orig_comment = blocking(context.pool(), move |conn| {
+      CommentView::read(&conn, edit_id, None)
+    })
+    .await??;
 
-    check_community_ban(user.id, orig_comment.community_id, pool).await?;
+    check_community_ban(user.id, orig_comment.community_id, context.pool()).await?;
 
     // Verify that only a mod or admin can remove
-    is_mod_or_admin(pool, user.id, orig_comment.community_id).await?;
+    is_mod_or_admin(context.pool(), user.id, orig_comment.community_id).await?;
 
     // Do the remove
     let removed = data.removed;
-    let updated_comment = match blocking(pool, move |conn| {
+    let updated_comment = match blocking(context.pool(), move |conn| {
       Comment::update_removed(conn, edit_id, removed)
     })
     .await?
@@ -492,33 +427,39 @@ impl Perform for Oper<RemoveComment> {
       removed: Some(removed),
       reason: data.reason.to_owned(),
     };
-    blocking(pool, move |conn| ModRemoveComment::create(conn, &form)).await??;
+    blocking(context.pool(), move |conn| {
+      ModRemoveComment::create(conn, &form)
+    })
+    .await??;
 
     // Send the apub message
     if removed {
-      updated_comment
-        .send_remove(&user, &self.client, pool)
-        .await?;
+      updated_comment.send_remove(&user, context).await?;
     } else {
-      updated_comment
-        .send_undo_remove(&user, &self.client, pool)
-        .await?;
+      updated_comment.send_undo_remove(&user, context).await?;
     }
 
     // Refetch it
     let edit_id = data.edit_id;
     let user_id = user.id;
-    let comment_view = blocking(pool, move |conn| {
+    let comment_view = blocking(context.pool(), move |conn| {
       CommentView::read(conn, edit_id, Some(user_id))
     })
     .await??;
 
     // Build the recipients
     let post_id = comment_view.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = get_post(post_id, context.pool()).await?;
     let mentions = vec![];
-    let recipient_ids =
-      send_local_notifs(mentions, updated_comment, &user, post, pool, false).await?;
+    let recipient_ids = send_local_notifs(
+      mentions,
+      updated_comment,
+      &user,
+      post,
+      context.pool(),
+      false,
+    )
+    .await?;
 
     let mut res = CommentResponse {
       comment: comment_view,
@@ -526,54 +467,57 @@ impl Perform for Oper<RemoveComment> {
       form_id: None,
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendComment {
-        op: UserOperation::RemoveComment,
-        comment: res.clone(),
-        my_id: ws.id,
-      });
+    context.chat_server().do_send(SendComment {
+      op: UserOperation::RemoveComment,
+      comment: res.clone(),
+      websocket_id,
+    });
 
-      // strip out the recipient_ids, so that
-      // users don't get double notifs
-      res.recipient_ids = Vec::new();
-    }
+    // strip out the recipient_ids, so that
+    // users don't get double notifs
+    res.recipient_ids = Vec::new();
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<MarkCommentAsRead> {
+impl Perform for MarkCommentAsRead {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &MarkCommentAsRead = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &MarkCommentAsRead = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_comment =
-      blocking(pool, move |conn| CommentView::read(&conn, edit_id, None)).await??;
+    let orig_comment = blocking(context.pool(), move |conn| {
+      CommentView::read(&conn, edit_id, None)
+    })
+    .await??;
 
-    check_community_ban(user.id, orig_comment.community_id, pool).await?;
+    check_community_ban(user.id, orig_comment.community_id, context.pool()).await?;
 
     // Verify that only the recipient can mark as read
     // Needs to fetch the parent comment / post to get the recipient
     let parent_id = orig_comment.parent_id;
     match parent_id {
       Some(pid) => {
-        let parent_comment =
-          blocking(pool, move |conn| CommentView::read(&conn, pid, None)).await??;
+        let parent_comment = blocking(context.pool(), move |conn| {
+          CommentView::read(&conn, pid, None)
+        })
+        .await??;
         if user.id != parent_comment.creator_id {
           return Err(APIError::err("no_comment_edit_allowed").into());
         }
       }
       None => {
         let parent_post_id = orig_comment.post_id;
-        let parent_post = blocking(pool, move |conn| Post::read(conn, parent_post_id)).await??;
+        let parent_post =
+          blocking(context.pool(), move |conn| Post::read(conn, parent_post_id)).await??;
         if user.id != parent_post.creator_id {
           return Err(APIError::err("no_comment_edit_allowed").into());
         }
@@ -582,7 +526,11 @@ impl Perform for Oper<MarkCommentAsRead> {
 
     // Do the mark as read
     let read = data.read;
-    match blocking(pool, move |conn| Comment::update_read(conn, edit_id, read)).await? {
+    match blocking(context.pool(), move |conn| {
+      Comment::update_read(conn, edit_id, read)
+    })
+    .await?
+    {
       Ok(comment) => comment,
       Err(_e) => return Err(APIError::err("couldnt_update_comment").into()),
     };
@@ -590,7 +538,7 @@ impl Perform for Oper<MarkCommentAsRead> {
     // Refetch it
     let edit_id = data.edit_id;
     let user_id = user.id;
-    let comment_view = blocking(pool, move |conn| {
+    let comment_view = blocking(context.pool(), move |conn| {
       CommentView::read(conn, edit_id, Some(user_id))
     })
     .await??;
@@ -606,16 +554,16 @@ impl Perform for Oper<MarkCommentAsRead> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<SaveComment> {
+impl Perform for SaveComment {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &SaveComment = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &SaveComment = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let comment_saved_form = CommentSavedForm {
       comment_id: data.comment_id,
@@ -624,19 +572,19 @@ impl Perform for Oper<SaveComment> {
 
     if data.save {
       let save_comment = move |conn: &'_ _| CommentSaved::save(conn, &comment_saved_form);
-      if blocking(pool, save_comment).await?.is_err() {
+      if blocking(context.pool(), save_comment).await?.is_err() {
         return Err(APIError::err("couldnt_save_comment").into());
       }
     } else {
       let unsave_comment = move |conn: &'_ _| CommentSaved::unsave(conn, &comment_saved_form);
-      if blocking(pool, unsave_comment).await?.is_err() {
+      if blocking(context.pool(), unsave_comment).await?.is_err() {
         return Err(APIError::err("couldnt_save_comment").into());
       }
     }
 
     let comment_id = data.comment_id;
     let user_id = user.id;
-    let comment_view = blocking(pool, move |conn| {
+    let comment_view = blocking(context.pool(), move |conn| {
       CommentView::read(conn, comment_id, Some(user_id))
     })
     .await??;
@@ -650,44 +598,47 @@ impl Perform for Oper<SaveComment> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<CreateCommentLike> {
+impl Perform for CreateCommentLike {
   type Response = CommentResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<CommentResponse, LemmyError> {
-    let data: &CreateCommentLike = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &CreateCommentLike = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let mut recipient_ids = Vec::new();
 
     // Don't do a downvote if site has downvotes disabled
     if data.score == -1 {
-      let site = blocking(pool, move |conn| SiteView::read(conn)).await??;
+      let site = blocking(context.pool(), move |conn| SiteView::read(conn)).await??;
       if !site.enable_downvotes {
         return Err(APIError::err("downvotes_disabled").into());
       }
     }
 
     let comment_id = data.comment_id;
-    let orig_comment =
-      blocking(pool, move |conn| CommentView::read(&conn, comment_id, None)).await??;
+    let orig_comment = blocking(context.pool(), move |conn| {
+      CommentView::read(&conn, comment_id, None)
+    })
+    .await??;
 
     let post_id = orig_comment.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
-    check_community_ban(user.id, post.community_id, pool).await?;
+    let post = get_post(post_id, context.pool()).await?;
+    check_community_ban(user.id, post.community_id, context.pool()).await?;
 
     let comment_id = data.comment_id;
-    let comment = blocking(pool, move |conn| Comment::read(conn, comment_id)).await??;
+    let comment = blocking(context.pool(), move |conn| Comment::read(conn, comment_id)).await??;
 
     // Add to recipient ids
     match comment.parent_id {
       Some(parent_id) => {
-        let parent_comment = blocking(pool, move |conn| Comment::read(conn, parent_id)).await??;
+        let parent_comment =
+          blocking(context.pool(), move |conn| Comment::read(conn, parent_id)).await??;
         if parent_comment.creator_id != user.id {
-          let parent_user = blocking(pool, move |conn| {
+          let parent_user = blocking(context.pool(), move |conn| {
             User_::read(conn, parent_comment.creator_id)
           })
           .await??;
@@ -707,31 +658,34 @@ impl Perform for Oper<CreateCommentLike> {
     };
 
     // Remove any likes first
-    let like_form2 = like_form.clone();
-    blocking(pool, move |conn| CommentLike::remove(conn, &like_form2)).await??;
+    let user_id = user.id;
+    blocking(context.pool(), move |conn| {
+      CommentLike::remove(conn, user_id, comment_id)
+    })
+    .await??;
 
     // Only add the like if the score isnt 0
     let do_add = like_form.score != 0 && (like_form.score == 1 || like_form.score == -1);
     if do_add {
       let like_form2 = like_form.clone();
       let like = move |conn: &'_ _| CommentLike::like(conn, &like_form2);
-      if blocking(pool, like).await?.is_err() {
+      if blocking(context.pool(), like).await?.is_err() {
         return Err(APIError::err("couldnt_like_comment").into());
       }
 
       if like_form.score == 1 {
-        comment.send_like(&user, &self.client, pool).await?;
+        comment.send_like(&user, context).await?;
       } else if like_form.score == -1 {
-        comment.send_dislike(&user, &self.client, pool).await?;
+        comment.send_dislike(&user, context).await?;
       }
     } else {
-      comment.send_undo_like(&user, &self.client, pool).await?;
+      comment.send_undo_like(&user, context).await?;
     }
 
     // Have to refetch the comment to get the current state
     let comment_id = data.comment_id;
     let user_id = user.id;
-    let liked_comment = blocking(pool, move |conn| {
+    let liked_comment = blocking(context.pool(), move |conn| {
       CommentView::read(conn, comment_id, Some(user_id))
     })
     .await??;
@@ -742,54 +696,50 @@ impl Perform for Oper<CreateCommentLike> {
       form_id: None,
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendComment {
-        op: UserOperation::CreateCommentLike,
-        comment: res.clone(),
-        my_id: ws.id,
-      });
+    context.chat_server().do_send(SendComment {
+      op: UserOperation::CreateCommentLike,
+      comment: res.clone(),
+      websocket_id,
+    });
 
-      // strip out the recipient_ids, so that
-      // users don't get double notifs
-      res.recipient_ids = Vec::new();
-    }
+    // strip out the recipient_ids, so that
+    // users don't get double notifs
+    res.recipient_ids = Vec::new();
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<GetComments> {
+impl Perform for GetComments {
   type Response = GetCommentsResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<GetCommentsResponse, LemmyError> {
-    let data: &GetComments = &self.data;
-    let user = get_user_from_jwt_opt(&data.auth, pool).await?;
-    let user_id = user.map(|u| u.id);
+    let data: &GetComments = &self;
+    let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
+    let user_id = match user {
+      Some(user) => Some(user.id),
+      None => None
+    };
 
     // Check community settings
     if let Some(community_id) = data.community_id {
-      let settings = blocking(pool, move |conn| {
-        CommunitySettings::read_from_community_id(conn, community_id)
-      })
-      .await??;
-
-      let privileged = {
-        if let Some(id) = user_id {
-          blocking(pool, move |conn| {
-            let user = User_::read(conn, id)?;
-            user.is_moderator(conn, community_id)
-          })
-          .await??
-        } else {
-          false
+      if let Some(user_id) = user_id {
+        let settings = blocking(context.pool(), move |conn| {
+          CommunitySettings::read_from_community_id(conn, community_id)
+        })
+        .await??;
+        
+        let privileged =
+          is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
+        if settings.private && !privileged {
+          return Err(APIError::err("community_is_private").into());
         }
-      };
-      if settings.private && !privileged {
+      } else {
         return Err(APIError::err("community_is_private").into());
       }
     }
@@ -800,7 +750,7 @@ impl Perform for Oper<GetComments> {
     let community_id = data.community_id;
     let page = data.page;
     let limit = data.limit;
-    let comments = blocking(pool, move |conn| {
+    let comments = blocking(context.pool(), move |conn| {
       CommentQueryBuilder::create(conn)
         .listing_type(type_)
         .sort(&sort)
@@ -810,23 +760,17 @@ impl Perform for Oper<GetComments> {
         .limit(limit)
         .list()
     })
-    .await?;
-    let comments = match comments {
-      Ok(comments) => comments,
-      Err(_) => return Err(APIError::err("couldnt_get_comments").into()),
-    };
+    .await??;
 
-    if let Some(ws) = websocket_info {
+    if let Some(id) = websocket_id {
       // You don't need to join the specific community room, bc this is already handled by
       // GetCommunity
       if data.community_id.is_none() {
-        if let Some(id) = ws.id {
-          // 0 is the "all" community
-          ws.chatserver.do_send(JoinCommunityRoom {
-            community_id: 0,
-            id,
-          });
-        }
+        // 0 is the "all" community
+        context.chat_server().do_send(JoinCommunityRoom {
+          community_id: 0,
+          id,
+        });
       }
     }
 

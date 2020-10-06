@@ -1,154 +1,29 @@
-//! `ChatServer` is an actor. It maintains list of connection client session.
-//! And manages available rooms. Peers send messages to other peers in same
-//! room through `ChatServer`.
-
-use super::*;
 use crate::{
-  api::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, *},
-  rate_limit::RateLimit,
-  websocket::UserOperation,
-  CommunityId,
-  ConnectionId,
-  DbPool,
-  IPAddr,
-  LemmyError,
-  PostId,
-  UserId,
+  websocket::{
+    handlers::{do_user_operation, to_json_string, Args},
+    messages::*,
+    UserOperation,
+  },
+  LemmyContext,
 };
-use actix_web::client::Client;
-use lemmy_db::naive_now;
-
-/// Chat server sends this messages to session
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct WSMessage(pub String);
-
-/// Message for chat server communications
-
-/// New chat session is created
-#[derive(Message)]
-#[rtype(usize)]
-pub struct Connect {
-  pub addr: Recipient<WSMessage>,
-  pub ip: IPAddr,
-}
-
-/// Session is disconnected
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Disconnect {
-  pub id: ConnectionId,
-  pub ip: IPAddr,
-}
-
-/// The messages sent to websocket clients
-#[derive(Serialize, Deserialize, Message)]
-#[rtype(result = "Result<String, std::convert::Infallible>")]
-pub struct StandardMessage {
-  /// Id of the client session
-  pub id: ConnectionId,
-  /// Peer message
-  pub msg: String,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SendAllMessage<Response> {
-  pub op: UserOperation,
-  pub response: Response,
-  pub my_id: Option<ConnectionId>,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SendUserRoomMessage<Response> {
-  pub op: UserOperation,
-  pub response: Response,
-  pub recipient_id: UserId,
-  pub my_id: Option<ConnectionId>,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SendCommunityRoomMessage<Response> {
-  pub op: UserOperation,
-  pub response: Response,
-  pub community_id: CommunityId,
-  pub my_id: Option<ConnectionId>,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SendPost {
-  pub op: UserOperation,
-  pub post: PostResponse,
-  pub my_id: Option<ConnectionId>,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SendComment {
-  pub op: UserOperation,
-  pub comment: CommentResponse,
-  pub my_id: Option<ConnectionId>,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct JoinUserRoom {
-  pub user_id: UserId,
-  pub id: ConnectionId,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct JoinCommunityRoom {
-  pub community_id: CommunityId,
-  pub id: ConnectionId,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct JoinPostRoom {
-  pub post_id: PostId,
-  pub id: ConnectionId,
-}
-
-#[derive(Message)]
-#[rtype(usize)]
-pub struct GetUsersOnline;
-
-#[derive(Message)]
-#[rtype(usize)]
-pub struct GetPostUsersOnline {
-  pub post_id: PostId,
-}
-
-#[derive(Message)]
-#[rtype(usize)]
-pub struct GetCommunityUsersOnline {
-  pub community_id: CommunityId,
-}
-
-pub struct SessionInfo {
-  pub addr: Recipient<WSMessage>,
-  pub ip: IPAddr,
-}
-
-#[derive(Message, Debug)]
-#[rtype(result = "()")]
-pub struct CaptchaItem {
-  pub uuid: String,
-  pub answer: String,
-  pub expires: chrono::NaiveDateTime,
-}
-
-#[derive(Message)]
-#[rtype(bool)]
-pub struct CheckCaptcha {
-  pub uuid: String,
-  pub answer: String,
-}
+use actix::prelude::*;
+use anyhow::Context as acontext;
+use background_jobs::QueueHandle;
+use diesel::{
+  r2d2::{ConnectionManager, Pool},
+  PgConnection,
+};
+use lemmy_api_structs::{comment::*, community::*, community_settings::*, post::*, report::*, site::*, user::*, APIError};
+use lemmy_rate_limit::RateLimit;
+use lemmy_utils::{location_info, CommunityId, ConnectionId, IPAddr, LemmyError, PostId, UserId};
+use rand::rngs::ThreadRng;
+use reqwest::Client;
+use serde::Serialize;
+use serde_json::Value;
+use std::{
+  collections::{HashMap, HashSet},
+  str::FromStr,
+};
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat
 /// session.
@@ -164,28 +39,39 @@ pub struct ChatServer {
 
   /// A map from user id to its connection ID for joined users. Remember a user can have multiple
   /// sessions (IE clients)
-  user_rooms: HashMap<UserId, HashSet<ConnectionId>>,
+  pub(super) user_rooms: HashMap<UserId, HashSet<ConnectionId>>,
 
-  rng: ThreadRng,
+  pub(super) rng: ThreadRng,
 
   /// The DB Pool
-  pool: Pool<ConnectionManager<PgConnection>>,
+  pub(super) pool: Pool<ConnectionManager<PgConnection>>,
 
   /// Rate limiting based on rate type and IP addr
-  rate_limiter: RateLimit,
+  pub(super) rate_limiter: RateLimit,
 
   /// A list of the current captchas
-  captchas: Vec<CaptchaItem>,
+  pub(super) captchas: Vec<CaptchaItem>,
 
   /// An HTTP Client
   client: Client,
+
+  activity_queue: QueueHandle,
 }
 
+pub struct SessionInfo {
+  pub addr: Recipient<WSMessage>,
+  pub ip: IPAddr,
+}
+
+/// `ChatServer` is an actor. It maintains list of connection client session.
+/// And manages available rooms. Peers send messages to other peers in same
+/// room through `ChatServer`.
 impl ChatServer {
   pub fn startup(
     pool: Pool<ConnectionManager<PgConnection>>,
     rate_limiter: RateLimit,
     client: Client,
+    activity_queue: QueueHandle,
   ) -> ChatServer {
     ChatServer {
       sessions: HashMap::new(),
@@ -197,10 +83,15 @@ impl ChatServer {
       rate_limiter,
       captchas: Vec::new(),
       client,
+      activity_queue,
     }
   }
 
-  pub fn join_community_room(&mut self, community_id: CommunityId, id: ConnectionId) {
+  pub fn join_community_room(
+    &mut self,
+    community_id: CommunityId,
+    id: ConnectionId,
+  ) -> Result<(), LemmyError> {
     // remove session from all rooms
     for sessions in self.community_rooms.values_mut() {
       sessions.remove(&id);
@@ -220,11 +111,12 @@ impl ChatServer {
     self
       .community_rooms
       .get_mut(&community_id)
-      .unwrap()
+      .context(location_info!())?
       .insert(id);
+    Ok(())
   }
 
-  pub fn join_post_room(&mut self, post_id: PostId, id: ConnectionId) {
+  pub fn join_post_room(&mut self, post_id: PostId, id: ConnectionId) -> Result<(), LemmyError> {
     // remove session from all rooms
     for sessions in self.post_rooms.values_mut() {
       sessions.remove(&id);
@@ -244,10 +136,16 @@ impl ChatServer {
       self.post_rooms.insert(post_id, HashSet::new());
     }
 
-    self.post_rooms.get_mut(&post_id).unwrap().insert(id);
+    self
+      .post_rooms
+      .get_mut(&post_id)
+      .context(location_info!())?
+      .insert(id);
+
+    Ok(())
   }
 
-  pub fn join_user_room(&mut self, user_id: UserId, id: ConnectionId) {
+  pub fn join_user_room(&mut self, user_id: UserId, id: ConnectionId) -> Result<(), LemmyError> {
     // remove session from all rooms
     for sessions in self.user_rooms.values_mut() {
       sessions.remove(&id);
@@ -258,7 +156,13 @@ impl ChatServer {
       self.user_rooms.insert(user_id, HashSet::new());
     }
 
-    self.user_rooms.get_mut(&user_id).unwrap().insert(id);
+    self
+      .user_rooms
+      .get_mut(&user_id)
+      .context(location_info!())?
+      .insert(id);
+
+    Ok(())
   }
 
   fn send_post_room_message<Response>(
@@ -266,7 +170,7 @@ impl ChatServer {
     op: &UserOperation,
     response: &Response,
     post_id: PostId,
-    my_id: Option<ConnectionId>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<(), LemmyError>
   where
     Response: Serialize,
@@ -274,7 +178,7 @@ impl ChatServer {
     let res_str = &to_json_string(op, response)?;
     if let Some(sessions) = self.post_rooms.get(&post_id) {
       for id in sessions {
-        if let Some(my_id) = my_id {
+        if let Some(my_id) = websocket_id {
           if *id == my_id {
             continue;
           }
@@ -290,7 +194,7 @@ impl ChatServer {
     op: &UserOperation,
     response: &Response,
     community_id: CommunityId,
-    my_id: Option<ConnectionId>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<(), LemmyError>
   where
     Response: Serialize,
@@ -298,7 +202,7 @@ impl ChatServer {
     let res_str = &to_json_string(op, response)?;
     if let Some(sessions) = self.community_rooms.get(&community_id) {
       for id in sessions {
-        if let Some(my_id) = my_id {
+        if let Some(my_id) = websocket_id {
           if *id == my_id {
             continue;
           }
@@ -313,14 +217,14 @@ impl ChatServer {
     &self,
     op: &UserOperation,
     response: &Response,
-    my_id: Option<ConnectionId>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<(), LemmyError>
   where
     Response: Serialize,
   {
     let res_str = &to_json_string(op, response)?;
     for id in self.sessions.keys() {
-      if let Some(my_id) = my_id {
+      if let Some(my_id) = websocket_id {
         if *id == my_id {
           continue;
         }
@@ -335,7 +239,7 @@ impl ChatServer {
     op: &UserOperation,
     response: &Response,
     recipient_id: UserId,
-    my_id: Option<ConnectionId>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<(), LemmyError>
   where
     Response: Serialize,
@@ -343,7 +247,7 @@ impl ChatServer {
     let res_str = &to_json_string(op, response)?;
     if let Some(sessions) = self.user_rooms.get(&recipient_id) {
       for id in sessions {
-        if let Some(my_id) = my_id {
+        if let Some(my_id) = websocket_id {
           if *id == my_id {
             continue;
           }
@@ -358,7 +262,7 @@ impl ChatServer {
     &self,
     user_operation: &UserOperation,
     comment: &CommentResponse,
-    my_id: Option<ConnectionId>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<(), LemmyError> {
     let mut comment_reply_sent = comment.clone();
     comment_reply_sent.comment.my_vote = None;
@@ -372,21 +276,26 @@ impl ChatServer {
       user_operation,
       &comment_post_sent,
       comment_post_sent.comment.post_id,
-      my_id,
+      websocket_id,
     )?;
 
     // Send it to the recipient(s) including the mentioned users
     for recipient_id in &comment_reply_sent.recipient_ids {
-      self.send_user_room_message(user_operation, &comment_reply_sent, *recipient_id, my_id)?;
+      self.send_user_room_message(
+        user_operation,
+        &comment_reply_sent,
+        *recipient_id,
+        websocket_id,
+      )?;
     }
 
     // Send it to the community too
-    self.send_community_room_message(user_operation, &comment_post_sent, 0, my_id)?;
+    self.send_community_room_message(user_operation, &comment_post_sent, 0, websocket_id)?;
     self.send_community_room_message(
       user_operation,
       &comment_post_sent,
       comment.comment.community_id,
-      my_id,
+      websocket_id,
     )?;
 
     Ok(())
@@ -396,7 +305,7 @@ impl ChatServer {
     &self,
     user_operation: &UserOperation,
     post: &PostResponse,
-    my_id: Option<ConnectionId>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<(), LemmyError> {
     let community_id = post.post.community_id;
 
@@ -406,11 +315,11 @@ impl ChatServer {
     post_sent.post.user_id = None;
 
     // Send it to /c/all and that community
-    self.send_community_room_message(user_operation, &post_sent, 0, my_id)?;
-    self.send_community_room_message(user_operation, &post_sent, community_id, my_id)?;
+    self.send_community_room_message(user_operation, &post_sent, 0, websocket_id)?;
+    self.send_community_room_message(user_operation, &post_sent, community_id, websocket_id)?;
 
     // Send it to the post room
-    self.send_post_room_message(user_operation, &post_sent, post.post.id, my_id)?;
+    self.send_post_room_message(user_operation, &post_sent, post.post.id, websocket_id)?;
 
     Ok(())
   }
@@ -421,7 +330,7 @@ impl ChatServer {
     }
   }
 
-  fn parse_json_message(
+  pub(super) fn parse_json_message(
     &mut self,
     msg: StandardMessage,
     ctx: &mut Context<Self>,
@@ -436,6 +345,7 @@ impl ChatServer {
     };
 
     let client = self.client.clone();
+    let activity_queue = self.activity_queue.clone();
     async move {
       let msg = msg;
       let json: Value = serde_json::from_str(&msg.msg)?;
@@ -446,11 +356,15 @@ impl ChatServer {
 
       let user_operation: UserOperation = UserOperation::from_str(&op)?;
 
-      let args = Args {
-        client,
+      let context = LemmyContext {
         pool,
+        chat_server: addr,
+        client,
+        activity_queue,
+      };
+      let args = Args {
+        context,
         rate_limiter,
-        chatserver: addr,
         id: msg.id,
         ip,
         op: user_operation.clone(),
@@ -467,7 +381,6 @@ impl ChatServer {
         UserOperation::AddAdmin => do_user_operation::<AddAdmin>(args).await,
         UserOperation::AddSitemod => do_user_operation::<AddSitemod>(args).await,
         UserOperation::BanUser => do_user_operation::<BanUser>(args).await,
-        UserOperation::RemoveUserContent => do_user_operation::<RemoveUserContent>(args).await,
         UserOperation::GetUserMentions => do_user_operation::<GetUserMentions>(args).await,
         UserOperation::MarkUserMentionAsRead => {
           do_user_operation::<MarkUserMentionAsRead>(args).await
@@ -478,6 +391,7 @@ impl ChatServer {
         UserOperation::PasswordChange => do_user_operation::<PasswordChange>(args).await,
         UserOperation::UserJoin => do_user_operation::<UserJoin>(args).await,
         UserOperation::SaveUserSettings => do_user_operation::<SaveUserSettings>(args).await,
+        UserOperation::RemoveUserContent => do_user_operation::<RemoveUserContent>(args).await,
 
         // Private Message ops
         UserOperation::CreatePrivateMessage => {
@@ -559,294 +473,5 @@ impl ChatServer {
         }
       }
     }
-  }
-}
-
-struct Args<'a> {
-  client: Client,
-  pool: DbPool,
-  rate_limiter: RateLimit,
-  chatserver: Addr<ChatServer>,
-  id: ConnectionId,
-  ip: IPAddr,
-  op: UserOperation,
-  data: &'a str,
-}
-
-async fn do_user_operation<'a, 'b, Data>(args: Args<'b>) -> Result<String, LemmyError>
-where
-  for<'de> Data: Deserialize<'de> + 'a,
-  Oper<Data>: Perform,
-{
-  let Args {
-    client,
-    pool,
-    rate_limiter,
-    chatserver,
-    id,
-    ip,
-    op,
-    data,
-  } = args;
-
-  let ws_info = WebsocketInfo {
-    chatserver,
-    id: Some(id),
-  };
-
-  let data = data.to_string();
-  let op2 = op.clone();
-
-  let client = client.clone();
-  let fut = async move {
-    let pool = pool.clone();
-    let parsed_data: Data = serde_json::from_str(&data)?;
-    let res = Oper::new(parsed_data, client)
-      .perform(&pool, Some(ws_info))
-      .await?;
-    to_json_string(&op, &res)
-  };
-
-  match op2 {
-    UserOperation::Register => rate_limiter.register().wrap(ip, fut).await,
-    UserOperation::CreatePost => rate_limiter.post().wrap(ip, fut).await,
-    UserOperation::CreateCommunity => rate_limiter.register().wrap(ip, fut).await,
-    UserOperation::CreateComment => rate_limiter.post().wrap(ip, fut).await,
-    UserOperation::CreateCommentReport => rate_limiter.post().wrap(ip, fut).await,
-    UserOperation::CreatePostReport => rate_limiter.post().wrap(ip, fut).await,
-    UserOperation::CreatePrivateMessage => rate_limiter.post().wrap(ip, fut).await,
-    _ => rate_limiter.message().wrap(ip, fut).await,
-  }
-}
-
-/// Make actor from `ChatServer`
-impl Actor for ChatServer {
-  /// We are going to use simple Context, we just need ability to communicate
-  /// with other actors.
-  type Context = Context<Self>;
-}
-
-/// Handler for Connect message.
-///
-/// Register new session and assign unique id to this session
-impl Handler<Connect> for ChatServer {
-  type Result = usize;
-
-  fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) -> Self::Result {
-    // register session with random id
-    let id = self.rng.gen::<usize>();
-    info!("{} joined", &msg.ip);
-
-    self.sessions.insert(
-      id,
-      SessionInfo {
-        addr: msg.addr,
-        ip: msg.ip,
-      },
-    );
-
-    id
-  }
-}
-
-/// Handler for Disconnect message.
-impl Handler<Disconnect> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
-    // Remove connections from sessions and all 3 scopes
-    if self.sessions.remove(&msg.id).is_some() {
-      for sessions in self.user_rooms.values_mut() {
-        sessions.remove(&msg.id);
-      }
-
-      for sessions in self.post_rooms.values_mut() {
-        sessions.remove(&msg.id);
-      }
-
-      for sessions in self.community_rooms.values_mut() {
-        sessions.remove(&msg.id);
-      }
-    }
-  }
-}
-
-/// Handler for Message message.
-impl Handler<StandardMessage> for ChatServer {
-  type Result = ResponseFuture<Result<String, std::convert::Infallible>>;
-
-  fn handle(&mut self, msg: StandardMessage, ctx: &mut Context<Self>) -> Self::Result {
-    let fut = self.parse_json_message(msg, ctx);
-    Box::pin(async move {
-      match fut.await {
-        Ok(m) => {
-          // info!("Message Sent: {}", m);
-          Ok(m)
-        }
-        Err(e) => {
-          error!("Error during message handling {}", e);
-          Ok(e.to_string())
-        }
-      }
-    })
-  }
-}
-
-impl<Response> Handler<SendAllMessage<Response>> for ChatServer
-where
-  Response: Serialize,
-{
-  type Result = ();
-
-  fn handle(&mut self, msg: SendAllMessage<Response>, _: &mut Context<Self>) {
-    self
-      .send_all_message(&msg.op, &msg.response, msg.my_id)
-      .unwrap();
-  }
-}
-
-impl<Response> Handler<SendUserRoomMessage<Response>> for ChatServer
-where
-  Response: Serialize,
-{
-  type Result = ();
-
-  fn handle(&mut self, msg: SendUserRoomMessage<Response>, _: &mut Context<Self>) {
-    self
-      .send_user_room_message(&msg.op, &msg.response, msg.recipient_id, msg.my_id)
-      .unwrap();
-  }
-}
-
-impl<Response> Handler<SendCommunityRoomMessage<Response>> for ChatServer
-where
-  Response: Serialize,
-{
-  type Result = ();
-
-  fn handle(&mut self, msg: SendCommunityRoomMessage<Response>, _: &mut Context<Self>) {
-    self
-      .send_community_room_message(&msg.op, &msg.response, msg.community_id, msg.my_id)
-      .unwrap();
-  }
-}
-
-impl Handler<SendPost> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: SendPost, _: &mut Context<Self>) {
-    self.send_post(&msg.op, &msg.post, msg.my_id).unwrap();
-  }
-}
-
-impl Handler<SendComment> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: SendComment, _: &mut Context<Self>) {
-    self.send_comment(&msg.op, &msg.comment, msg.my_id).unwrap();
-  }
-}
-
-impl Handler<JoinUserRoom> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: JoinUserRoom, _: &mut Context<Self>) {
-    self.join_user_room(msg.user_id, msg.id);
-  }
-}
-
-impl Handler<JoinCommunityRoom> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: JoinCommunityRoom, _: &mut Context<Self>) {
-    self.join_community_room(msg.community_id, msg.id);
-  }
-}
-
-impl Handler<JoinPostRoom> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: JoinPostRoom, _: &mut Context<Self>) {
-    self.join_post_room(msg.post_id, msg.id);
-  }
-}
-
-impl Handler<GetUsersOnline> for ChatServer {
-  type Result = usize;
-
-  fn handle(&mut self, _msg: GetUsersOnline, _: &mut Context<Self>) -> Self::Result {
-    // Because itertools's unique_by uses a hash-set behind the scenes this cna cause a *lot* of expensive hash
-    // operations and *may* be a perforance drag later down the line if there are enough online users
-    use itertools::Itertools;
-    let infos: Vec<_> = self.sessions.values().unique_by(|info| &info.ip).collect();
-    infos.len()
-  }
-}
-
-impl Handler<GetPostUsersOnline> for ChatServer {
-  type Result = usize;
-
-  fn handle(&mut self, msg: GetPostUsersOnline, _: &mut Context<Self>) -> Self::Result {
-    if let Some(users) = self.post_rooms.get(&msg.post_id) {
-      users.len()
-    } else {
-      0
-    }
-  }
-}
-
-impl Handler<GetCommunityUsersOnline> for ChatServer {
-  type Result = usize;
-
-  fn handle(&mut self, msg: GetCommunityUsersOnline, _: &mut Context<Self>) -> Self::Result {
-    if let Some(users) = self.community_rooms.get(&msg.community_id) {
-      users.len()
-    } else {
-      0
-    }
-  }
-}
-
-#[derive(Serialize)]
-struct WebsocketResponse<T> {
-  op: String,
-  data: T,
-}
-
-fn to_json_string<Response>(op: &UserOperation, data: &Response) -> Result<String, LemmyError>
-where
-  Response: Serialize,
-{
-  let response = WebsocketResponse {
-    op: op.to_string(),
-    data,
-  };
-  Ok(serde_json::to_string(&response)?)
-}
-
-impl Handler<CaptchaItem> for ChatServer {
-  type Result = ();
-
-  fn handle(&mut self, msg: CaptchaItem, _: &mut Context<Self>) {
-    self.captchas.push(msg);
-  }
-}
-
-impl Handler<CheckCaptcha> for ChatServer {
-  type Result = bool;
-
-  fn handle(&mut self, msg: CheckCaptcha, _: &mut Context<Self>) -> Self::Result {
-    // Remove all the ones that are past the expire time
-    self.captchas.retain(|x| x.expires.gt(&naive_now()));
-
-    let check = self
-      .captchas
-      .iter()
-      .any(|r| r.uuid == msg.uuid && r.answer == msg.answer);
-
-    // Remove this uuid so it can't be re-checked (Checks only work once)
-    self.captchas.retain(|x| x.uuid != msg.uuid);
-
-    check
   }
 }

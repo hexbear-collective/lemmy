@@ -1,9 +1,9 @@
 // This is for db migrations that require code
-use crate::LemmyError;
 use diesel::{
-  sql_types::{Nullable, Text},
+//  sql_types::{Nullable, Text},
   *,
 };
+/*
 use lemmy_db::{
   comment::Comment,
   community::{Community, CommunityForm},
@@ -16,20 +16,23 @@ use lemmy_db::{
 use lemmy_utils::{
   generate_actor_keypair, get_apub_protocol_string, make_apub_endpoint, settings::Settings,
   EndpointType,
+  LemmyError,
 };
 use log::info;
+ */
+use lemmy_utils::LemmyError;
 
 pub fn run_advanced_migrations(conn: &PgConnection) -> Result<(), LemmyError> {
-  user_updates_2020_04_02(&conn)?;
-  community_updates_2020_04_02(&conn)?;
-  post_updates_2020_04_03(&conn)?;
-  comment_updates_2020_04_03(&conn)?;
-  private_message_updates_2020_05_05(&conn)?;
-  post_thumbnail_url_updates_2020_07_27(&conn)?;
+  // user_updates_2020_04_02(&conn)?;
+  // community_updates_2020_04_02(&conn)?;
+  // post_updates_2020_04_03(&conn)?;
+  // comment_updates_2020_04_03(&conn)?;
+  // private_message_updates_2020_05_05(&conn)?;
+  // post_thumbnail_url_updates_2020_07_27(&conn)?;
 
   Ok(())
 }
-
+/*
 fn user_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
   use lemmy_db::schema::user_::dsl::*;
 
@@ -48,7 +51,7 @@ fn user_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
 
     let form = UserForm {
       name: cuser.name.to_owned(),
-      email: cuser.email.to_owned(),
+      email: Some(cuser.email.to_owned()),
       matrix_user_id: cuser.matrix_user_id.to_owned(),
       avatar: Some(cuser.avatar.to_owned()),
       banner: Some(cuser.banner.to_owned()),
@@ -63,7 +66,7 @@ fn user_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
       lang: cuser.lang.to_owned(),
       show_avatars: cuser.show_avatars,
       send_notifications_to_email: cuser.send_notifications_to_email,
-      actor_id: make_apub_endpoint(EndpointType::User, &cuser.name).to_string(),
+      actor_id: Some(make_apub_endpoint(EndpointType::User, &cuser.name).to_string()),
       bio: cuser.bio.to_owned(),
       local: cuser.local,
       private_key: Some(keypair.private_key),
@@ -107,7 +110,7 @@ fn community_updates_2020_04_02(conn: &PgConnection) -> Result<(), LemmyError> {
       deleted: None,
       nsfw: ccommunity.nsfw,
       updated: None,
-      actor_id: make_apub_endpoint(EndpointType::Community, &ccommunity.name).to_string(),
+      actor_id: Some(make_apub_endpoint(EndpointType::Community, &ccommunity.name).to_string()),
       local: ccommunity.local,
       private_key: Some(keypair.private_key),
       public_key: Some(keypair.public_key),
@@ -134,7 +137,7 @@ fn post_updates_2020_04_03(conn: &PgConnection) -> Result<(), LemmyError> {
 
   // Update the ap_id
   let incorrect_posts = post
-    .filter(ap_id.eq("http://fake.com"))
+    .filter(ap_id.eq("changeme_%"))
     .filter(local.eq(true))
     .load::<Post>(conn)?;
 
@@ -159,7 +162,7 @@ fn comment_updates_2020_04_03(conn: &PgConnection) -> Result<(), LemmyError> {
 
   // Update the ap_id
   let incorrect_comments = comment
-    .filter(ap_id.eq("http://fake.com"))
+    .filter(ap_id.eq("changeme_%"))
     .filter(local.eq(true))
     .load::<Comment>(conn)?;
 
@@ -184,7 +187,7 @@ fn private_message_updates_2020_05_05(conn: &PgConnection) -> Result<(), LemmyEr
 
   // Update the ap_id
   let incorrect_pms = private_message
-    .filter(ap_id.eq("http://fake.com"))
+    .filter(ap_id.eq("changeme_%"))
     .filter(local.eq(true))
     .load::<PrivateMessage>(conn)?;
 
@@ -226,3 +229,4 @@ fn post_thumbnail_url_updates_2020_07_27(conn: &PgConnection) -> Result<(), Lemm
 
   Ok(())
 }
+*/

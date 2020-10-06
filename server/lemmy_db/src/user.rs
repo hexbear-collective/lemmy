@@ -1,5 +1,4 @@
 use crate::{
-  community::CommunityModerator,
   is_email_regex,
   naive_now,
   schema::{user_, user_::dsl::*},
@@ -50,8 +49,10 @@ pub struct UserForm {
   pub name: String,
   pub preferred_username: Option<String>,
   pub password_encrypted: String,
+  pub admin: bool,
+  pub sitemod: bool,
   pub banned: bool,
-  pub email: Option<String>,
+  pub email: Option<Option<String>>,
   pub avatar: Option<Option<String>>,
   pub updated: Option<chrono::NaiveDateTime>,
   pub show_nsfw: bool,
@@ -62,7 +63,7 @@ pub struct UserForm {
   pub show_avatars: bool,
   pub send_notifications_to_email: bool,
   pub matrix_user_id: Option<String>,
-  pub actor_id: String,
+  pub actor_id: Option<String>,
   pub bio: Option<String>,
   pub local: bool,
   pub private_key: Option<String>,
@@ -149,21 +150,6 @@ impl User_ {
     user_.filter(actor_id.eq(object_id)).first::<Self>(conn)
   }
 
-  pub fn is_moderator(&self, conn: &PgConnection, community_id_: i32) -> Result<bool, Error> {
-    use crate::{community::Community, schema::community_moderator::dsl::*};
-    let community = Community::read(conn, community_id_)?;
-
-    Ok(
-      community_moderator
-        .filter(community_id.eq(community_id_))
-        .filter(user_id.eq(self.id))
-        .first::<CommunityModerator>(conn)
-        .optional()?
-        .is_some()
-        || community.creator_id == self.id,
-    )
-  }
-
   pub fn find_by_email_or_username(
     conn: &PgConnection,
     username_or_email: &str,
@@ -176,9 +162,7 @@ impl User_ {
   }
 
   pub fn find_by_username(conn: &PgConnection, username: &str) -> Result<User_, Error> {
-    user_
-      .filter(lower(name).eq(username.to_lowercase()))
-      .first::<User_>(conn)
+    user_.filter(name.ilike(username)).first::<User_>(conn)
   }
 
   pub fn find_by_email(conn: &PgConnection, from_email: &str) -> Result<Self, Error> {
@@ -189,6 +173,15 @@ impl User_ {
 
   pub fn get_profile_url(&self, hostname: &str) -> String {
     format!("https://{}/u/{}", hostname, self.name)
+  }
+
+  pub fn upsert(conn: &PgConnection, user_form: &UserForm) -> Result<User_, Error> {
+    insert_into(user_)
+      .values(user_form)
+      .on_conflict(actor_id)
+      .do_update()
+      .set(user_form)
+      .get_result::<Self>(conn)
   }
 
   pub fn get_unread_notifs(conn: &PgConnection, user_id: i32) -> Result<UserUnreadCount, Error> {
@@ -231,10 +224,13 @@ mod tests {
       name: "thommy".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -244,7 +240,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_9826382637".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -259,6 +255,8 @@ mod tests {
       name: "thommy".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -302,6 +300,8 @@ mod tests {
       name: "creator".into(),
       preferred_username: None,
       password_encrypted: "creator".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -327,6 +327,8 @@ mod tests {
       name: "moderator".into(),
       preferred_username: None,
       password_encrypted: "mod".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -352,6 +354,8 @@ mod tests {
       name: "not_moderator".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
+      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,

@@ -27,7 +27,7 @@ pub struct PrivateMessageForm {
   pub read: Option<bool>,
   pub published: Option<chrono::NaiveDateTime>,
   pub updated: Option<chrono::NaiveDateTime>,
-  pub ap_id: String,
+  pub ap_id: Option<String>,
   pub local: bool,
 }
 
@@ -35,11 +35,6 @@ impl Crud<PrivateMessageForm> for PrivateMessage {
   fn read(conn: &PgConnection, private_message_id: i32) -> Result<Self, Error> {
     use crate::schema::private_message::dsl::*;
     private_message.find(private_message_id).first::<Self>(conn)
-  }
-
-  fn delete(conn: &PgConnection, private_message_id: i32) -> Result<usize, Error> {
-    use crate::schema::private_message::dsl::*;
-    diesel::delete(private_message.find(private_message_id)).execute(conn)
   }
 
   fn create(conn: &PgConnection, private_message_form: &PrivateMessageForm) -> Result<Self, Error> {
@@ -124,6 +119,20 @@ impl PrivateMessage {
     .set(read.eq(true))
     .get_results::<Self>(conn)
   }
+
+  // TODO use this
+  pub fn upsert(
+    conn: &PgConnection,
+    private_message_form: &PrivateMessageForm,
+  ) -> Result<Self, Error> {
+    use crate::schema::private_message::dsl::*;
+    insert_into(private_message)
+      .values(private_message_form)
+      .on_conflict(ap_id)
+      .do_update()
+      .set(private_message_form)
+      .get_result::<Self>(conn)
+  }
 }
 
 #[cfg(test)]
@@ -148,6 +157,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -157,7 +167,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_6723878".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -175,6 +185,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -184,7 +195,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_287263876".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -202,7 +213,7 @@ mod tests {
       read: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -217,7 +228,7 @@ mod tests {
       read: false,
       updated: None,
       published: inserted_private_message.published,
-      ap_id: "http://fake.com".into(),
+      ap_id: inserted_private_message.ap_id.to_owned(),
       local: true,
     };
 
@@ -228,7 +239,6 @@ mod tests {
       PrivateMessage::update_deleted(&conn, inserted_private_message.id, true).unwrap();
     let marked_read_private_message =
       PrivateMessage::update_read(&conn, inserted_private_message.id, true).unwrap();
-    let num_deleted = PrivateMessage::delete(&conn, inserted_private_message.id).unwrap();
     User_::delete(&conn, inserted_creator.id).unwrap();
     User_::delete(&conn, inserted_recipient.id).unwrap();
 
@@ -237,6 +247,5 @@ mod tests {
     assert_eq!(expected_private_message, inserted_private_message);
     assert!(deleted_private_message.deleted);
     assert!(marked_read_private_message.read);
-    assert_eq!(1, num_deleted);
   }
 }

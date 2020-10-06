@@ -46,7 +46,7 @@ pub struct CommunityForm {
   pub updated: Option<chrono::NaiveDateTime>,
   pub deleted: Option<bool>,
   pub nsfw: bool,
-  pub actor_id: String,
+  pub actor_id: Option<String>,
   pub local: bool,
   pub private_key: Option<String>,
   pub public_key: Option<String>,
@@ -100,15 +100,6 @@ impl Community {
       .first::<Self>(conn)
   }
 
-  pub fn list_local(conn: &PgConnection) -> Result<Vec<Self>, Error> {
-    use crate::schema::community::dsl::*;
-    community.filter(local.eq(true)).load::<Community>(conn)
-  }
-
-  pub fn get_settings(&self, conn: &PgConnection) -> Result<CommunitySettings, Error> {
-    CommunitySettings::read_from_community_id(&conn, self.id)
-  }
-
   pub fn update_deleted(
     conn: &PgConnection,
     community_id: i32,
@@ -129,6 +120,17 @@ impl Community {
     diesel::update(community.find(community_id))
       .set((removed.eq(new_removed), updated.eq(naive_now())))
       .get_result::<Self>(conn)
+  }
+
+  pub fn update_removed_for_creator(
+    conn: &PgConnection,
+    for_creator_id: i32,
+    new_removed: bool,
+  ) -> Result<Vec<Self>, Error> {
+    use crate::schema::community::dsl::*;
+    diesel::update(community.filter(creator_id.eq(for_creator_id)))
+      .set((removed.eq(new_removed), updated.eq(naive_now())))
+      .get_results::<Self>(conn)
   }
 
   pub fn update_creator(
@@ -158,6 +160,20 @@ impl Community {
     Self::community_mods_and_admins(conn, community_id)
       .unwrap_or_default()
       .contains(&user_id)
+  }
+
+  pub fn upsert(conn: &PgConnection, community_form: &CommunityForm) -> Result<Community, Error> {
+    use crate::schema::community::dsl::*;
+    insert_into(community)
+      .values(community_form)
+      .on_conflict(actor_id)
+      .do_update()
+      .set(community_form)
+      .get_result::<Self>(conn)
+  }
+
+  pub fn get_settings(&self, conn: &PgConnection) -> Result<CommunitySettings, Error> {
+    CommunitySettings::read_from_community_id(&conn, self.id)
   }
 }
 
@@ -318,7 +334,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_8266238".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -338,7 +354,7 @@ mod tests {
       removed: None,
       deleted: None,
       updated: None,
-      actor_id: "changeme_7625376".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,

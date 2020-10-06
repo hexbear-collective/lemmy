@@ -1,3 +1,35 @@
+use std::str::FromStr;
+use std::time::Duration;
+
+use actix_web::web::Data;
+use url::Url;
+
+use lemmy_api_structs::{APIError, post::*};
+use lemmy_db::{
+  comment_view::*,
+  community_settings::*,
+  community_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  moderator::*,
+  naive_now,
+  post::*,
+  post_view::*,
+  Saveable,
+  site::*,
+  site_view::*,
+  SortType,
+  user_view::*,
+};
+use lemmy_utils::{
+  ConnectionId,
+  EndpointType,
+  is_valid_post_title,
+  LemmyError,
+  make_apub_endpoint,
+};
+
 use crate::{
   api::{
     check_community_ban,
@@ -6,8 +38,6 @@ use crate::{
     get_user_from_jwt,
     get_user_from_jwt_opt,
     is_mod_or_admin,
-    APIError,
-    Oper,
     Perform,
   },
   apub::{ApubLikeableType, ApubObjectType},
@@ -15,160 +45,27 @@ use crate::{
   fetch_iframely_and_pictrs_data,
   is_within_post_body_char_limit,
   is_within_post_title_char_limit,
+  LemmyContext,
   websocket::{
-    server::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
+    messages::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
     UserOperation,
-    WebsocketInfo,
   },
-  DbPool,
-  LemmyError,
 };
-use lemmy_db::{
-  comment_view::*,
-  community_settings::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  post::*,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_view::*,
-  Crud,
-  Likeable,
-  ListingType,
-  Saveable,
-  SortType,
-};
-use lemmy_utils::{is_valid_post_title, make_apub_endpoint, EndpointType};
-use log::debug;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use url::Url;
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreatePost {
-  name: String,
-  url: Option<String>,
-  body: Option<String>,
-  nsfw: bool,
-  pub community_id: i32,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PostResponse {
-  pub post: PostView,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetPost {
-  pub id: i32,
-  auth: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetPostResponse {
-  post: PostView,
-  comments: Vec<CommentView>,
-  community: CommunityView,
-  moderators: Vec<CommunityModeratorView>,
-  admins: Vec<UserView>,
-  sitemods: Vec<UserView>,
-  pub online: usize,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetPosts {
-  type_: String,
-  sort: String,
-  page: Option<i64>,
-  limit: Option<i64>,
-  pub community_id: Option<i32>,
-  pub community_name: Option<String>,
-  auth: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetPostsResponse {
-  pub posts: Vec<PostView>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreatePostLike {
-  post_id: i32,
-  score: i16,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct EditPost {
-  pub edit_id: i32,
-  name: String,
-  url: Option<String>,
-  body: Option<String>,
-  nsfw: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DeletePost {
-  pub edit_id: i32,
-  deleted: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RemovePost {
-  pub edit_id: i32,
-  removed: bool,
-  reason: Option<String>,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct LockPost {
-  pub edit_id: i32,
-  locked: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct StickyPost {
-  pub edit_id: i32,
-  stickied: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SavePost {
-  post_id: i32,
-  save: bool,
-  auth: String,
-}
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<CreatePost> {
+impl Perform for CreatePost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &CreatePost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &CreatePost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     check_slurs(&data.name)?;
     check_slurs_opt(&data.body)?;
-
-    // if let Some(body) = &data.body {
-    //   if let Err(pii) = pii_check(body) {
-    //     return Err(APIError::err(&pii_vec_to_str(pii)).into());
-    //   }
-    // }
-
     if !is_within_post_title_char_limit(&data.name) {
       return Err(APIError::err("post_title_too_long").into());
     }
@@ -178,14 +75,13 @@ impl Perform for Oper<CreatePost> {
         return Err(APIError::err("post_body_too_long").into());
       }
     }
-
     if !is_valid_post_title(&data.name) {
       return Err(APIError::err("invalid_post_title").into());
     }
 
     let user_id = user.id;
     let community_id = data.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
@@ -193,20 +89,20 @@ impl Perform for Oper<CreatePost> {
     let mut moderators: Vec<i32> = vec![];
 
     moderators.append(
-      &mut blocking(pool, move |conn| {
+      &mut blocking(context.pool(), move |conn| {
         CommunityModeratorView::for_community(conn, community_id)
           .map(|v| v.into_iter().map(|m| m.user_id).collect())
       })
       .await??,
     );
     moderators.append(
-      &mut blocking(pool, move |conn| {
+      &mut blocking(context.pool(), move |conn| {
         UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
     moderators.append(
-      &mut blocking(pool, move |conn| {
+      &mut blocking(context.pool(), move |conn| {
         UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
       })
       .await??,
@@ -223,16 +119,13 @@ impl Perform for Oper<CreatePost> {
     if !settings.post_links && !privileged && data.url.is_some() {
       return Err(APIError::err("community_no_link_posts").into());
     }
-
-    // Check for a site ban
-    let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
-    if user.banned {
-      return Err(APIError::err("site_ban").into());
+    if !privileged {
+      check_community_ban(user.id, data.community_id, context.pool()).await?;
     }
-
-    check_community_ban(user.id, data.community_id, pool).await?;
-
-    let user_view = blocking(pool, move |conn| UserView::read(conn, user_id)).await??;
+    
+    let user_view =
+      blocking(context.pool(),
+               move |conn| UserView::get_user_secure(conn, user_id)).await??;
     let score = user_view.post_score + user_view.comment_score;
 
     // no upstream, dessalines wants to leverage rate limiting
@@ -260,7 +153,7 @@ impl Perform for Oper<CreatePost> {
 
     // Fetch Iframely and pictrs cached image
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
-      fetch_iframely_and_pictrs_data(&self.client, url.to_owned()).await;
+      fetch_iframely_and_pictrs_data(context.client(), data.url.to_owned()).await;
 
     let post_form = PostForm {
       name: data.name.trim().to_owned(),
@@ -278,26 +171,27 @@ impl Perform for Oper<CreatePost> {
       embed_description: iframely_description,
       embed_html: iframely_html,
       thumbnail_url: pictrs_thumbnail,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
 
-    let inserted_post = match blocking(pool, move |conn| Post::create(conn, &post_form)).await? {
-      Ok(post) => post,
-      Err(e) => {
-        let err_type = if e.to_string() == "value too long for type character varying(200)" {
-          "post_title_too_long"
-        } else {
-          "couldnt_create_post"
-        };
+    let inserted_post =
+      match blocking(context.pool(), move |conn| Post::create(conn, &post_form)).await? {
+        Ok(post) => post,
+        Err(e) => {
+          let err_type = if e.to_string() == "value too long for type character varying(200)" {
+            "post_title_too_long"
+          } else {
+            "couldnt_create_post"
+          };
 
-        return Err(APIError::err(err_type).into());
-      }
-    };
+          return Err(APIError::err(err_type).into());
+        }
+      };
 
     let inserted_post_id = inserted_post.id;
-    let updated_post = match blocking(pool, move |conn| {
+    let updated_post = match blocking(context.pool(), move |conn| {
       let apub_id =
         make_apub_endpoint(EndpointType::Post, &inserted_post_id.to_string()).to_string();
       Post::update_ap_id(conn, inserted_post_id, apub_id)
@@ -308,7 +202,7 @@ impl Perform for Oper<CreatePost> {
       Err(_e) => return Err(APIError::err("couldnt_create_post").into()),
     };
 
-    updated_post.send_create(&user, &self.client, pool).await?;
+    updated_post.send_create(&user, context).await?;
 
     // They like their own post by default
     let like_form = PostLikeForm {
@@ -318,15 +212,15 @@ impl Perform for Oper<CreatePost> {
     };
 
     let like = move |conn: &'_ _| PostLike::like(conn, &like_form);
-    if blocking(pool, like).await?.is_err() {
+    if blocking(context.pool(), like).await?.is_err() {
       return Err(APIError::err("couldnt_like_post").into());
     }
 
-    updated_post.send_like(&user, &self.client, pool).await?;
+    updated_post.send_like(&user, context).await?;
 
     // Refetch the view
     let inserted_post_id = inserted_post.id;
-    let post_view = match blocking(pool, move |conn| {
+    let post_view = match blocking(context.pool(), move |conn| {
       PostView::read(conn, inserted_post_id, Some(user.id))
     })
     .await?
@@ -337,33 +231,38 @@ impl Perform for Oper<CreatePost> {
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::CreatePost,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::CreatePost,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<GetPost> {
+impl Perform for GetPost {
   type Response = GetPostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<GetPostResponse, LemmyError> {
-    let data: &GetPost = &self.data;
-    let user = get_user_from_jwt_opt(&data.auth, pool).await?;
-    let user_id = user.map(|u| u.id);
+    let data: &GetPost = &self;
+    let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
+    let user_id = match user {
+      Some(user) => Some(user.id),
+      None => None
+    };
 
     let id = data.id;
-    let post_view = match blocking(pool, move |conn| PostView::read(conn, id, user_id)).await? {
+    let post_view = match blocking(context.pool(), move |conn| {
+      PostView::read(conn, id, user_id)
+    })
+    .await?
+    {
       Ok(post) => post,
       Err(_e) => return Err(APIError::err("couldnt_find_post").into()),
     };
@@ -375,14 +274,14 @@ impl Perform for Oper<GetPost> {
       let mut moderators: Vec<i32> = vec![];
 
       moderators.append(
-        &mut blocking(pool, move |conn| {
+        &mut blocking(context.pool(), move |conn| {
           CommunityModeratorView::for_community(conn, community_id)
             .map(|v| v.into_iter().map(|m| m.user_id).collect())
         })
         .await??,
       );
       moderators.append(
-        &mut blocking(pool, move |conn| {
+        &mut blocking(context.pool(), move |conn| {
           UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
         })
         .await??,
@@ -400,31 +299,28 @@ impl Perform for Oper<GetPost> {
     }
 
     let post_id = data.id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = blocking(context.pool(), move |conn| Post::read(conn, post_id)).await??;
 
     // Check community settings
     let community_id = post.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
     let community_id = post.community_id;
-    let privileged = blocking(pool, move |conn| {
-      if let Some(u_id) = user_id {
-        let user = User_::read(conn, u_id)?;
-        user.is_moderator(conn, community_id)
-      } else {
-        Ok(false)
-      }
-    })
-    .await??;
+    let privileged = match user_id {
+      Some(user_id) => {
+        is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok()
+      },
+      None => false
+    };
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
 
     let id = data.id;
-    let comments = blocking(pool, move |conn| {
+    let comments = blocking(context.pool(), move |conn| {
       CommentQueryBuilder::create(conn)
         .for_post_id(id)
         .my_user_id(user_id)
@@ -434,69 +330,40 @@ impl Perform for Oper<GetPost> {
     .await??;
 
     let community_id = post_view.community_id;
-    let community = blocking(pool, move |conn| {
+    let community = blocking(context.pool(), move |conn| {
       CommunityView::read(conn, community_id, user_id)
     })
     .await??;
 
     let community_id = post_view.community_id;
-    let moderators = blocking(pool, move |conn| {
+    let moderators = blocking(context.pool(), move |conn| {
       CommunityModeratorView::for_community(conn, community_id)
     })
     .await??;
 
-    let community_id = post_view.community_id;
-    let settings = blocking(pool, move |conn| {
-      CommunitySettings::read_from_community_id(conn, community_id)
-    })
-    .await??;
-
-    let community_id = post_view.community_id;
-    if let Some(user_id) = user_id {
-      let privileged = blocking(pool, move |conn| {
-        let user = User_::read(conn, user_id)?;
-        user.is_moderator(conn, community_id)
-      })
-      .await??;
-      if settings.private && !privileged {
-        return Err(APIError::err("community_is_private").into());
-      }
-    }
-
     let site_creator_id =
-      blocking(pool, move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
+      blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
 
-    let mut admins = blocking(pool, move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let sitemods = blocking(pool, move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
-    let online = if let Some(ws) = websocket_info {
-      if let Some(id) = ws.id {
-        ws.chatserver.do_send(JoinPostRoom {
-          post_id: data.id,
-          id,
-        });
-      }
+    if let Some(id) = websocket_id {
+      context.chat_server().do_send(JoinPostRoom {
+        post_id: data.id,
+        id,
+      });
+    }
 
-      use std::time::Duration;
-      match ws
-        .chatserver
-        .send(GetPostUsersOnline { post_id: data.id })
-        .timeout(Duration::from_millis(10))
-        .await
-      {
-        Ok(count) => count,
-        Err(_e) => {
-          debug!("could not fetch online count");
-          1
-        }
-      }
-    } else {
-      0
-    };
+    let online = context
+      .chat_server()
+      .send(GetPostUsersOnline { post_id: data.id })
+      .timeout(Duration::from_millis(10))
+      .await
+      .unwrap_or(1);
 
     // Return the jwt
     Ok(GetPostResponse {
@@ -512,16 +379,16 @@ impl Perform for Oper<GetPost> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<GetPosts> {
+impl Perform for GetPosts {
   type Response = GetPostsResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<GetPostsResponse, LemmyError> {
-    let data: &GetPosts = &self.data;
-    let user = get_user_from_jwt_opt(&data.auth, pool).await?;
+    let data: &GetPosts = &self;
+    let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
 
     let user_id = match &user {
       Some(user) => Some(user.id),
@@ -539,7 +406,7 @@ impl Perform for Oper<GetPosts> {
     let limit = data.limit;
     let community_id = data.community_id;
     let community_name = data.community_name.to_owned();
-    let posts = match blocking(pool, move |conn| {
+    let posts = match blocking(context.pool(), move |conn| {
       PostQueryBuilder::create(conn)
         .listing_type(type_)
         .sort(&sort)
@@ -557,17 +424,15 @@ impl Perform for Oper<GetPosts> {
       Err(_e) => return Err(APIError::err("couldnt_get_posts").into()),
     };
 
-    if let Some(ws) = websocket_info {
+    if let Some(id) = websocket_id {
       // You don't need to join the specific community room, bc this is already handled by
       // GetCommunity
       if data.community_id.is_none() {
-        if let Some(id) = ws.id {
-          // 0 is the "all" community
-          ws.chatserver.do_send(JoinCommunityRoom {
-            community_id: 0,
-            id,
-          });
-        }
+        // 0 is the "all" community
+        context.chat_server().do_send(JoinCommunityRoom {
+          community_id: 0,
+          id,
+        });
       }
     }
 
@@ -576,20 +441,20 @@ impl Perform for Oper<GetPosts> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<CreatePostLike> {
+impl Perform for CreatePostLike {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &CreatePostLike = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &CreatePostLike = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     // Don't do a downvote if site has downvotes disabled
     if data.score == -1 {
-      let site = blocking(pool, move |conn| SiteView::read(conn)).await??;
+      let site = blocking(context.pool(), move |conn| SiteView::read(conn)).await??;
       if !site.enable_downvotes {
         return Err(APIError::err("downvotes_disabled").into());
       }
@@ -597,24 +462,21 @@ impl Perform for Oper<CreatePostLike> {
 
     // Check for a community ban
     let post_id = data.post_id;
-    let post = blocking(pool, move |conn| Post::read(conn, post_id)).await??;
+    let post = blocking(context.pool(), move |conn| Post::read(conn, post_id)).await??;
 
-    check_community_ban(user.id, post.community_id, pool).await?;
+    check_community_ban(user.id, post.community_id, context.pool()).await?;
 
     // Check community settings
     let community_id = post.community_id;
-    let settings = blocking(pool, move |conn| {
+    let settings = blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await??;
 
     let community_id = post.community_id;
     let user_id = user.id;
-    let privileged = blocking(pool, move |conn| {
-      let user = User_::read(conn, user_id)?;
-      user.is_moderator(conn, community_id)
-    })
-    .await??;
+    let privileged =
+      is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
@@ -626,30 +488,33 @@ impl Perform for Oper<CreatePostLike> {
     };
 
     // Remove any likes first
-    let like_form2 = like_form.clone();
-    blocking(pool, move |conn| PostLike::remove(conn, &like_form2)).await??;
+    let user_id = user.id;
+    blocking(context.pool(), move |conn| {
+      PostLike::remove(conn, user_id, post_id)
+    })
+    .await??;
 
     // Only add the like if the score isnt 0
     let do_add = like_form.score != 0 && (like_form.score == 1 || like_form.score == -1);
     if do_add {
       let like_form2 = like_form.clone();
       let like = move |conn: &'_ _| PostLike::like(conn, &like_form2);
-      if blocking(pool, like).await?.is_err() {
+      if blocking(context.pool(), like).await?.is_err() {
         return Err(APIError::err("couldnt_like_post").into());
       }
 
       if like_form.score == 1 {
-        post.send_like(&user, &self.client, pool).await?;
+        post.send_like(&user, context).await?;
       } else if like_form.score == -1 {
-        post.send_dislike(&user, &self.client, pool).await?;
+        post.send_dislike(&user, context).await?;
       }
     } else {
-      post.send_undo_like(&user, &self.client, pool).await?;
+      post.send_undo_like(&user, context).await?;
     }
 
     let post_id = data.post_id;
     let user_id = user.id;
-    let post_view = match blocking(pool, move |conn| {
+    let post_view = match blocking(context.pool(), move |conn| {
       PostView::read(conn, post_id, Some(user_id))
     })
     .await?
@@ -660,47 +525,39 @@ impl Perform for Oper<CreatePostLike> {
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::CreatePostLike,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::CreatePostLike,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<EditPost> {
+impl Perform for EditPost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &EditPost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &EditPost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     check_slurs(&data.name)?;
     check_slurs_opt(&data.body)?;
-
-    // if let Some(body) = &data.body {
-    //   if let Err(pii) = pii_check(body) {
-    //     return Err(APIError::err(&pii_vec_to_str(pii)).into());
-    //   }
-    // }
 
     if !is_valid_post_title(&data.name) {
       return Err(APIError::err("invalid_post_title").into());
     }
 
     let edit_id = data.edit_id;
-    let orig_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
+    let orig_post = blocking(context.pool(), move |conn| Post::read(conn, edit_id)).await??;
 
-    check_community_ban(user.id, orig_post.community_id, pool).await?;
+    check_community_ban(user.id, orig_post.community_id, context.pool()).await?;
 
     // Verify that only the creator can edit
     if !Post::is_post_creator(user.id, orig_post.creator_id) {
@@ -709,7 +566,7 @@ impl Perform for Oper<EditPost> {
 
     // Fetch Iframely and Pictrs cached image
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
-      fetch_iframely_and_pictrs_data(&self.client, data.url.to_owned()).await;
+      fetch_iframely_and_pictrs_data(context.client(), data.url.to_owned()).await;
 
     let post_form = PostForm {
       name: data.name.trim().to_owned(),
@@ -727,13 +584,16 @@ impl Perform for Oper<EditPost> {
       embed_description: iframely_description,
       embed_html: iframely_html,
       thumbnail_url: pictrs_thumbnail,
-      ap_id: orig_post.ap_id,
+      ap_id: Some(orig_post.ap_id),
       local: orig_post.local,
       published: None,
     };
 
     let edit_id = data.edit_id;
-    let res = blocking(pool, move |conn| Post::update(conn, edit_id, &post_form)).await?;
+    let res = blocking(context.pool(), move |conn| {
+      Post::update(conn, edit_id, &post_form)
+    })
+    .await?;
     let updated_post: Post = match res {
       Ok(post) => post,
       Err(e) => {
@@ -748,44 +608,42 @@ impl Perform for Oper<EditPost> {
     };
 
     // Send apub update
-    updated_post.send_update(&user, &self.client, pool).await?;
+    updated_post.send_update(&user, context).await?;
 
     let edit_id = data.edit_id;
-    let post_view = blocking(pool, move |conn| {
+    let post_view = blocking(context.pool(), move |conn| {
       PostView::read(conn, edit_id, Some(user.id))
     })
     .await??;
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::EditPost,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::EditPost,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<DeletePost> {
+impl Perform for DeletePost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &DeletePost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &DeletePost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
+    let orig_post = blocking(context.pool(), move |conn| Post::read(conn, edit_id)).await??;
 
-    check_community_ban(user.id, orig_post.community_id, pool).await?;
+    check_community_ban(user.id, orig_post.community_id, context.pool()).await?;
 
     // Verify that only the creator can delete
     if !Post::is_post_creator(user.id, orig_post.creator_id) {
@@ -795,65 +653,61 @@ impl Perform for Oper<DeletePost> {
     // Update the post
     let edit_id = data.edit_id;
     let deleted = data.deleted;
-    let updated_post = blocking(pool, move |conn| {
+    let updated_post = blocking(context.pool(), move |conn| {
       Post::update_deleted(conn, edit_id, deleted)
     })
     .await??;
 
     // apub updates
     if deleted {
-      updated_post.send_delete(&user, &self.client, pool).await?;
+      updated_post.send_delete(&user, context).await?;
     } else {
-      updated_post
-        .send_undo_delete(&user, &self.client, pool)
-        .await?;
+      updated_post.send_undo_delete(&user, context).await?;
     }
 
     // Refetch the post
     let edit_id = data.edit_id;
-    let post_view = blocking(pool, move |conn| {
+    let post_view = blocking(context.pool(), move |conn| {
       PostView::read(conn, edit_id, Some(user.id))
     })
     .await??;
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::DeletePost,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::DeletePost,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<RemovePost> {
+impl Perform for RemovePost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &RemovePost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &RemovePost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
+    let orig_post = blocking(context.pool(), move |conn| Post::read(conn, edit_id)).await??;
 
-    check_community_ban(user.id, orig_post.community_id, pool).await?;
+    check_community_ban(user.id, orig_post.community_id, context.pool()).await?;
 
     // Verify that only the mods can remove
-    is_mod_or_admin(pool, user.id, orig_post.community_id).await?;
+    is_mod_or_admin(context.pool(), user.id, orig_post.community_id).await?;
 
     // Update the post
     let edit_id = data.edit_id;
     let removed = data.removed;
-    let updated_post = blocking(pool, move |conn| {
+    let updated_post = blocking(context.pool(), move |conn| {
       Post::update_removed(conn, edit_id, removed)
     })
     .await??;
@@ -865,64 +719,65 @@ impl Perform for Oper<RemovePost> {
       removed: Some(removed),
       reason: data.reason.to_owned(),
     };
-    blocking(pool, move |conn| ModRemovePost::create(conn, &form)).await??;
+    blocking(context.pool(), move |conn| {
+      ModRemovePost::create(conn, &form)
+    })
+    .await??;
 
     // apub updates
     if removed {
-      updated_post.send_remove(&user, &self.client, pool).await?;
+      updated_post.send_remove(&user, context).await?;
     } else {
-      updated_post
-        .send_undo_remove(&user, &self.client, pool)
-        .await?;
+      updated_post.send_undo_remove(&user, context).await?;
     }
 
     // Refetch the post
     let edit_id = data.edit_id;
     let user_id = user.id;
-    let post_view = blocking(pool, move |conn| {
+    let post_view = blocking(context.pool(), move |conn| {
       PostView::read(conn, edit_id, Some(user_id))
     })
     .await??;
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::RemovePost,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::RemovePost,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<LockPost> {
+impl Perform for LockPost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &LockPost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &LockPost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
+    let orig_post = blocking(context.pool(), move |conn| Post::read(conn, edit_id)).await??;
 
-    check_community_ban(user.id, orig_post.community_id, pool).await?;
+    check_community_ban(user.id, orig_post.community_id, context.pool()).await?;
 
     // Verify that only the mods can lock
-    is_mod_or_admin(pool, user.id, orig_post.community_id).await?;
+    is_mod_or_admin(context.pool(), user.id, orig_post.community_id).await?;
 
     // Update the post
     let edit_id = data.edit_id;
     let locked = data.locked;
-    let updated_post =
-      blocking(pool, move |conn| Post::update_locked(conn, edit_id, locked)).await??;
+    let updated_post = blocking(context.pool(), move |conn| {
+      Post::update_locked(conn, edit_id, locked)
+    })
+    .await??;
 
     // Mod tables
     let form = ModLockPostForm {
@@ -930,56 +785,54 @@ impl Perform for Oper<LockPost> {
       post_id: data.edit_id,
       locked: Some(locked),
     };
-    blocking(pool, move |conn| ModLockPost::create(conn, &form)).await??;
+    blocking(context.pool(), move |conn| ModLockPost::create(conn, &form)).await??;
 
     // apub updates
-    updated_post.send_update(&user, &self.client, pool).await?;
+    updated_post.send_update(&user, context).await?;
 
     // Refetch the post
     let edit_id = data.edit_id;
-    let post_view = blocking(pool, move |conn| {
+    let post_view = blocking(context.pool(), move |conn| {
       PostView::read(conn, edit_id, Some(user.id))
     })
     .await??;
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::LockPost,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::LockPost,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<StickyPost> {
+impl Perform for StickyPost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &StickyPost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &StickyPost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let edit_id = data.edit_id;
-    let orig_post = blocking(pool, move |conn| Post::read(conn, edit_id)).await??;
+    let orig_post = blocking(context.pool(), move |conn| Post::read(conn, edit_id)).await??;
 
-    check_community_ban(user.id, orig_post.community_id, pool).await?;
+    check_community_ban(user.id, orig_post.community_id, context.pool()).await?;
 
     // Verify that only the mods can sticky
-    is_mod_or_admin(pool, user.id, orig_post.community_id).await?;
+    is_mod_or_admin(context.pool(), user.id, orig_post.community_id).await?;
 
     // Update the post
     let edit_id = data.edit_id;
     let stickied = data.stickied;
-    let updated_post = blocking(pool, move |conn| {
+    let updated_post = blocking(context.pool(), move |conn| {
       Post::update_stickied(conn, edit_id, stickied)
     })
     .await??;
@@ -990,44 +843,45 @@ impl Perform for Oper<StickyPost> {
       post_id: data.edit_id,
       stickied: Some(stickied),
     };
-    blocking(pool, move |conn| ModStickyPost::create(conn, &form)).await??;
+    blocking(context.pool(), move |conn| {
+      ModStickyPost::create(conn, &form)
+    })
+    .await??;
 
     // Apub updates
     // TODO stickied should pry work like locked for ease of use
-    updated_post.send_update(&user, &self.client, pool).await?;
+    updated_post.send_update(&user, context).await?;
 
     // Refetch the post
     let edit_id = data.edit_id;
-    let post_view = blocking(pool, move |conn| {
+    let post_view = blocking(context.pool(), move |conn| {
       PostView::read(conn, edit_id, Some(user.id))
     })
     .await??;
 
     let res = PostResponse { post: post_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendPost {
-        op: UserOperation::StickyPost,
-        post: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendPost {
+      op: UserOperation::StickyPost,
+      post: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<SavePost> {
+impl Perform for SavePost {
   type Response = PostResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<PostResponse, LemmyError> {
-    let data: &SavePost = &self.data;
-    let user = get_user_from_jwt(&data.auth, pool).await?;
+    let data: &SavePost = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     let post_saved_form = PostSavedForm {
       post_id: data.post_id,
@@ -1036,19 +890,19 @@ impl Perform for Oper<SavePost> {
 
     if data.save {
       let save = move |conn: &'_ _| PostSaved::save(conn, &post_saved_form);
-      if blocking(pool, save).await?.is_err() {
+      if blocking(context.pool(), save).await?.is_err() {
         return Err(APIError::err("couldnt_save_post").into());
       }
     } else {
       let unsave = move |conn: &'_ _| PostSaved::unsave(conn, &post_saved_form);
-      if blocking(pool, unsave).await?.is_err() {
+      if blocking(context.pool(), unsave).await?.is_err() {
         return Err(APIError::err("couldnt_save_post").into());
       }
     }
 
     let post_id = data.post_id;
     let user_id = user.id;
-    let post_view = blocking(pool, move |conn| {
+    let post_view = blocking(context.pool(), move |conn| {
       PostView::read(conn, post_id, Some(user_id))
     })
     .await??;

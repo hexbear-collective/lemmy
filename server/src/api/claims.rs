@@ -1,8 +1,8 @@
-use diesel::{result::Error, PgConnection};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
-use lemmy_db::{user::User_, Crud};
-use lemmy_utils::settings::Settings;
+use jsonwebtoken::{decode, DecodingKey, encode, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
+
+use lemmy_db::user::User_;
+use lemmy_utils::settings::Settings;
 
 type Jwt = String;
 
@@ -25,7 +25,7 @@ impl Claims {
     )
   }
 
-  pub fn jwt(user: User_, hostname: String) -> Jwt {
+  pub fn jwt(user: User_, hostname: String) -> Result<Jwt, jsonwebtoken::errors::Error> {
     let my_claims = Claims {
       id: user.id,
       iss: hostname,
@@ -35,11 +35,5 @@ impl Claims {
       &my_claims,
       &EncodingKey::from_secret(Settings::get().jwt_secret.as_ref()),
     )
-    .unwrap()
-  }
-
-  pub fn find_by_jwt(conn: &PgConnection, jwt: &str) -> Result<User_, Error> {
-    let claims: Claims = Claims::decode(&jwt).expect("Invalid token").claims;
-    User_::read(&conn, claims.id)
   }
 }

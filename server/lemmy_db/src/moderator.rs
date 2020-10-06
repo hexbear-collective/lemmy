@@ -41,11 +41,6 @@ impl Crud<ModRemovePostForm> for ModRemovePost {
     mod_remove_post.find(from_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_remove_post::dsl::*;
-    diesel::delete(mod_remove_post.find(from_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, form: &ModRemovePostForm) -> Result<Self, Error> {
     use crate::schema::mod_remove_post::dsl::*;
     insert_into(mod_remove_post)
@@ -85,11 +80,6 @@ impl Crud<ModLockPostForm> for ModLockPost {
     mod_lock_post.find(from_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_lock_post::dsl::*;
-    diesel::delete(mod_lock_post.find(from_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, form: &ModLockPostForm) -> Result<Self, Error> {
     use crate::schema::mod_lock_post::dsl::*;
     insert_into(mod_lock_post)
@@ -127,11 +117,6 @@ impl Crud<ModStickyPostForm> for ModStickyPost {
   fn read(conn: &PgConnection, from_id: i32) -> Result<Self, Error> {
     use crate::schema::mod_sticky_post::dsl::*;
     mod_sticky_post.find(from_id).first::<Self>(conn)
-  }
-
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_sticky_post::dsl::*;
-    diesel::delete(mod_sticky_post.find(from_id)).execute(conn)
   }
 
   fn create(conn: &PgConnection, form: &ModStickyPostForm) -> Result<Self, Error> {
@@ -175,11 +160,6 @@ impl Crud<ModRemoveCommentForm> for ModRemoveComment {
     mod_remove_comment.find(from_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_remove_comment::dsl::*;
-    diesel::delete(mod_remove_comment.find(from_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, form: &ModRemoveCommentForm) -> Result<Self, Error> {
     use crate::schema::mod_remove_comment::dsl::*;
     insert_into(mod_remove_comment)
@@ -221,11 +201,6 @@ impl Crud<ModRemoveCommunityForm> for ModRemoveCommunity {
   fn read(conn: &PgConnection, from_id: i32) -> Result<Self, Error> {
     use crate::schema::mod_remove_community::dsl::*;
     mod_remove_community.find(from_id).first::<Self>(conn)
-  }
-
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_remove_community::dsl::*;
-    diesel::delete(mod_remove_community.find(from_id)).execute(conn)
   }
 
   fn create(conn: &PgConnection, form: &ModRemoveCommunityForm) -> Result<Self, Error> {
@@ -277,11 +252,6 @@ impl Crud<ModBanFromCommunityForm> for ModBanFromCommunity {
     mod_ban_from_community.find(from_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_ban_from_community::dsl::*;
-    diesel::delete(mod_ban_from_community.find(from_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, form: &ModBanFromCommunityForm) -> Result<Self, Error> {
     use crate::schema::mod_ban_from_community::dsl::*;
     insert_into(mod_ban_from_community)
@@ -329,11 +299,6 @@ impl Crud<ModBanForm> for ModBan {
     mod_ban.find(from_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_ban::dsl::*;
-    diesel::delete(mod_ban.find(from_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, form: &ModBanForm) -> Result<Self, Error> {
     use crate::schema::mod_ban::dsl::*;
     insert_into(mod_ban).values(form).get_result::<Self>(conn)
@@ -371,11 +336,6 @@ impl Crud<ModAddCommunityForm> for ModAddCommunity {
   fn read(conn: &PgConnection, from_id: i32) -> Result<Self, Error> {
     use crate::schema::mod_add_community::dsl::*;
     mod_add_community.find(from_id).first::<Self>(conn)
-  }
-
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_add_community::dsl::*;
-    diesel::delete(mod_add_community.find(from_id)).execute(conn)
   }
 
   fn create(conn: &PgConnection, form: &ModAddCommunityForm) -> Result<Self, Error> {
@@ -417,11 +377,6 @@ impl Crud<ModAddForm> for ModAdd {
     mod_add.find(from_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, from_id: i32) -> Result<usize, Error> {
-    use crate::schema::mod_add::dsl::*;
-    diesel::delete(mod_add.find(from_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, form: &ModAddForm) -> Result<Self, Error> {
     use crate::schema::mod_add::dsl::*;
     insert_into(mod_add).values(form).get_result::<Self>(conn)
@@ -461,6 +416,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -470,7 +426,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_829398".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -488,6 +444,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -497,7 +454,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_82982738".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -517,7 +474,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_283687".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -545,7 +502,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -562,7 +519,7 @@ mod tests {
       parent_id: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -749,16 +706,6 @@ mod tests {
       removed: Some(false),
       when_: inserted_mod_add.when_,
     };
-
-    ModRemovePost::delete(&conn, inserted_mod_remove_post.id).unwrap();
-    ModLockPost::delete(&conn, inserted_mod_lock_post.id).unwrap();
-    ModStickyPost::delete(&conn, inserted_mod_sticky_post.id).unwrap();
-    ModRemoveComment::delete(&conn, inserted_mod_remove_comment.id).unwrap();
-    ModRemoveCommunity::delete(&conn, inserted_mod_remove_community.id).unwrap();
-    ModBanFromCommunity::delete(&conn, inserted_mod_ban_from_community.id).unwrap();
-    ModBan::delete(&conn, inserted_mod_ban.id).unwrap();
-    ModAddCommunity::delete(&conn, inserted_mod_add_community.id).unwrap();
-    ModAdd::delete(&conn, inserted_mod_add.id).unwrap();
 
     Comment::delete(&conn, inserted_comment.id).unwrap();
     Post::delete(&conn, inserted_post.id).unwrap();

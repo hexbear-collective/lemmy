@@ -34,11 +34,6 @@ impl Crud<ActivityForm> for Activity {
     activity.find(activity_id).first::<Self>(conn)
   }
 
-  fn delete(conn: &PgConnection, activity_id: i32) -> Result<usize, Error> {
-    use crate::schema::activity::dsl::*;
-    diesel::delete(activity.find(activity_id)).execute(conn)
-  }
-
   fn create(conn: &PgConnection, new_activity: &ActivityForm) -> Result<Self, Error> {
     use crate::schema::activity::dsl::*;
     insert_into(activity)
@@ -108,6 +103,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -117,7 +113,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_862362".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -155,11 +151,9 @@ mod tests {
     };
 
     let read_activity = Activity::read(&conn, inserted_activity.id).unwrap();
-    let num_deleted = Activity::delete(&conn, inserted_activity.id).unwrap();
     User_::delete(&conn, inserted_creator.id).unwrap();
 
     assert_eq!(expected_activity, read_activity);
     assert_eq!(expected_activity, inserted_activity);
-    assert_eq!(1, num_deleted);
   }
 }
