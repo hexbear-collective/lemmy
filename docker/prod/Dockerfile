@@ -10,7 +10,7 @@ WORKDIR /app
 RUN sudo chown -R rust:rust .
 RUN USER=root cargo new server
 WORKDIR /app/server
-COPY server/Cargo.toml server/Cargo.lock ./
+COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
 COPY server/lemmy_db ./lemmy_db
 COPY server/lemmy_utils ./lemmy_utils
 COPY server/lemmy_api_structs ./lemmy_api_structs

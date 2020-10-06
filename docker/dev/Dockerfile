@@ -29,7 +29,7 @@ RUN mkdir -p lemmy_db/src/ \
       lemmy
 
 # Copy the cargo tomls
-COPY server/Cargo.toml server/Cargo.lock ./
+COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
 COPY server/lemmy_db/Cargo.toml ./lemmy_db/
 COPY server/lemmy_utils/Cargo.toml ./lemmy_utils/
 COPY server/lemmy_api_structs/Cargo.toml ./lemmy_api_structs/

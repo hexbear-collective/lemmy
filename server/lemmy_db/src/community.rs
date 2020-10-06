@@ -321,6 +321,7 @@ mod tests {
       name: "bobbee".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
       email: None,
       matrix_user_id: None,
       avatar: None,

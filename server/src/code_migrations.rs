@@ -1,8 +1,5 @@
 // This is for db migrations that require code
-use diesel::{
-//  sql_types::{Nullable, Text},
-  *,
-};
+use diesel::*;
 /*
 use lemmy_db::{
   comment::Comment,
@@ -22,7 +19,7 @@ use log::info;
  */
 use lemmy_utils::LemmyError;
 
-pub fn run_advanced_migrations(conn: &PgConnection) -> Result<(), LemmyError> {
+pub fn run_advanced_migrations(_conn: &PgConnection) -> Result<(), LemmyError> {
   // user_updates_2020_04_02(&conn)?;
   // community_updates_2020_04_02(&conn)?;
   // post_updates_2020_04_03(&conn)?;

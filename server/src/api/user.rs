@@ -1,25 +1,20 @@
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use actix_web::web::Data;
 use anyhow::Context;
 use bcrypt::verify;
-use captcha::{Difficulty, gen};
+use captcha::{gen, Difficulty};
 use chrono::Duration;
 use log::{error, info};
 
-use lemmy_api_structs::{APIError, user::*};
+use lemmy_api_structs::{user::*, APIError};
 use lemmy_db::{
   comment::*,
   comment_view::*,
   community::*,
   community_settings::*,
   community_view::*,
-  Crud,
   diesel_option_overwrite,
-  Followable,
-  Joinable,
-  ListingType,
   moderator::*,
   naive_now,
   password_reset_request::*,
@@ -29,43 +24,54 @@ use lemmy_db::{
   private_message_view::*,
   site::*,
   site_view::*,
-  SortType,
   user::*,
   user_mention::*,
   user_mention_view::*,
   user_tag::*,
   user_view::*,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
 };
 use lemmy_utils::{
-  ConnectionId,
-  EndpointType,
   generate_actor_keypair,
   generate_random_string,
   is_valid_preferred_username,
   is_valid_username,
-  LemmyError,
   location_info,
   make_apub_endpoint,
   naive_from_unix,
   remove_slurs,
   send_email,
   settings::Settings,
+  ConnectionId,
+  EndpointType,
+  LemmyError,
 };
 
 use crate::{
-  api::{check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, Perform},
+  api::{
+    check_slurs,
+    claims::Claims,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_admin,
+    is_admin_or_sitemod,
+    Perform,
+  },
   apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
-  LemmyContext,
   websocket::{
     messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
     UserOperation,
   },
+  LemmyContext,
 };
-use crate::api::is_admin_or_sitemod;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -92,7 +98,11 @@ impl Perform for SetUserTag {
       tags.insert(key.clone(), v);
     }
 
-    match blocking(context.pool(), move |conn| UserTag::set_key(conn, user, key, value)).await? {
+    match blocking(context.pool(), move |conn| {
+      UserTag::set_key(conn, user, key, value)
+    })
+    .await?
+    {
       Ok(usertag) => Ok(UserTagResponse {
         user,
         community: None,
@@ -201,7 +211,7 @@ impl Perform for Register {
     if data.admin && !any_admins {
       return Err(APIError::err("admin_already_created").into());
     }
-    
+
     // Make sure site has open registration
     if let Ok(site) = blocking(context.pool(), move |conn| SiteView::read(conn)).await? {
       let site: SiteView = site;
@@ -227,7 +237,7 @@ impl Perform for Register {
           } else {
             return Err(APIError::err("missing_hcaptcha_id").into());
           }
-        },
+        }
         _ => {
           let check = context
             .chat_server()
@@ -266,13 +276,12 @@ impl Perform for Register {
       }
       None => None,
     };
-    
+
     // Register the new user
     let user_form = UserForm {
       name: data.username.to_owned(),
       email: Some(email.to_owned()),
       admin: false,
-      sitemod: false,
       matrix_user_id: None,
       avatar: None,
       banner: None,
@@ -393,7 +402,6 @@ impl Perform for Register {
         return Err(APIError::err("community_moderator_already_exists").into());
       }
     }
-
 
     // Add their pronouns if they specified at account registration
     if let Some(pronouns) = data.pronouns.clone() {
@@ -555,7 +563,6 @@ impl Perform for SaveUserSettings {
       name: read_user.name,
       email,
       admin: read_user.admin,
-      sitemod: read_user.sitemod,
       matrix_user_id: data.matrix_user_id.to_owned(),
       avatar,
       banner,
@@ -691,8 +698,10 @@ impl Perform for GetUserDetails {
     })
     .await??;
 
-    let site_creator_id =
-      blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
+    let site_creator_id = blocking(context.pool(), move |conn| {
+      Site::read(conn, 1).map(|s| s.creator_id)
+    })
+    .await??;
 
     let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
@@ -842,7 +851,10 @@ impl Perform for BanUser {
 
     let banned_user_id = data.user_id;
     // Make sure target user is not an admin or sitemod
-    let target = blocking(context.pool(), move |conn| User_::read(&conn, banned_user_id)).await??;
+    let target = blocking(context.pool(), move |conn| {
+      User_::read(&conn, banned_user_id)
+    })
+    .await??;
     if target.admin || target.sitemod {
       return Err(APIError::err("couldnt_update_user").into());
     }
@@ -1547,9 +1559,12 @@ impl Perform for GetUnreadCount {
 
     let unread_notifs = blocking(context.pool(), move |conn| {
       User_::get_unread_notifs(conn, user_id)
-    }).await??;
+    })
+    .await??;
 
-    Ok(GetUnreadCountResponse { unreads: unread_notifs.unreads })
+    Ok(GetUnreadCountResponse {
+      unreads: unread_notifs.unreads,
+    })
   }
 }
 
@@ -1573,10 +1588,10 @@ impl Perform for RemoveUserContent {
     let mod_communities = blocking(context.pool(), move |conn| {
       CommunityModeratorView::for_user(conn, uid)
     })
-        .await??
-        .iter()
-        .map(|c| c.id)
-        .collect::<Vec<i32>>();
+    .await??
+    .iter()
+    .map(|c| c.id)
+    .collect::<Vec<i32>>();
 
     let remove_communities = match data.community_id {
       Some(community_id) => {
@@ -1608,30 +1623,30 @@ impl Perform for RemoveUserContent {
       let time = data.time;
       blocking(context.pool(), move |conn| {
         let posts_query = PostQueryBuilder::create(conn)
-            .for_creator_id(remove_user_id)
-            .max_age(time);
+          .for_creator_id(remove_user_id)
+          .max_age(time);
         posts_query.list()
       })
-          .await??
-          .iter()
-          .for_each(|pv| post_id_list.push(pv.id));
+      .await??
+      .iter()
+      .for_each(|pv| post_id_list.push(pv.id));
 
       let time = data.time;
       blocking(context.pool(), move |conn| {
         let comments_query = CommentQueryBuilder::create(conn)
-            .for_creator_id(remove_user_id)
-            .max_age(time);
+          .for_creator_id(remove_user_id)
+          .max_age(time);
         comments_query.list()
       })
-          .await??
-          .iter()
-          .for_each(|cv| comment_id_list.push(cv.id));
+      .await??
+      .iter()
+      .for_each(|cv| comment_id_list.push(cv.id));
     } else {
       for community_id in remove_communities {
         blocking(context.pool(), move |conn| {
           let posts_query = PostQueryBuilder::create(conn)
-              .for_creator_id(remove_user_id)
-              .for_community_id(community_id);
+            .for_creator_id(remove_user_id)
+            .for_community_id(community_id);
           /*
           let time = data.time;
           if time != 0 {
@@ -1640,20 +1655,20 @@ impl Perform for RemoveUserContent {
           */
           posts_query.list()
         })
-            .await??
-            .iter()
-            .for_each(|pv| post_id_list.push(pv.id));
+        .await??
+        .iter()
+        .for_each(|pv| post_id_list.push(pv.id));
 
         blocking(context.pool(), move |conn| {
           let comments_query = CommentQueryBuilder::create(conn)
-              .for_creator_id(remove_user_id)
-              .for_community_id(community_id);
+            .for_creator_id(remove_user_id)
+            .for_community_id(community_id);
 
           comments_query.list()
         })
-            .await??
-            .iter()
-            .for_each(|cv| comment_id_list.push(cv.id));
+        .await??
+        .iter()
+        .for_each(|cv| comment_id_list.push(cv.id));
       }
     }
 
@@ -1665,7 +1680,10 @@ impl Perform for RemoveUserContent {
         removed: Some(true),
       };
 
-      blocking(context.pool(), move |conn| ModRemovePost::create(conn, &form)).await??;
+      blocking(context.pool(), move |conn| {
+        ModRemovePost::create(conn, &form)
+      })
+      .await??;
       blocking(context.pool(), move |conn| Post::permadelete(conn, post_id)).await??;
     }
 
@@ -1677,8 +1695,14 @@ impl Perform for RemoveUserContent {
         removed: Some(true),
       };
 
-      blocking(context.pool(), move |conn| ModRemoveComment::create(conn, &form)).await??;
-      blocking(context.pool(), move |conn| Comment::permadelete(conn, comment_id)).await??;
+      blocking(context.pool(), move |conn| {
+        ModRemoveComment::create(conn, &form)
+      })
+      .await??;
+      blocking(context.pool(), move |conn| {
+        Comment::permadelete(conn, comment_id)
+      })
+      .await??;
     }
 
     let user_id = data.user_id;
