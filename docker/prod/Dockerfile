@@ -15,6 +15,10 @@ COPY server/lemmy_db ./lemmy_db
 COPY server/lemmy_utils ./lemmy_utils
 COPY server/lemmy_api_structs ./lemmy_api_structs
 COPY server/lemmy_rate_limit ./lemmy_rate_limit
+
+# this is for the frontend
+COPY .git/ ./.git/
+
 RUN mkdir -p ./src/bin \
    && echo 'fn main() { println!("Dummy") }' > ./src/bin/main.rs
 RUN cargo build --release
