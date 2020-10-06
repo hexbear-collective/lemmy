@@ -50,7 +50,6 @@ pub struct UserForm {
   pub preferred_username: Option<String>,
   pub password_encrypted: String,
   pub admin: bool,
-  pub sitemod: bool,
   pub banned: bool,
   pub email: Option<Option<String>>,
   pub avatar: Option<Option<String>>,
@@ -224,8 +223,6 @@ mod tests {
       name: "thommy".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
-      admin: false,
-      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -255,8 +252,6 @@ mod tests {
       name: "thommy".into(),
       preferred_username: None,
       password_encrypted: "nope".into(),
-      admin: false,
-      sitemod: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -291,131 +286,128 @@ mod tests {
     assert_eq!(1, num_deleted);
   }
 
-  #[test]
-  fn test_user_methods() {
-    use crate::{community::*, Joinable};
-    let conn = establish_unpooled_connection();
-
-    let new_creator_user = UserForm {
-      name: "creator".into(),
-      preferred_username: None,
-      password_encrypted: "creator".into(),
-      admin: false,
-      sitemod: false,
-      email: None,
-      matrix_user_id: None,
-      avatar: None,
-      banner: None,
-      banned: false,
-      updated: None,
-      show_nsfw: false,
-      theme: "darkly".into(),
-      default_sort_type: SortType::Hot as i16,
-      default_listing_type: ListingType::Subscribed as i16,
-      lang: "browser".into(),
-      show_avatars: true,
-      send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
-      bio: None,
-      local: true,
-      private_key: None,
-      public_key: None,
-      last_refreshed_at: None,
-    };
-
-    let new_mod_user = UserForm {
-      name: "moderator".into(),
-      preferred_username: None,
-      password_encrypted: "mod".into(),
-      admin: false,
-      sitemod: false,
-      email: None,
-      matrix_user_id: None,
-      avatar: None,
-      banner: None,
-      banned: false,
-      updated: None,
-      show_nsfw: false,
-      theme: "darkly".into(),
-      default_sort_type: SortType::Hot as i16,
-      default_listing_type: ListingType::Subscribed as i16,
-      lang: "browser".into(),
-      show_avatars: true,
-      send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
-      bio: None,
-      local: true,
-      private_key: None,
-      public_key: None,
-      last_refreshed_at: None,
-    };
-
-    let new_notmod_user = UserForm {
-      name: "not_moderator".into(),
-      preferred_username: None,
-      password_encrypted: "nope".into(),
-      admin: false,
-      sitemod: false,
-      email: None,
-      matrix_user_id: None,
-      avatar: None,
-      banner: None,
-      banned: false,
-      updated: None,
-      show_nsfw: false,
-      theme: "darkly".into(),
-      default_sort_type: SortType::Hot as i16,
-      default_listing_type: ListingType::Subscribed as i16,
-      lang: "browser".into(),
-      show_avatars: true,
-      send_notifications_to_email: false,
-      actor_id: "http://fake.com".into(),
-      bio: None,
-      local: true,
-      private_key: None,
-      public_key: None,
-      last_refreshed_at: None,
-    };
-
-    let inserted_creator_user = User_::create(&conn, &new_creator_user).unwrap();
-    let inserted_mod_user = User_::create(&conn, &new_mod_user).unwrap();
-    let inserted_notmod_user = User_::create(&conn, &new_notmod_user).unwrap();
-
-    let new_community = CommunityForm {
-      name: "mod_community".to_string(),
-      title: "nada".to_owned(),
-      description: None,
-      category_id: 1,
-      creator_id: inserted_creator_user.id,
-      removed: None,
-      deleted: None,
-      updated: None,
-      nsfw: false,
-      actor_id: "http://fake.com".into(),
-      local: true,
-      private_key: None,
-      public_key: None,
-      last_refreshed_at: None,
-      published: None,
-      banner: None,
-      icon: None,
-    };
-
-    let inserted_community = Community::create(&conn, &new_community).unwrap();
-    let new_moderator = CommunityModeratorForm {
-      community_id: inserted_community.id,
-      user_id: inserted_mod_user.id,
-    };
-    let _inserted_moderator = CommunityModerator::join(&conn, &new_moderator);
-
-    assert!(!inserted_notmod_user
-      .is_moderator(&conn, inserted_community.id)
-      .unwrap());
-    assert!(inserted_mod_user
-      .is_moderator(&conn, inserted_community.id)
-      .unwrap());
-    assert!(inserted_creator_user
-      .is_moderator(&conn, inserted_community.id)
-      .unwrap());
-  }
+  // #[test]
+  // fn test_user_methods() {
+  //   use crate::{community::*, Joinable};
+  //   let conn = establish_unpooled_connection();
+  //
+  //   let new_creator_user = UserForm {
+  //     name: "creator".into(),
+  //     preferred_username: None,
+  //     password_encrypted: "creator".into(),
+  //     admin: false,
+  //     email: None,
+  //     matrix_user_id: None,
+  //     avatar: None,
+  //     banner: None,
+  //     banned: false,
+  //     updated: None,
+  //     show_nsfw: false,
+  //     theme: "darkly".into(),
+  //     default_sort_type: SortType::Hot as i16,
+  //     default_listing_type: ListingType::Subscribed as i16,
+  //     lang: "browser".into(),
+  //     show_avatars: true,
+  //     send_notifications_to_email: false,
+  //     actor_id: "http://fake.com".into(),
+  //     bio: None,
+  //     local: true,
+  //     private_key: None,
+  //     public_key: None,
+  //     last_refreshed_at: None,
+  //   };
+  //
+  //   let new_mod_user = UserForm {
+  //     name: "moderator".into(),
+  //     preferred_username: None,
+  //     password_encrypted: "mod".into(),
+  //     admin: false,
+  //     email: None,
+  //     matrix_user_id: None,
+  //     avatar: None,
+  //     banner: None,
+  //     banned: false,
+  //     updated: None,
+  //     show_nsfw: false,
+  //     theme: "darkly".into(),
+  //     default_sort_type: SortType::Hot as i16,
+  //     default_listing_type: ListingType::Subscribed as i16,
+  //     lang: "browser".into(),
+  //     show_avatars: true,
+  //     send_notifications_to_email: false,
+  //     actor_id: "http://fake.com".into(),
+  //     bio: None,
+  //     local: true,
+  //     private_key: None,
+  //     public_key: None,
+  //     last_refreshed_at: None,
+  //   };
+  //
+  //   let new_notmod_user = UserForm {
+  //     name: "not_moderator".into(),
+  //     preferred_username: None,
+  //     password_encrypted: "nope".into(),
+  //     admin: false,
+  //     email: None,
+  //     matrix_user_id: None,
+  //     avatar: None,
+  //     banner: None,
+  //     banned: false,
+  //     updated: None,
+  //     show_nsfw: false,
+  //     theme: "darkly".into(),
+  //     default_sort_type: SortType::Hot as i16,
+  //     default_listing_type: ListingType::Subscribed as i16,
+  //     lang: "browser".into(),
+  //     show_avatars: true,
+  //     send_notifications_to_email: false,
+  //     actor_id: "http://fake.com".into(),
+  //     bio: None,
+  //     local: true,
+  //     private_key: None,
+  //     public_key: None,
+  //     last_refreshed_at: None,
+  //   };
+  //
+  //   let inserted_creator_user = User_::create(&conn, &new_creator_user).unwrap();
+  //   let inserted_mod_user = User_::create(&conn, &new_mod_user).unwrap();
+  //   let inserted_notmod_user = User_::create(&conn, &new_notmod_user).unwrap();
+  //
+  //   let new_community = CommunityForm {
+  //     name: "mod_community".to_string(),
+  //     title: "nada".to_owned(),
+  //     description: None,
+  //     category_id: 1,
+  //     creator_id: inserted_creator_user.id,
+  //     removed: None,
+  //     deleted: None,
+  //     updated: None,
+  //     nsfw: false,
+  //     actor_id: "http://fake.com".into(),
+  //     local: true,
+  //     private_key: None,
+  //     public_key: None,
+  //     last_refreshed_at: None,
+  //     published: None,
+  //     banner: None,
+  //     icon: None,
+  //   };
+  //
+  //   let inserted_community = Community::create(&conn, &new_community).unwrap();
+  //   let new_moderator = CommunityModeratorForm {
+  //     community_id: inserted_community.id,
+  //     user_id: inserted_mod_user.id,
+  //   };
+  //   let _inserted_moderator = CommunityModerator::join(&conn, &new_moderator);
+  //
+  //   assert!(!inserted_notmod_user
+  //     .is_moderator(&conn, inserted_community.id)
+  //     .unwrap());
+  //   assert!(inserted_mod_user
+  //     .is_moderator(&conn, inserted_community.id)
+  //     .unwrap());
+  //   assert!(inserted_creator_user
+  //     .is_moderator(&conn, inserted_community.id)
+  //     .unwrap());
+  // }
 }

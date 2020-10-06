@@ -19,7 +19,8 @@ use crate::{
 use activitystreams::{
   activity::{
     kind::{FollowType, UndoType},
-    Follow, Undo,
+    Follow,
+    Undo,
   },
   actor::{ApActor, Endpoints, Person},
   object::{Image, Tombstone},
@@ -254,7 +255,6 @@ impl FromApub for UserForm {
       preferred_username,
       password_encrypted: "".to_string(),
       admin: false,
-      sitemod: false,
       banned: false,
       email: None,
       avatar,
