@@ -75,25 +75,29 @@ impl Perform for GetModlog {
 
     let community_id = data.community_id;
 
-    let anon_log: bool = match &data.auth {
-      Some(auth) => match get_user_from_jwt(&auth, context.pool()).await {
-        Ok(user) => {
-          if let Some(c_id) = community_id {
-            match is_mod_or_admin(context.pool(), user.id, c_id).await {
-              Ok(_) => false,
-              Err(_e) => true,
-            }
-          } else {
-            match is_admin_or_sitemod(context.pool(), user.id).await {
-              Ok(_) => false,
-              Err(_e) => true,
+    let anon_log: bool = false;
+
+    if anon_log {
+      match &data.auth {
+        Some(auth) => match get_user_from_jwt(&auth, context.pool()).await {
+          Ok(user) => {
+            if let Some(c_id) = community_id {
+              match is_mod_or_admin(context.pool(), user.id, c_id).await {
+                Ok(_) => false,
+                Err(_e) => true,
+              }
+            } else {
+              match is_admin_or_sitemod(context.pool(), user.id).await {
+                Ok(_) => false,
+                Err(_e) => true,
+              }
             }
           }
-        }
-        Err(_e) => true,
-      },
-      None => true,
-    };
+          Err(_e) => true,
+        },
+        None => true,
+      };
+    }
 
     let mod_user_id = data.mod_user_id;
     let page = data.page;
