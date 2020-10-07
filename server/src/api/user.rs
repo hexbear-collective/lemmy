@@ -847,7 +847,7 @@ impl Perform for BanUser {
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
     // Make sure user is an admin
-    is_admin(context.pool(), user.id).await?;
+    is_admin_or_sitemod(context.pool(), user.id).await?;
 
     let banned_user_id = data.user_id;
     // Make sure target user is not an admin or sitemod
