@@ -1,37 +1,36 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use actix_web::web::Data;
 use anyhow::Context;
 
-use lemmy_api_structs::{APIError, community::*};
+use lemmy_api_structs::{community::*, APIError};
 use lemmy_db::{
-  Bannable,
   comment::Comment,
   comment_view::CommentQueryBuilder,
   community::*,
   community_settings::*,
   community_view::*,
-  Crud,
   diesel_option_overwrite,
-  Followable,
-  Joinable,
   moderator::*,
   naive_now,
   post::Post,
   site::*,
-  SortType,
   user_view::*,
+  Bannable,
+  Crud,
+  Followable,
+  Joinable,
+  SortType,
 };
 use lemmy_utils::{
-  ConnectionId,
-  EndpointType,
   generate_actor_keypair,
   is_valid_community_name,
-  LemmyError,
   location_info,
   make_apub_endpoint,
   naive_from_unix,
+  ConnectionId,
+  EndpointType,
+  LemmyError,
 };
 
 use crate::{
@@ -41,16 +40,17 @@ use crate::{
     get_user_from_jwt,
     get_user_from_jwt_opt,
     is_admin,
+    is_admin_or_sitemod,
     is_mod_or_admin,
     Perform,
   },
   apub::ActorType,
   blocking,
-  LemmyContext,
   websocket::{
     messages::{GetCommunityUsersOnline, JoinCommunityRoom, SendCommunityRoomMessage},
     UserOperation,
   },
+  LemmyContext,
 };
 
 #[async_trait::async_trait(?Send)]
@@ -102,7 +102,7 @@ impl Perform for GetCommunity {
     let admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
 
-        if let Some(id) = websocket_id {
+    if let Some(id) = websocket_id {
       context
         .chat_server()
         .do_send(JoinCommunityRoom { community_id, id });
@@ -155,7 +155,7 @@ impl Perform for CreateCommunity {
     let site: Site = blocking(context.pool(), move |conn| Site::read(conn, 1)).await??;
     if !site.enable_create_communities {
       // ...but let admins/sitemods create them anyway
-      if is_admin(context.pool(), user_id).await.is_err() {
+      if is_admin_or_sitemod(context.pool(), user_id).await.is_err() {
         return Err(APIError::err("create_community_disabled").into());
       }
     }
@@ -795,7 +795,8 @@ impl Perform for TransferCommunity {
     // Make sure user is the creator, or an admin, or sitemod
     if user_id != read_community.creator_id
       && !(admins.iter().map(|a| a.id).any(|x| x == user_id)
-        || sitemods.iter().map(|a| a.id).any(|x| x == user_id)) {
+        || sitemods.iter().map(|a| a.id).any(|x| x == user_id))
+    {
       return Err(APIError::err("not_an_admin").into());
     }
 

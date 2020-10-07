@@ -1,28 +1,27 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use actix_web::web::Data;
 use anyhow::Context;
 use log::{debug, info};
 
-use lemmy_api_structs::{APIError, site::*, user::Register};
+use lemmy_api_structs::{site::*, user::Register, APIError};
 use lemmy_db::{
   category::*,
   comment_view::*,
   community_view::*,
-  Crud,
   diesel_option_overwrite,
   moderator::*,
   moderator_views::*,
   naive_now,
   post_view::*,
-  SearchType,
   site::*,
   site_view::*,
-  SortType,
   user_view::*,
+  Crud,
+  SearchType,
+  SortType,
 };
-use lemmy_utils::{ConnectionId, LemmyError, location_info, settings::Settings};
+use lemmy_utils::{location_info, settings::Settings, ConnectionId, LemmyError};
 
 use crate::{
   api::{
@@ -31,17 +30,18 @@ use crate::{
     get_user_from_jwt,
     get_user_from_jwt_opt,
     is_admin,
+    is_admin_or_sitemod,
     is_mod_or_admin,
     Perform,
   },
   apub::fetcher::search_by_apub_id,
   blocking,
-  LemmyContext,
   version,
   websocket::{
     messages::{GetUsersOnline, SendAllMessage},
     UserOperation,
   },
+  LemmyContext,
 };
 
 #[async_trait::async_trait(?Send)]
@@ -84,7 +84,7 @@ impl Perform for GetModlog {
               Err(_e) => true,
             }
           } else {
-            match is_admin(context.pool(), user.id).await {
+            match is_admin_or_sitemod(context.pool(), user.id).await {
               Ok(_) => false,
               Err(_e) => true,
             }
@@ -168,8 +168,7 @@ impl Perform for CreateSite {
   ) -> Result<SiteResponse, LemmyError> {
     let data: &CreateSite = &self;
 
-    match blocking(context.pool(), move |conn| { Site::read(conn, 1)}).await?
-    {
+    match blocking(context.pool(), move |conn| Site::read(conn, 1)).await? {
       Ok(_site) => return Err(APIError::err("site_already_exists").into()),
       Err(_e) => (),
     };
@@ -312,7 +311,6 @@ impl Perform for GetSite {
 
     let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
-
 
     // Make sure the site creator is the top admin
     if let Some(site_view) = site_view.to_owned() {
@@ -639,7 +637,7 @@ impl Perform for SaveSiteConfig {
 impl Perform for GetSiteModerators {
   type Response = GetSiteModeratorsResponse;
 
-    async fn perform(
+  async fn perform(
     &self,
     context: &Data<LemmyContext>,
     _websocket_id: Option<ConnectionId>,
