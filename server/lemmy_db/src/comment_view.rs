@@ -539,6 +539,7 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       updated: None,
       nsfw: false,
       embed_title: None,

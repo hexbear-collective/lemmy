@@ -83,6 +83,7 @@ async fn receive_remove_post(
     nsfw: post.nsfw,
     locked: None,
     stickied: None,
+    featured: None,
     updated: Some(naive_now()),
     embed_title: post.embed_title,
     embed_description: post.embed_description,

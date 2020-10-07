@@ -106,6 +106,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/list", web::get().to(route_get::<GetPosts>))
           .route("/like", web::post().to(route_post::<CreatePostLike>))
           .route("/save", web::put().to(route_post::<SavePost>))
+          .route("/featured", web::get().to(route_get::<GetFeaturedPosts>))
           .route(
             "/resolve_report",
             web::post().to(route_post::<ResolvePostReport>),

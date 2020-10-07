@@ -1,33 +1,32 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use actix_web::web::Data;
 use url::Url;
 
-use lemmy_api_structs::{APIError, post::*};
+use lemmy_api_structs::{post::*, APIError};
 use lemmy_db::{
   comment_view::*,
   community_settings::*,
   community_view::*,
-  Crud,
-  Likeable,
-  ListingType,
   moderator::*,
   naive_now,
   post::*,
   post_view::*,
-  Saveable,
   site::*,
   site_view::*,
-  SortType,
   user_view::*,
+  Crud,
+  Likeable,
+  ListingType,
+  Saveable,
+  SortType,
 };
 use lemmy_utils::{
+  is_valid_post_title,
+  make_apub_endpoint,
   ConnectionId,
   EndpointType,
-  is_valid_post_title,
   LemmyError,
-  make_apub_endpoint,
 };
 
 use crate::{
@@ -45,11 +44,11 @@ use crate::{
   fetch_iframely_and_pictrs_data,
   is_within_post_body_char_limit,
   is_within_post_title_char_limit,
-  LemmyContext,
   websocket::{
     messages::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},
     UserOperation,
   },
+  LemmyContext,
 };
 
 #[async_trait::async_trait(?Send)]
@@ -122,10 +121,11 @@ impl Perform for CreatePost {
     if !privileged {
       check_community_ban(user.id, data.community_id, context.pool()).await?;
     }
-    
-    let user_view =
-      blocking(context.pool(),
-               move |conn| UserView::get_user_secure(conn, user_id)).await??;
+
+    let user_view = blocking(context.pool(), move |conn| {
+      UserView::get_user_secure(conn, user_id)
+    })
+    .await??;
     let score = user_view.post_score + user_view.comment_score;
 
     // no upstream, dessalines wants to leverage rate limiting
@@ -166,6 +166,7 @@ impl Perform for CreatePost {
       nsfw: data.nsfw,
       locked: None,
       stickied: None,
+      featured: None,
       updated: None,
       embed_title: iframely_title,
       embed_description: iframely_description,
@@ -254,7 +255,7 @@ impl Perform for GetPost {
     let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
     let user_id = match user {
       Some(user) => Some(user.id),
-      None => None
+      None => None,
     };
 
     let id = data.id;
@@ -310,10 +311,10 @@ impl Perform for GetPost {
 
     let community_id = post.community_id;
     let privileged = match user_id {
-      Some(user_id) => {
-        is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok()
-      },
-      None => false
+      Some(user_id) => is_mod_or_admin(context.pool(), user_id, community_id)
+        .await
+        .is_ok(),
+      None => false,
     };
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
@@ -341,8 +342,10 @@ impl Perform for GetPost {
     })
     .await??;
 
-    let site_creator_id =
-      blocking(context.pool(), move |conn| Site::read(conn, 1).map(|s| s.creator_id)).await??;
+    let site_creator_id = blocking(context.pool(), move |conn| {
+      Site::read(conn, 1).map(|s| s.creator_id)
+    })
+    .await??;
 
     let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
@@ -441,6 +444,40 @@ impl Perform for GetPosts {
 }
 
 #[async_trait::async_trait(?Send)]
+impl Perform for GetFeaturedPosts {
+  type Response = GetPostsResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
+  ) -> Result<GetPostsResponse, LemmyError> {
+    let data: &GetFeaturedPosts = &self;
+    let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
+
+    let user_id = match &user {
+      Some(user) => Some(user.id),
+      None => None,
+    };
+
+    let posts = match blocking(context.pool(), move |conn| {
+      PostQueryBuilder::create(conn)
+        .my_user_id(user_id)
+        .featured(true)
+        .limit(2)
+        .list()
+    })
+    .await?
+    {
+      Ok(posts) => posts,
+      Err(_e) => return Err(APIError::err("couldnt_get_posts").into()),
+    };
+
+    Ok(GetPostsResponse { posts })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
 impl Perform for CreatePostLike {
   type Response = PostResponse;
 
@@ -475,8 +512,9 @@ impl Perform for CreatePostLike {
 
     let community_id = post.community_id;
     let user_id = user.id;
-    let privileged =
-      is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
+    let privileged = is_mod_or_admin(context.pool(), user_id, community_id)
+      .await
+      .is_ok();
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
     }
@@ -579,6 +617,7 @@ impl Perform for EditPost {
       deleted: Some(orig_post.deleted),
       locked: Some(orig_post.locked),
       stickied: Some(orig_post.stickied),
+      featured: Some(orig_post.featured),
       updated: Some(naive_now()),
       embed_title: iframely_title,
       embed_description: iframely_description,

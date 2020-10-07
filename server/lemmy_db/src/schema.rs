@@ -335,6 +335,7 @@ table! {
         thumbnail_url -> Nullable<Text>,
         ap_id -> Varchar,
         local -> Bool,
+        featured -> Bool,
     }
 }
 
