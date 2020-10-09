@@ -158,12 +158,10 @@ async fn fetch_iframely_and_pictrs_data(
   match &url {
     Some(url) => {
       // Fetch iframely data
-      println!("fetch iframely");
       let (iframely_title, iframely_description, iframely_thumbnail_url, iframely_html) =
         match fetch_iframely(client, url).await {
           Ok(res) => (res.title, res.description, res.thumbnail_url, res.html),
           Err(e) => {
-            println!("{}", e);
             error!("iframely err: {}", e);
             (None, None, None, None)
           }
@@ -174,7 +172,6 @@ async fn fetch_iframely_and_pictrs_data(
         Some(iframely_thumbnail_url) => match fetch_pictrs(client, &iframely_thumbnail_url).await {
           Ok(res) => Some(res.files[0].file.to_owned()),
           Err(e) => {
-            println!("{}", e);
             error!("pictrs err: {}", e);
             None
           }
@@ -183,7 +180,6 @@ async fn fetch_iframely_and_pictrs_data(
         None => match fetch_pictrs(client, &url).await {
           Ok(res) => Some(res.files[0].file.to_owned()),
           Err(e) => {
-            println!("{}", e);
             error!("pictrs err: {}", e);
             None
           }
