@@ -133,23 +133,15 @@ impl Perform for CreatePost {
       return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
     }
 
-    let url = match data.url.to_owned() {
-      Some(url) => {
-        if url.trim().is_empty() {
-          None
-        } else {
-          // no upstream, dessalines wants to leverage rate limiting
-          if score < 5 && !privileged {
-            return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
-          }
-          match Url::parse(&url) {
-            Ok(_t) => Some(url),
-            Err(_e) => return Err(APIError::err("invalid_url").into()),
-          }
-        }
+    if let Some(url) = data.url.as_ref() {
+      if score < 5 && !privileged {
+        return Err(APIError::err(format!("score_too_low, {}", score).as_str()).into());
       }
-      None => None,
-    };
+      match Url::parse(url) {
+        Ok(_t) => (),
+        Err(_e) => return Err(APIError::err("invalid_url").into()),
+      }
+    }
 
     // Fetch Iframely and pictrs cached image
     let (iframely_title, iframely_description, iframely_html, pictrs_thumbnail) =
@@ -157,7 +149,7 @@ impl Perform for CreatePost {
 
     let post_form = PostForm {
       name: data.name.trim().to_owned(),
-      url,
+      url: data.url.to_owned(),
       body: data.body.to_owned(),
       community_id: data.community_id,
       creator_id: user.id,
