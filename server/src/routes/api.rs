@@ -5,6 +5,7 @@ use lemmy_api_structs::{
   community::*,
   community_settings::*,
   post::*,
+  post_hexbear::{FeaturePost, GetFeaturedPosts},
   report::*,
   site::*,
   user::*,
@@ -106,11 +107,12 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/list", web::get().to(route_get::<GetPosts>))
           .route("/like", web::post().to(route_post::<CreatePostLike>))
           .route("/save", web::put().to(route_post::<SavePost>))
-          .route("/featured", web::get().to(route_get::<GetFeaturedPosts>))
           .route(
             "/resolve_report",
             web::post().to(route_post::<ResolvePostReport>),
-          ),
+          )
+          .route("/featured", web::get().to(route_get::<GetFeaturedPosts>))
+          .route("/featured", web::put().to(route_post::<FeaturePost>)),
       )
       // Comment
       .service(
@@ -220,7 +222,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           )
           .route("/tags", web::get().to(route_get::<GetUserTag>))
           .route("/tags", web::post().to(route_post::<SetUserTag>))
-          .route("/unread_notifs", web::get().to(route_get::<GetUnreadCount>))
+          .route("/unread_notifs", web::get().to(route_get::<GetUnreadCount>)),
       )
       // Admin Actions
       .service(

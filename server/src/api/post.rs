@@ -436,40 +436,6 @@ impl Perform for GetPosts {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for GetFeaturedPosts {
-  type Response = GetPostsResponse;
-
-  async fn perform(
-    &self,
-    context: &Data<LemmyContext>,
-    _websocket_id: Option<ConnectionId>,
-  ) -> Result<GetPostsResponse, LemmyError> {
-    let data: &GetFeaturedPosts = &self;
-    let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
-
-    let user_id = match &user {
-      Some(user) => Some(user.id),
-      None => None,
-    };
-
-    let posts = match blocking(context.pool(), move |conn| {
-      PostQueryBuilder::create(conn)
-        .my_user_id(user_id)
-        .featured(true)
-        .limit(2)
-        .list()
-    })
-    .await?
-    {
-      Ok(posts) => posts,
-      Err(_e) => return Err(APIError::err("couldnt_get_posts").into()),
-    };
-
-    Ok(GetPostsResponse { posts })
-  }
-}
-
-#[async_trait::async_trait(?Send)]
 impl Perform for CreatePostLike {
   type Response = PostResponse;
 

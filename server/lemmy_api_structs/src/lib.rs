@@ -8,6 +8,7 @@ pub mod post;
 pub mod report;
 pub mod site;
 pub mod user;
+pub mod post_hexbear;
 
 use thiserror::Error;
 
