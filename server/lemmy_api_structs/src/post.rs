@@ -27,11 +27,6 @@ pub struct GetPost {
   pub auth: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetFeaturedPosts {
-  pub auth: Option<String>,
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct GetPostResponse {
   pub post: PostView,

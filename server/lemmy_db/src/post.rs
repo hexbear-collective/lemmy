@@ -209,6 +209,16 @@ impl Post {
         .get_result::<Self>(conn)
   }
 
+  pub fn update_featured(
+    conn: &PgConnection,
+    post_id: i32,
+    new_featured: bool,
+  ) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+    diesel::update(post.find(post_id))
+        .set(featured.eq(new_featured))
+        .get_result::<Self>(conn)
+  }
 }
 
 impl Crud<PostForm> for Post {

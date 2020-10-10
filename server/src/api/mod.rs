@@ -4,11 +4,11 @@ use lemmy_api_structs::APIError;
 use lemmy_db::{
   community::Community,
   community_view::CommunityUserBanView,
-  Crud,
   post::Post,
   user::User_,
+  Crud,
 };
-use lemmy_utils::{ConnectionId, LemmyError, slur_check, slurs_vec_to_str};
+use lemmy_utils::{slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
 
 use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 
@@ -17,6 +17,7 @@ pub mod comment;
 pub mod community;
 pub mod community_settings;
 pub mod post;
+pub mod post_hexbear;
 pub mod report;
 pub mod site;
 pub mod user;

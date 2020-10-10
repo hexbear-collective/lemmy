@@ -76,4 +76,5 @@ pub enum UserOperation {
   GetSiteModerators,
   GetUserTag,
   SetUserTag,
+  FeaturePost,
 }
