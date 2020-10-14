@@ -499,8 +499,6 @@ impl Perform for MarkCommentAsRead {
     })
     .await??;
 
-    check_community_ban(user.id, orig_comment.community_id, context.pool()).await?;
-
     // Verify that only the recipient can mark as read
     // Needs to fetch the parent comment / post to get the recipient
     let parent_id = orig_comment.parent_id;
