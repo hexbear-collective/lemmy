@@ -14,6 +14,7 @@ pub extern crate dotenv;
 pub extern crate jsonwebtoken;
 extern crate log;
 pub extern crate openssl;
+pub extern crate reqwest;
 pub extern crate rss;
 pub extern crate serde;
 pub extern crate serde_json;
@@ -24,52 +25,72 @@ pub mod api;
 pub mod apub;
 pub mod code_migrations;
 pub mod hcaptcha;
-pub mod rate_limit;
 pub mod request;
 pub mod routes;
 pub mod version;
 pub mod websocket;
 
-use crate::request::{retry, RecvError};
-use actix_web::{client::Client, dev::ConnectionInfo};
+use crate::{
+  request::{retry, RecvError},
+  websocket::chat_server::ChatServer,
+};
+use actix::Addr;
 use anyhow::anyhow;
-use lemmy_utils::{get_apub_protocol_string, settings::Settings};
+use background_jobs::QueueHandle;
+use lemmy_utils::{get_apub_protocol_string, settings::Settings, LemmyError};
 use log::error;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use reqwest::Client;
 use serde::Deserialize;
-use std::{
-  net::{IpAddr, SocketAddr},
-  process::Command,
-};
+use std::process::Command;
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
-pub type ConnectionId = usize;
-pub type PostId = i32;
-pub type CommunityId = i32;
-pub type UserId = i32;
-pub type IPAddr = String;
 
-#[derive(Debug)]
-pub struct LemmyError {
-  inner: anyhow::Error,
+pub struct LemmyContext {
+  pub pool: DbPool,
+  pub chat_server: Addr<ChatServer>,
+  pub client: Client,
+  pub activity_queue: QueueHandle,
 }
 
-impl<T> From<T> for LemmyError
-where
-  T: Into<anyhow::Error>,
-{
-  fn from(t: T) -> Self {
-    LemmyError { inner: t.into() }
+impl LemmyContext {
+  pub fn create(
+    pool: DbPool,
+    chat_server: Addr<ChatServer>,
+    client: Client,
+    activity_queue: QueueHandle,
+  ) -> LemmyContext {
+    LemmyContext {
+      pool,
+      chat_server,
+      client,
+      activity_queue,
+    }
+  }
+  pub fn pool(&self) -> &DbPool {
+    &self.pool
+  }
+  pub fn chat_server(&self) -> &Addr<ChatServer> {
+    &self.chat_server
+  }
+  pub fn client(&self) -> &Client {
+    &self.client
+  }
+  pub fn activity_queue(&self) -> &QueueHandle {
+    &self.activity_queue
   }
 }
 
-impl std::fmt::Display for LemmyError {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    self.inner.fmt(f)
+impl Clone for LemmyContext {
+  fn clone(&self) -> Self {
+    LemmyContext {
+      pool: self.pool.clone(),
+      chat_server: self.chat_server.clone(),
+      client: self.client.clone(),
+      activity_queue: self.activity_queue.clone(),
+    }
   }
 }
-
-impl actix_web::error::ResponseError for LemmyError {}
 
 #[derive(Deserialize, Debug)]
 pub struct IframelyResponse {
@@ -82,7 +103,7 @@ pub struct IframelyResponse {
 pub async fn fetch_iframely(client: &Client, url: &str) -> Result<IframelyResponse, LemmyError> {
   let fetch_url = format!("http://iframely/oembed?url={}", url);
 
-  let mut response = retry(|| client.get(&fetch_url).send()).await?;
+  let response = retry(|| client.get(&fetch_url).send()).await?;
 
   let res: IframelyResponse = response
     .json()
@@ -111,7 +132,7 @@ pub async fn fetch_pictrs(client: &Client, image_url: &str) -> Result<PictrsResp
     utf8_percent_encode(image_url, NON_ALPHANUMERIC) // TODO this might not be needed
   );
 
-  let mut response = retry(|| client.get(&fetch_url).send()).await?;
+  let response = retry(|| client.get(&fetch_url).send()).await?;
 
   let response: PictrsResponse = response
     .json()
@@ -204,18 +225,6 @@ pub async fn is_image_content_type(client: &Client, test: &str) -> Result<(), Le
   }
 }
 
-pub fn get_ip(conn_info: &ConnectionInfo) -> String {
-  conn_info
-    .realip_remote_addr()
-    .and_then(|real_ip| {
-      real_ip
-        .parse::<IpAddr>()
-        .or_else(|_| real_ip.parse::<SocketAddr>().map(|sa| sa.ip()))
-        .ok()
-    })
-    .map_or("0.0.0.0".to_string(), |ip_addr| ip_addr.to_string())
-}
-
 pub async fn blocking<F, T>(pool: &DbPool, f: F) -> Result<T, LemmyError>
 where
   F: FnOnce(&diesel::PgConnection) -> T + Send + 'static,
@@ -230,23 +239,6 @@ where
   .await?;
 
   Ok(res)
-}
-
-pub fn is_within_post_title_char_limit(title: &str) -> bool {
-  title.len() <= 160
-}
-
-// This should possibly be raised to accomodate essays or creative writing
-pub fn is_within_post_body_char_limit(body: &str) -> bool {
-  body.len() <= 20000
-}
-
-pub fn is_within_comment_char_limit(content: &str) -> bool {
-  content.len() <= 10000
-}
-
-pub fn is_within_message_char_limit(content: &str) -> bool {
-  content.len() <= 4000
 }
 
 pub fn captcha_espeak_wav_base64(captcha: &str) -> Result<String, LemmyError> {
@@ -296,6 +288,23 @@ pub fn espeak_wav_base64(text: &str) -> Result<String, LemmyError> {
   Ok(base64)
 }
 
+pub fn is_within_post_title_char_limit(title: &str) -> bool {
+  title.len() <= 160
+}
+
+// This should possibly be raised to accomodate essays or creative writing
+pub fn is_within_post_body_char_limit(body: &str) -> bool {
+  body.len() <= 20000
+}
+
+pub fn is_within_comment_char_limit(content: &str) -> bool {
+  content.len() <= 10000
+}
+
+pub fn is_within_message_char_limit(content: &str) -> bool {
+  content.len() <= 4000
+}
+
 #[cfg(test)]
 mod tests {
   use crate::{captcha_espeak_wav_base64, is_image_content_type};
@@ -303,7 +312,7 @@ mod tests {
   #[test]
   fn test_image() {
     actix_rt::System::new("tset_image").block_on(async move {
-      let client = actix_web::client::Client::default();
+      let client = reqwest::Client::default();
       assert!(is_image_content_type(&client, "https://1734811051.rsc.cdn77.org/data/images/full/365645/as-virus-kills-navajos-in-their-homes-tribal-women-provide-lifeline.jpg?w=600?w=650").await.is_ok());
       assert!(is_image_content_type(&client,
                                     "https://twitter.com/BenjaminNorton/status/1259922424272957440?s=20"

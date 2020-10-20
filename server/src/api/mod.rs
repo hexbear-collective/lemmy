@@ -1,44 +1,26 @@
-use crate::{api::claims::Claims, blocking, websocket::WebsocketInfo, DbPool, LemmyError};
-use actix_web::client::Client;
+use actix_web::web::Data;
+
+use lemmy_api_structs::APIError;
 use lemmy_db::{
-  community::*, community_view::*, moderator::*, site::*, user::*, user_view::*, Crud,
+  community::Community,
+  community_view::CommunityUserBanView,
+  post::Post,
+  user::User_,
+  Crud,
 };
-use lemmy_utils::{slur_check, slurs_vec_to_str};
-use thiserror::Error;
+use lemmy_utils::{slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
+
+use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 
 pub mod claims;
 pub mod comment;
 pub mod community;
 pub mod community_settings;
 pub mod post;
+pub mod post_hexbear;
 pub mod report;
 pub mod site;
 pub mod user;
-
-#[derive(Debug, Error)]
-#[error("{{\"error\":\"{message}\"}}")]
-pub struct APIError {
-  pub message: String,
-}
-
-impl APIError {
-  pub fn err(msg: &str) -> Self {
-    APIError {
-      message: msg.to_string(),
-    }
-  }
-}
-
-pub struct Oper<T> {
-  data: T,
-  client: Client,
-}
-
-impl<Data> Oper<Data> {
-  pub fn new(data: Data, client: Client) -> Oper<Data> {
-    Oper { data, client }
-  }
-}
 
 #[async_trait::async_trait(?Send)]
 pub trait Perform {
@@ -46,12 +28,12 @@ pub trait Perform {
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<Self::Response, LemmyError>;
 }
 
-pub async fn is_mod_or_admin(
+pub(in crate::api) async fn is_mod_or_admin(
   pool: &DbPool,
   user_id: i32,
   community_id: i32,
@@ -61,11 +43,10 @@ pub async fn is_mod_or_admin(
   })
   .await?;
   if !is_mod_or_admin {
-    return Err(APIError::err("not_an_admin").into());
+    return Err(APIError::err("not_a_mod_or_admin").into());
   }
   Ok(())
 }
-
 pub async fn is_admin(pool: &DbPool, user_id: i32) -> Result<(), LemmyError> {
   let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
   if !user.admin {
@@ -80,6 +61,13 @@ pub async fn is_admin_or_sitemod(pool: &DbPool, user_id: i32) -> Result<(), Lemm
     return Err(APIError::err("not_an_admin").into());
   }
   Ok(())
+}
+
+pub(in crate::api) async fn get_post(post_id: i32, pool: &DbPool) -> Result<Post, LemmyError> {
+  match blocking(pool, move |conn| Post::read(conn, post_id)).await? {
+    Ok(post) => Ok(post),
+    Err(_e) => Err(APIError::err("couldnt_find_post").into()),
+  }
 }
 
 pub(in crate::api) async fn get_user_from_jwt(
@@ -109,14 +97,14 @@ pub(in crate::api) async fn get_user_from_jwt_opt(
   }
 }
 
-pub(in crate::api) fn check_slurs(text: &str) -> Result<(), APIError> {
+pub(in crate) fn check_slurs(text: &str) -> Result<(), APIError> {
   if let Err(slurs) = slur_check(text) {
     Err(APIError::err(&slurs_vec_to_str(slurs)))
   } else {
     Ok(())
   }
 }
-pub(in crate::api) fn check_slurs_opt(text: &Option<String>) -> Result<(), APIError> {
+pub(in crate) fn check_slurs_opt(text: &Option<String>) -> Result<(), APIError> {
   match text {
     Some(t) => check_slurs(t),
     None => Ok(()),

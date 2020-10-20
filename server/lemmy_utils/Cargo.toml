@@ -3,6 +3,10 @@ name = "lemmy_utils"
 version = "0.1.0"
 edition = "2018"
 
+[lib]
+name = "lemmy_utils"
+path = "src/lib.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -20,3 +24,5 @@ comrak = "0.7"
 lazy_static = "1.3.0"
 openssl = "0.10"
 url = { version = "2.1.1", features = ["serde"] }
+actix-web = "3.0.0-alpha.3"
+anyhow = "1.0.32"

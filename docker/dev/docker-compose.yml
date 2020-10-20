@@ -3,11 +3,9 @@ version: '3.3'
 services:
 
   lemmy:
-    build: 
-      context: ../../
-      dockerfile: docker/dev/Dockerfile
+    image: lemmy-dev:latest
     ports:
-      - "127.0.0.1:8536:8536"
+      - "8536:8536"
     restart: always
     environment:
       - RUST_LOG=debug
@@ -22,7 +20,7 @@ services:
     image: postgres:12-alpine
     ports:
       # use a different port so it doesnt conflict with postgres running on the host
-      - "127.0.0.1:5433:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_USER=lemmy
       - POSTGRES_PASSWORD=password
@@ -34,7 +32,7 @@ services:
   pictrs:
     image: asonix/pictrs:v0.1.13-r0
     ports: 
-      - "127.0.0.1:8537:8080"
+      - "8537:8080"
     user: 991:991
     volumes:
       - ./volumes/pictrs:/mnt
@@ -43,7 +41,7 @@ services:
   iframely:
     image: jolt/iframely:v1.4.3
     ports:
-      - "127.0.0.1:8061:80"
+      - "8061:80"
     volumes:
       - ../iframely.config.local.js:/iframely/config.local.js:ro
     restart: always

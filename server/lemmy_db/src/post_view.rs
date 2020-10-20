@@ -20,6 +20,7 @@ table! {
     deleted -> Bool,
     nsfw -> Bool,
     stickied -> Bool,
+    featured -> Bool,
     embed_title -> Nullable<Text>,
     embed_description -> Nullable<Text>,
     embed_html -> Nullable<Text>,
@@ -76,6 +77,7 @@ pub struct PostView {
   pub deleted: bool,
   pub nsfw: bool,
   pub stickied: bool,
+  pub featured: bool,
   pub embed_title: Option<String>,
   pub embed_description: Option<String>,
   pub embed_html: Option<String>,
@@ -127,6 +129,7 @@ pub struct PostQueryBuilder<'a> {
   show_nsfw: bool,
   saved_only: bool,
   unread_only: bool,
+  featured: bool,
   max_age: Option<i32>,
   page: Option<i64>,
   limit: Option<i64>,
@@ -152,6 +155,7 @@ impl<'a> PostQueryBuilder<'a> {
       show_nsfw: true,
       saved_only: false,
       unread_only: false,
+      featured: false,
       max_age: None,
       page: None,
       limit: None,
@@ -208,6 +212,11 @@ impl<'a> PostQueryBuilder<'a> {
     self
   }
 
+  pub fn featured(mut self, featured: bool) -> Self {
+    self.featured = featured;
+    self
+  }
+
   pub fn unread_only(mut self, unread_only: bool) -> Self {
     self.unread_only = unread_only;
     self
@@ -233,9 +242,11 @@ impl<'a> PostQueryBuilder<'a> {
 
     let mut query = self.query;
 
-    if let ListingType::Subscribed = self.listing_type {
-      query = query.filter(subscribed.eq(true));
-    }
+    query = match self.listing_type {
+      ListingType::Subscribed => query.filter(subscribed.eq(true)),
+      ListingType::Local => query.filter(community_local.eq(true)),
+      _ => query,
+    };
 
     if let Some(for_community_id) = self.for_community_id {
       query = query.filter(community_id.eq(for_community_id));
@@ -314,6 +325,10 @@ impl<'a> PostQueryBuilder<'a> {
       query = query.filter(read.eq(false));
     };
 
+    if self.featured {
+      query = query.filter(featured.eq(true));
+    };
+
     if let Some(max_age) = self.max_age {
       query = query.filter(published.gt(now - max_age.days()))
     };
@@ -379,6 +394,7 @@ mod tests {
       name: user_name.to_owned(),
       preferred_username: None,
       password_encrypted: "nope".into(),
+      admin: false,
       email: None,
       matrix_user_id: None,
       avatar: None,
@@ -392,7 +408,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_8282738268".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -412,7 +428,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_2763".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -434,13 +450,14 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       updated: None,
       nsfw: false,
       embed_title: None,
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -460,12 +477,6 @@ mod tests {
       post_id: inserted_post.id,
       user_id: inserted_user.id,
       published: inserted_post_like.published,
-      score: 1,
-    };
-
-    let post_like_form = PostLikeForm {
-      post_id: inserted_post.id,
-      user_id: inserted_user.id,
       score: 1,
     };
 
@@ -510,6 +521,7 @@ mod tests {
       deleted: false,
       locked: false,
       stickied: false,
+      featured: false,
       community_name: community_name.to_owned(),
       community_icon: None,
       community_removed: false,
@@ -532,7 +544,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
       creator_actor_id: inserted_user.actor_id.to_owned(),
       creator_local: true,
@@ -551,6 +563,7 @@ mod tests {
       deleted: false,
       locked: false,
       stickied: false,
+      featured: false,
       creator_id: inserted_user.id,
       creator_name: user_name,
       creator_preferred_username: None,
@@ -583,7 +596,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
       creator_actor_id: inserted_user.actor_id.to_owned(),
       creator_local: true,
@@ -591,7 +604,7 @@ mod tests {
       community_local: true,
     };
 
-    let like_removed = PostLike::remove(&conn, &post_like_form).unwrap();
+    let like_removed = PostLike::remove(&conn, inserted_user.id, inserted_post.id).unwrap();
     let num_deleted = Post::delete(&conn, inserted_post.id).unwrap();
     Community::delete(&conn, inserted_community.id).unwrap();
     User_::delete(&conn, inserted_user.id).unwrap();
