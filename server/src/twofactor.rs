@@ -53,7 +53,7 @@ pub fn generate_2fa(user: User_) -> Result<(), LemmyError> {
   let subject = &format!("ChapoChat: Attempted login for {}", &user.name);
   let time = Utc::now().format("%Y-%m-%d %H:%M:%S");
   let html = &format!("<h1>Attempted login for {}</h1><br><p>At {} UTC a login was attempted on your account.
-        Because your account is setup with two-factor authentication, you must enter a code to successfully login.</p>
+        Because your account is setup with two-factor authentication, you must enter a code to successfully login. This code will expire within one hour.</p>
         <h3>Your login code is {}</h3>", user.name, time, genned_code);
   //println!("Sending 2fa email with code {}", genned_code);
   match send_email(subject, user.email.unwrap().as_str(), &user.name, html) {

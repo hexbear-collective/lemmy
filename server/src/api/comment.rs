@@ -3,53 +3,28 @@ use std::str::FromStr;
 use actix_web::web::Data;
 use log::error;
 
-use lemmy_api_structs::{APIError, comment::*};
+use lemmy_api_structs::{comment::*, APIError};
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community_settings::*,
-  Crud,
-  Likeable,
-  ListingType,
-  moderator::*,
-  post::*,
-  Saveable,
-  site_view::*,
-  SortType,
-  user::*,
-  user_mention::*,
+  comment::*, comment_view::*, community_settings::*, moderator::*, post::*, site_view::*, user::*,
+  user_mention::*, Crud, Likeable, ListingType, Saveable, SortType,
 };
 use lemmy_utils::{
-  ConnectionId,
-  EndpointType,
-  LemmyError,
-  make_apub_endpoint,
-  MentionData,
-  num_md_images,
-  remove_slurs,
-  scrape_text_for_mentions,
-  send_email,
-  settings::Settings,
+  make_apub_endpoint, num_md_images, remove_slurs, scrape_text_for_mentions, send_email,
+  settings::Settings, ConnectionId, EndpointType, LemmyError, MentionData,
 };
 
 use crate::{
   api::{
-    check_community_ban,
-    get_post,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_mod_or_admin,
+    check_community_ban, get_post, get_user_from_jwt, get_user_from_jwt_opt, is_mod_or_admin,
     Perform,
   },
   apub::{ApubLikeableType, ApubObjectType},
-  blocking,
-  DbPool,
-  is_within_comment_char_limit,
-  LemmyContext,
+  blocking, is_within_comment_char_limit,
   websocket::{
     messages::{JoinCommunityRoom, SendComment},
     UserOperation,
   },
+  DbPool, LemmyContext,
 };
 
 #[async_trait::async_trait(?Send)]
@@ -95,8 +70,9 @@ impl Perform for CreateComment {
     })
     .await??;
 
-    let privileged =
-      is_mod_or_admin(context.pool(), user.id, post.community_id).await.is_ok();
+    let privileged = is_mod_or_admin(context.pool(), user.id, post.community_id)
+      .await
+      .is_ok();
 
     if settings.private && !privileged {
       return Err(APIError::err("community_is_private").into());
@@ -114,7 +90,10 @@ impl Perform for CreateComment {
       let user_id = user.id;
       let community_id = post.community_id;
 
-      if is_mod_or_admin(context.pool(), user_id, community_id).await.is_err() {
+      if is_mod_or_admin(context.pool(), user_id, community_id)
+        .await
+        .is_err()
+      {
         return Err(APIError::err("locked").into());
       }
     }
@@ -238,7 +217,9 @@ impl Perform for EditComment {
 
     let community_id = orig_comment.community_id;
     let user_id = user.id;
-    let privileged = is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
+    let privileged = is_mod_or_admin(context.pool(), user_id, community_id)
+      .await
+      .is_ok();
     let num_images: i32 = num_md_images(&content_slurs_removed); // replaced content_pii_removed
 
     if !privileged && settings.comment_images < num_images {
@@ -312,7 +293,7 @@ impl Perform for DeleteComment {
   ) -> Result<CommentResponse, LemmyError> {
     let data: &DeleteComment = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
-    
+
     let edit_id = data.edit_id;
     let orig_comment = blocking(context.pool(), move |conn| {
       CommentView::read(&conn, edit_id, None)
@@ -721,7 +702,7 @@ impl Perform for GetComments {
     let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
     let user_id = match user {
       Some(user) => Some(user.id),
-      None => None
+      None => None,
     };
 
     // Check community settings
@@ -731,9 +712,10 @@ impl Perform for GetComments {
           CommunitySettings::read_from_community_id(conn, community_id)
         })
         .await??;
-        
-        let privileged =
-          is_mod_or_admin(context.pool(), user_id, community_id).await.is_ok();
+
+        let privileged = is_mod_or_admin(context.pool(), user_id, community_id)
+          .await
+          .is_ok();
         if settings.private && !privileged {
           return Err(APIError::err("community_is_private").into());
         }

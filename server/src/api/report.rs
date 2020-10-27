@@ -1,6 +1,6 @@
 use actix_web::web::Data;
 
-use lemmy_api_structs::{APIError, report::*};
+use lemmy_api_structs::{report::*, APIError};
 use lemmy_db::{
   comment::*,
   comment_view::*,
@@ -8,27 +8,16 @@ use lemmy_db::{
   post::*,
   post_view::*,
   report_views::{
-    CommentReportQueryBuilder,
-    CommentReportView,
-    PostReportQueryBuilder,
-    PostReportView,
+    CommentReportQueryBuilder, CommentReportView, PostReportQueryBuilder, PostReportView,
   },
-  Reportable,
   user_view::UserView,
+  Reportable,
 };
-use lemmy_utils::{
-  ConnectionId,
-  LemmyError,
-};
+use lemmy_utils::{ConnectionId, LemmyError};
 
 use crate::{
-  api::{
-    check_community_ban,
-    get_user_from_jwt,
-    Perform
-  },
-  blocking,
-  LemmyContext,
+  api::{check_community_ban, get_user_from_jwt, Perform},
+  blocking, LemmyContext,
 };
 
 const MAX_REPORT_LEN: usize = 1000;
@@ -44,7 +33,7 @@ impl Perform for CreateCommentReport {
   ) -> Result<CommentReportResponse, LemmyError> {
     let data: &CreateCommentReport = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
-    
+
     // Check size of report and check for whitespace
     let reason: Option<String> = match data.reason.clone() {
       Some(s) if s.trim().is_empty() => None,
@@ -57,7 +46,10 @@ impl Perform for CreateCommentReport {
 
     // Fetch comment information
     let comment_id = data.comment;
-    let comment = blocking(context.pool(), move |conn| CommentView::read(&conn, comment_id, None)).await??;
+    let comment = blocking(context.pool(), move |conn| {
+      CommentView::read(&conn, comment_id, None)
+    })
+    .await??;
 
     // Check for community ban
     check_community_ban(user.id, comment.community_id, context.pool()).await?;
@@ -76,7 +68,10 @@ impl Perform for CreateCommentReport {
       comment_text: comment.content,
       comment_time,
     };
-    blocking(context.pool(), move |conn| CommentReport::report(conn, &report_form)).await??;
+    blocking(context.pool(), move |conn| {
+      CommentReport::report(conn, &report_form)
+    })
+    .await??;
 
     Ok(CommentReportResponse { success: true })
   }
@@ -106,7 +101,10 @@ impl Perform for CreatePostReport {
 
     // Fetch post information from the database
     let post_id = data.post;
-    let post = blocking(context.pool(), move |conn| PostView::read(&conn, post_id, None)).await??;
+    let post = blocking(context.pool(), move |conn| {
+      PostView::read(&conn, post_id, None)
+    })
+    .await??;
 
     // Check for community ban
     check_community_ban(user.id, post.community_id, context.pool()).await?;
@@ -127,7 +125,10 @@ impl Perform for CreatePostReport {
       post_body: post.body,
       post_time,
     };
-    blocking(context.pool(), move |conn| PostReport::report(conn, &report_form)).await??;
+    blocking(context.pool(), move |conn| {
+      PostReport::report(conn, &report_form)
+    })
+    .await??;
 
     Ok(PostReportResponse { success: true })
   }
@@ -323,7 +324,10 @@ impl Perform for ResolveCommentReport {
 
     // Fetch the report view
     let report_id = data.report;
-    let report = blocking(context.pool(), move |conn| CommentReportView::read(&conn, &report_id)).await??;
+    let report = blocking(context.pool(), move |conn| {
+      CommentReportView::read(&conn, &report_id)
+    })
+    .await??;
 
     // Check for community ban
     check_community_ban(user.id, report.community_id, context.pool()).await?;
@@ -373,7 +377,10 @@ impl Perform for ResolvePostReport {
 
     // Fetch the report view
     let report_id = data.report;
-    let report = blocking(context.pool(), move |conn| PostReportView::read(&conn, &report_id)).await??;
+    let report = blocking(context.pool(), move |conn| {
+      PostReportView::read(&conn, &report_id)
+    })
+    .await??;
 
     // Check for community ban
     check_community_ban(user.id, report.community_id, context.pool()).await?;
