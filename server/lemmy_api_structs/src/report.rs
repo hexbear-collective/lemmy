@@ -1,7 +1,4 @@
-use lemmy_db::report_views::{
-  CommentReportView,
-  PostReportView,
-};
+use lemmy_db::report_views::{CommentReportView, PostReportView};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

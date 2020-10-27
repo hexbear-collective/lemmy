@@ -2,8 +2,7 @@ use lemmy_api_structs::APIError;
 use lemmy_db::user::*;
 use lemmy_utils::{send_email, LemmyError};
 
-use std::sync::Mutex;
-use std::time::Duration;
+use std::{sync::Mutex, time::Duration};
 
 use chrono::prelude::*;
 use lazy_static::lazy_static;

@@ -25,8 +25,8 @@ pub struct Register {
   pub show_nsfw: bool,
   pub captcha_uuid: Option<String>,
   pub captcha_answer: Option<String>,
-  pub pronouns: Option<String>,       // hexbear
-  pub hcaptcha_id: Option<String>,    // hexbear
+  pub pronouns: Option<String>,    // hexbear
+  pub hcaptcha_id: Option<String>, // hexbear
 }
 
 #[derive(Serialize, Deserialize)]
@@ -71,7 +71,7 @@ pub struct SaveUserSettings {
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginResponse {
-  pub requires_2fa: bool, //this should be exclusive with jwt 
+  pub requires_2fa: bool, //this should be exclusive with jwt
   pub jwt: String,
 }
 
@@ -95,8 +95,8 @@ pub struct GetUserDetailsResponse {
   pub comments: Vec<CommentView>,
   pub posts: Vec<PostView>,
   // TODO: These should be removed. GetSite does this already.
-  pub admins: Vec<UserView>,    // hexbear
-  pub sitemods: Vec<UserView>,  // hexbear
+  pub admins: Vec<UserView>,   // hexbear
+  pub sitemods: Vec<UserView>, // hexbear
 }
 
 #[derive(Serialize, Deserialize)]

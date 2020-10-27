@@ -75,8 +75,8 @@ pub struct UserForm {
 
 #[derive(QueryableByName)]
 pub struct UserUnreadCount {
-    #[sql_type = "Integer"]
-    pub unreads: i32,
+  #[sql_type = "Integer"]
+  pub unreads: i32,
 }
 
 impl Crud<UserForm> for User_ {
