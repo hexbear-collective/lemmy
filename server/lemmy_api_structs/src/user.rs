@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub struct Login {
   pub username_or_email: String,
   pub password: String,
+  pub code_2fa: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -64,11 +65,13 @@ pub struct SaveUserSettings {
   pub old_password: Option<String>,
   pub show_avatars: bool,
   pub send_notifications_to_email: bool,
+  pub has_2fa: bool,
   pub auth: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginResponse {
+  pub requires_2fa: bool, //this should be exclusive with jwt 
   pub jwt: String,
 }
 

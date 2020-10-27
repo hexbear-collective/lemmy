@@ -27,6 +27,7 @@ pub mod code_migrations;
 pub mod hcaptcha;
 pub mod request;
 pub mod routes;
+pub mod twofactor;
 pub mod version;
 pub mod websocket;
 

@@ -490,6 +490,7 @@ table! {
         last_refreshed_at -> Timestamp,
         sitemod -> Bool,
         banner -> Nullable<Text>,
+        has_2fa -> Bool,
     }
 }
 
@@ -518,6 +519,7 @@ table! {
         banned -> Nullable<Bool>,
         show_avatars -> Nullable<Bool>,
         send_notifications_to_email -> Nullable<Bool>,
+        has_2fa -> Nullable<Bool>,
         published -> Nullable<Timestamp>,
         number_of_posts -> Nullable<Int8>,
         post_score -> Nullable<Int8>,

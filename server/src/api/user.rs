@@ -9,63 +9,28 @@ use log::{error, info};
 
 use lemmy_api_structs::{user::*, APIError};
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community::*,
-  community_settings::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  naive_now,
-  password_reset_request::*,
-  post::*,
-  post_view::*,
-  private_message::*,
-  private_message_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  user_mention_view::*,
-  user_tag::*,
-  user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  comment::*, comment_view::*, community::*, community_settings::*, community_view::*,
+  diesel_option_overwrite, moderator::*, naive_now, password_reset_request::*, post::*,
+  post_view::*, private_message::*, private_message_view::*, site::*, site_view::*, user::*,
+  user_mention::*, user_mention_view::*, user_tag::*, user_view::*, Crud, Followable, Joinable,
+  ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_preferred_username,
-  is_valid_username,
-  location_info,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
+  generate_actor_keypair, generate_random_string, is_valid_preferred_username, is_valid_username,
+  location_info, make_apub_endpoint, naive_from_unix, remove_slurs, send_email, settings::Settings,
+  ConnectionId, EndpointType, LemmyError,
 };
 
 use crate::{
   api::{
-    check_slurs,
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    is_admin_or_sitemod,
-    Perform,
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_admin_or_sitemod, Perform,
   },
   apub::ApubObjectType,
-  blocking,
-  captcha_espeak_wav_base64,
+  blocking, captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
+  twofactor::{check_2fa, generate_2fa},
   websocket::{
     messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
     UserOperation,
@@ -185,8 +150,37 @@ impl Perform for Login {
       return Err(APIError::err("invalid_login_credentials").into());
     }
 
+    //handle 2fa
+    if user.has_2fa {
+      match &data.code_2fa {
+        Some(code) => match check_2fa(&user, code) {
+          Ok(matches) => {
+            if matches {
+              return Ok(LoginResponse {
+                requires_2fa: false,
+                jwt: Claims::jwt(user, Settings::get().hostname)?,
+              });
+            }
+            return Err(APIError::err("invalid_2fa_code").into());
+          }
+          Err(e) => return Err(e),
+        },
+        None => {
+          match generate_2fa(user) {
+            Ok(_k) => (),
+            Err(e) => return Err(e),
+          };
+          return Ok(LoginResponse {
+            requires_2fa: true,
+            jwt: String::from(""),
+          });
+        }
+      }
+    }
+
     // Return the jwt
     Ok(LoginResponse {
+      requires_2fa: false,
       jwt: Claims::jwt(user, Settings::get().hostname)?,
     })
   }
@@ -296,6 +290,7 @@ impl Perform for Register {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
+      has_2fa: false,
       actor_id: Some(make_apub_endpoint(EndpointType::User, &data.username).to_string()),
       bio: None,
       local: true,
@@ -414,6 +409,7 @@ impl Perform for Register {
 
     // Return the jwt
     Ok(LoginResponse {
+      requires_2fa: false,
       jwt: Claims::jwt(inserted_user, Settings::get().hostname)?,
     })
   }
@@ -577,6 +573,7 @@ impl Perform for SaveUserSettings {
       lang: data.lang.to_owned(),
       show_avatars: data.show_avatars,
       send_notifications_to_email: data.send_notifications_to_email,
+      has_2fa: data.has_2fa,
       actor_id: Some(read_user.actor_id),
       bio,
       local: read_user.local,
@@ -606,6 +603,7 @@ impl Perform for SaveUserSettings {
 
     // Return the jwt
     Ok(LoginResponse {
+      requires_2fa: false,
       jwt: Claims::jwt(updated_user, Settings::get().hostname)?,
     })
   }
@@ -1114,6 +1112,7 @@ impl Perform for DeleteAccount {
     }
 
     Ok(LoginResponse {
+      requires_2fa: false,
       jwt: data.auth.to_owned(),
     })
   }
@@ -1211,6 +1210,7 @@ impl Perform for PasswordChange {
 
     // Return the jwt
     Ok(LoginResponse {
+      requires_2fa: false,
       jwt: Claims::jwt(updated_user, Settings::get().hostname)?,
     })
   }
