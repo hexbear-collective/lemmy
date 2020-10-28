@@ -19,6 +19,7 @@ pub struct Settings {
   pub email: Option<EmailConfig>,
   pub federation: FederationConfig,
   pub captcha: CaptchaConfig,
+  pub twofactor: TwoFactorConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -76,6 +77,13 @@ pub struct FederationConfig {
   pub tls_enabled: bool,
   pub allowed_instances: String,
   pub blocked_instances: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TwoFactorConfig {
+  pub cache_size: usize,
+  pub allowed_characters: String,
+  pub code_length: usize,
 }
 
 lazy_static! {
