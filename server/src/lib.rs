@@ -33,6 +33,7 @@ pub mod websocket;
 
 use crate::{
   request::{retry, RecvError},
+  twofactor::CodeCacheHandler,
   websocket::chat_server::ChatServer,
 };
 use actix::Addr;
@@ -43,7 +44,7 @@ use log::error;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::Client;
 use serde::Deserialize;
-use std::process::Command;
+use std::{process::Command, sync::Arc};
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
@@ -52,6 +53,7 @@ pub struct LemmyContext {
   pub chat_server: Addr<ChatServer>,
   pub client: Client,
   pub activity_queue: QueueHandle,
+  pub cache_handler: Arc<CodeCacheHandler>,
 }
 
 impl LemmyContext {
@@ -60,12 +62,14 @@ impl LemmyContext {
     chat_server: Addr<ChatServer>,
     client: Client,
     activity_queue: QueueHandle,
+    cache_handler: Arc<CodeCacheHandler>,
   ) -> LemmyContext {
     LemmyContext {
       pool,
       chat_server,
       client,
       activity_queue,
+      cache_handler,
     }
   }
   pub fn pool(&self) -> &DbPool {
@@ -80,9 +84,12 @@ impl LemmyContext {
   pub fn activity_queue(&self) -> &QueueHandle {
     &self.activity_queue
   }
+  pub fn code_cache_2fa(&self) -> &CodeCacheHandler {
+    &self.cache_handler
+  }
 }
 
-impl Clone for LemmyContext {
+/*impl Clone for LemmyContext {
   fn clone(&self) -> Self {
     LemmyContext {
       pool: self.pool.clone(),
@@ -91,7 +98,7 @@ impl Clone for LemmyContext {
       activity_queue: self.activity_queue.clone(),
     }
   }
-}
+}*/
 
 #[derive(Deserialize, Debug)]
 pub struct IframelyResponse {

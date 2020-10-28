@@ -30,7 +30,6 @@ use crate::{
   blocking, captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
-  twofactor::{check_2fa, generate_2fa},
   websocket::{
     messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
     UserOperation,
@@ -153,7 +152,7 @@ impl Perform for Login {
     //handle 2fa
     if user.has_2fa {
       match &data.code_2fa {
-        Some(code) => match check_2fa(&user, code) {
+        Some(code) => match context.code_cache_2fa().check_2fa(&user, code) {
           Ok(matches) => {
             if matches {
               return Ok(LoginResponse {
@@ -166,7 +165,7 @@ impl Perform for Login {
           Err(e) => return Err(e),
         },
         None => {
-          match generate_2fa(user) {
+          match context.code_cache_2fa().generate_2fa(user) {
             Ok(_k) => (),
             Err(e) => return Err(e),
           };
