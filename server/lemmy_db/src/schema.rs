@@ -546,7 +546,7 @@ table! {
 }
 
 table! {
-    user_tokens (id) {
+    hexbear.user_tokens (id) {
         id -> Uuid,
         user_id -> Int4,
         token_hash -> Text,

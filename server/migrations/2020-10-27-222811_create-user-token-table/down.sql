@@ -1,1 +1,1 @@
-drop table user_tokens;
+drop table hexbear.user_tokens;

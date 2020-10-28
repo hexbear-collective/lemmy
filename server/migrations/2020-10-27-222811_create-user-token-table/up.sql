@@ -1,4 +1,4 @@
-create table user_tokens (
+create table hexbear.user_tokens (
   id          uuid      primary key default uuid_generate_v4(),
   user_id     int       references user_ on update cascade on delete cascade not null,
   token_hash  text      not null,
