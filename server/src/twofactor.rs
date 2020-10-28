@@ -60,7 +60,7 @@ impl CodeCacheHandler {
     let html = &format!("<h1>Attempted login for {}</h1><br><p>At {} UTC a login was attempted on your account.
               Because your account is setup with two-factor authentication, you must enter a code to successfully login. This code will expire within one hour.</p>
               <h3>Your login code is {}</h3>", user.name, time, genned_code);
-    println!("Sending 2fa email with code {}", genned_code);
+    //println!("Sending 2fa email with code {}", genned_code);
     match send_email(subject, user.email.unwrap().as_str(), &user.name, html) {
       Ok(_k) => (),
       Err(e) => println!("Failed to send email: {}", e),
@@ -75,7 +75,7 @@ impl CodeCacheHandler {
       Ok(k) => k,
       Err(_e) => return Err(APIError::err("internal_error").into()),
     };
-    println!("Entered code {}", code);
+    //println!("Entered code {}", code);
     match code_cache.get(code) {
       Some(cached_user) => {
         if cached_user.id == user.id {
