@@ -79,6 +79,11 @@
     hcaptcha_site_key: "10000000-ffff-ffff-ffff-000000000001"
     hcaptcha_verify_url: "https://hcaptcha.com/siteverify"
   }
+  twofactor: {
+    cache_size: 100
+    allowed_characters: "0123456789"
+    code_length: 8
+  }
 #  # email sending configuration
 #  email: {
 #    # hostname and port of the smtp server

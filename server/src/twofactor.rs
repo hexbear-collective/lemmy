@@ -1,15 +1,12 @@
 use lemmy_api_structs::APIError;
 use lemmy_db::user::*;
-use lemmy_utils::{send_email, LemmyError};
+use lemmy_utils::{send_email, settings::Settings, LemmyError};
 
 use std::{sync::Mutex, time::Duration};
 
 use chrono::prelude::*;
-use rand::seq::SliceRandom;
+use rand::seq::IteratorRandom;
 use ttl_cache::TtlCache;
-
-const ALLOWED_CODE_CHARS: &[u8] = b"0123456789";
-const CODE_LENGTH: usize = 8;
 
 pub struct CodeCacheHandler {
   cache: Mutex<TtlCache<String, User_>>,
@@ -18,7 +15,7 @@ pub struct CodeCacheHandler {
 impl CodeCacheHandler {
   pub fn new() -> CodeCacheHandler {
     CodeCacheHandler {
-      cache: Mutex::new(TtlCache::new(100)),
+      cache: Mutex::new(TtlCache::new(Settings::get().twofactor.cache_size)),
     }
   }
 
@@ -35,15 +32,11 @@ impl CodeCacheHandler {
         Err(_e) => return Err(APIError::err("internal_error").into()),
       };
       let mut rng = rand::thread_rng();
+      let config = Settings::get().twofactor;
       loop {
         genned_code = String::from("");
-        for _ in 0..=CODE_LENGTH {
-          genned_code.push(
-            ALLOWED_CODE_CHARS
-              .choose(&mut rng)
-              .map(|&c| c as char)
-              .unwrap(),
-          );
+        for _ in 0..config.code_length {
+          genned_code.push(config.allowed_characters.chars().choose(&mut rng).unwrap());
         }
         if code_cache.get(genned_code.as_str()).is_none() {
           //break if this is a unique 2fa code
