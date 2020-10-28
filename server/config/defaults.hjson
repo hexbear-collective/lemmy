@@ -92,4 +92,13 @@
 #    # whether or not smtp connections should use tls
 #    use_tls: true
 #  }
+  # configure the user auth toden defaults
+  auth_token: {
+    auth_minutes: 5760  # the ammount of time in minutes a new token is authorised for by default
+    renew_minutes: 5760 # the ammount of time in minutes a renewed token is authorised for by default
+    renew_window_minutes: 360 # the ammount of time in minutes before a token expiry to renew at
+  }
+  two_factor: {
+    code_cache_size: 100
+  }
 }

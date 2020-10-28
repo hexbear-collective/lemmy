@@ -9,25 +9,62 @@ use log::{error, info};
 
 use lemmy_api_structs::{user::*, APIError};
 use lemmy_db::{
-  comment::*, comment_view::*, community::*, community_settings::*, community_view::*,
-  diesel_option_overwrite, moderator::*, naive_now, password_reset_request::*, post::*,
-  post_view::*, private_message::*, private_message_view::*, site::*, site_view::*, user::*,
-  user_mention::*, user_mention_view::*, user_tag::*, user_view::*, Crud, Followable, Joinable,
-  ListingType, SortType,
+  comment::*,
+  comment_view::*,
+  community::*,
+  community_settings::*,
+  community_view::*,
+  diesel_option_overwrite,
+  moderator::*,
+  naive_now,
+  password_reset_request::*,
+  post::*,
+  post_view::*,
+  private_message::*,
+  private_message_view::*,
+  site::*,
+  site_view::*,
+  user::*,
+  user_mention::*,
+  user_mention_view::*,
+  user_tag::*,
+  user_view::*,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair, generate_random_string, is_valid_preferred_username, is_valid_username,
-  location_info, make_apub_endpoint, naive_from_unix, remove_slurs, send_email, settings::Settings,
-  ConnectionId, EndpointType, LemmyError,
+  generate_actor_keypair,
+  generate_random_string,
+  is_valid_preferred_username,
+  is_valid_username,
+  location_info,
+  make_apub_endpoint,
+  naive_from_unix,
+  remove_slurs,
+  send_email,
+  settings::Settings,
+  ConnectionId,
+  EndpointType,
+  LemmyError,
 };
 
 use crate::{
   api::{
-    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
-    is_admin_or_sitemod, Perform,
+    check_slurs,
+    claims::Claims,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_admin,
+    is_admin_or_sitemod,
+    validate_token,
+    Perform,
   },
   apub::ApubObjectType,
-  blocking, captcha_espeak_wav_base64,
+  blocking,
+  captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
@@ -36,8 +73,7 @@ use crate::{
   },
   LemmyContext,
 };
-use lemmy_db::user_token::{UserTokenForm, UserToken};
-use crate::api::validate_token;
+use lemmy_db::user_token::{UserToken, UserTokenForm};
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -209,7 +245,8 @@ impl Perform for Logout {
 
     blocking(context.pool(), move |conn| {
       UserToken::revoke(conn, claims.token_id)
-    }).await??;
+    })
+    .await??;
 
     Ok(LoginResponse {
       requires_2fa: false,
@@ -581,7 +618,8 @@ impl Perform for SaveUserSettings {
                 // cant return anything here? might break something?
                 blocking(context.pool(), move |conn| {
                   UserToken::revoke_all(conn, user_id)
-                }).await??;
+                })
+                .await??;
 
                 user.password_encrypted
               }
@@ -1152,9 +1190,8 @@ impl Perform for DeleteAccount {
       return Err(APIError::err("couldnt_update_post").into());
     }
 
-    if blocking(context.pool(), move |conn| {
-      UserToken::revoke_all(conn, user_id)
-    }).await?.is_err() {
+    let token_revoke = move |conn: &'_ _| UserToken::revoke_all(conn, user_id);
+    if blocking(context.pool(), token_revoke).await?.is_err() {
       return Err(APIError::err("couldnt_update_user").into());
     }
 
@@ -1258,7 +1295,8 @@ impl Perform for PasswordChange {
     // cant return anything here, would brick the account
     blocking(context.pool(), move |conn| {
       UserToken::revoke_all(conn, user_id)
-    }).await??;
+    })
+    .await??;
 
     let jwt = generate_token(context, updated_user.id).await?;
 
@@ -1778,23 +1816,27 @@ impl Perform for RemoveUserContent {
   }
 }
 
-async fn generate_token(context: &Data<LemmyContext>, user_id: i32) -> Result<UserToken, LemmyError> {
+async fn generate_token(
+  context: &Data<LemmyContext>,
+  user_id: i32,
+) -> Result<UserToken, LemmyError> {
   let uuid = uuid::Uuid::new_v4();
   let token = Claims::jwt(user_id, uuid, Settings::get().hostname)?;
+
+  let settings = Settings::get();
 
   let form = UserTokenForm {
     id: uuid,
     user_id,
     token_hash: token,
-    expires_at: naive_now() + Duration::days(4),
+    expires_at: naive_now() + Duration::minutes(settings.auth_token.auth_minutes.into()),
   };
 
-  let user_token = match blocking(context.pool(), move |conn| {
-    UserToken::create(conn, &form)
-  }).await? {
-    Ok(user_token) => user_token,
-    Err(_e) => return Err(APIError::err("couldnt_update_user").into()),
-  };
+  let user_token =
+    match blocking(context.pool(), move |conn| UserToken::create(conn, &form)).await? {
+      Ok(user_token) => user_token,
+      Err(_e) => return Err(APIError::err("couldnt_update_user").into()),
+    };
 
-  return Ok(user_token)
+  Ok(user_token)
 }

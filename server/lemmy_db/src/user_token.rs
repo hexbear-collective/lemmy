@@ -33,10 +33,10 @@ impl UserToken {
   pub fn read(conn: &PgConnection, uuid: uuid::Uuid) -> Result<Self, Error> {
     user_tokens.find(uuid).first::<Self>(conn)
   }
-  pub fn renew(conn: &PgConnection, uuid: uuid::Uuid) -> Result<Self, Error> {
+  pub fn renew(conn: &PgConnection, uuid: uuid::Uuid, minutes: i64) -> Result<Self, Error> {
     diesel::update(user_tokens.find(uuid))
       .set((
-          expires_at.eq(naive_now() + Duration::days(4)),
+          expires_at.eq(naive_now() + Duration::minutes(minutes)),
           renewed_at.eq(naive_now()),
         ))
       .get_result::<Self>(conn)

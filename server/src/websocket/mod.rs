@@ -5,6 +5,7 @@ pub mod messages;
 #[derive(EnumString, ToString, Debug, Clone)]
 pub enum UserOperation {
   Login,
+  Logout,
   Register,
   GetCaptcha,
   CreateCommunity,

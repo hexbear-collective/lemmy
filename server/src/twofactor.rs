@@ -1,6 +1,6 @@
 use lemmy_api_structs::APIError;
 use lemmy_db::user::*;
-use lemmy_utils::{send_email, LemmyError};
+use lemmy_utils::{send_email, settings::Settings, LemmyError};
 
 use std::{sync::Mutex, time::Duration};
 
@@ -17,8 +17,9 @@ pub struct CodeCacheHandler {
 
 impl CodeCacheHandler {
   pub fn new() -> CodeCacheHandler {
+    let settings = Settings::get();
     CodeCacheHandler {
-      cache: Mutex::new(TtlCache::new(100)),
+      cache: Mutex::new(TtlCache::new(settings.two_factor.code_cache_size)),
     }
   }
 
