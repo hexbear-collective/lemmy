@@ -547,6 +547,12 @@ impl Perform for SaveUserSettings {
                   User_::update_password(conn, user_id, &new_password)
                 })
                 .await??;
+
+                // cant return anything here? might break something?
+                blocking(context.pool(), move |conn| {
+                  UserToken::revoke_all(conn, user_id)
+                }).await?;
+
                 user.password_encrypted
               }
               None => return Err(APIError::err("password_incorrect").into()),
@@ -1116,9 +1122,15 @@ impl Perform for DeleteAccount {
       return Err(APIError::err("couldnt_update_post").into());
     }
 
+    if blocking(context.pool(), move |conn| {
+      UserToken::revoke_all(conn, user_id)
+    }).await?.is_err() {
+      return Err(APIError::err("couldnt_update_user").into());
+    }
+
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: data.auth.to_owned(),
+      jwt: "".to_owned(),
     })
   }
 }
@@ -1212,6 +1224,11 @@ impl Perform for PasswordChange {
       Ok(user) => user,
       Err(_e) => return Err(APIError::err("couldnt_update_user").into()),
     };
+
+    // cant return anything here, would brick the account
+    blocking(context.pool(), move |conn| {
+      UserToken::revoke_all(conn, user_id)
+    }).await?;
 
     let jwt = generate_token(context, updated_user.id).await?;
 
@@ -1739,14 +1756,14 @@ async fn generate_token(context: &Data<LemmyContext>, user_id: i32) -> Result<Us
     id: uuid,
     user_id,
     token_hash: token,
-    expires_at: naive_now(), // implement expiration
+    expires_at: naive_now() + Duration::days(4),
   };
 
   let user_token = match blocking(context.pool(), move |conn| {
     UserToken::create(conn, &form)
   }).await? {
     Ok(user_token) => user_token,
-    Err(_e) => return Err(APIError::err("couldnt_update_private_message").into()),
+    Err(_e) => return Err(APIError::err("couldnt_update_user").into()),
   };
 
   return Ok(user_token)

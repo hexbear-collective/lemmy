@@ -1,12 +1,13 @@
 use actix_web::web::Data;
 
 use lemmy_api_structs::APIError;
-use lemmy_db::{
-  community::Community, community_view::CommunityUserBanView, post::Post, user::User_, Crud,
-};
+use lemmy_db::{community::Community, community_view::CommunityUserBanView, post::Post, user::User_, Crud, naive_now};
 use lemmy_utils::{slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
 
 use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
+use lemmy_db::user_token::UserToken;
+use uuid::Uuid;
+use chrono::Duration;
 
 pub mod claims;
 pub mod comment;
@@ -74,6 +75,9 @@ pub(in crate::api) async fn get_user_from_jwt(
     Ok(claims) => claims.claims,
     Err(_e) => return Err(APIError::err("not_logged_in").into()),
   };
+
+  validate_token(claims.token_id, pool).await?;
+
   let user_id = claims.id;
   let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
   // Check for a site ban
@@ -81,6 +85,31 @@ pub(in crate::api) async fn get_user_from_jwt(
     return Err(APIError::err("site_ban").into());
   }
   Ok(user)
+}
+
+pub(in crate::api) async fn validate_token(
+  token_id: uuid::Uuid,
+  pool: &DbPool,
+) -> Result<(), LemmyError> {
+  let token = match blocking(pool, move |conn| {
+    UserToken::read(conn, token_id)
+  }).await? {
+    Ok(user_token) => user_token,
+    Err(_e) => return Err(APIError::err("not_logged_in").into()),
+  };
+
+  if token.is_revoked {
+    return Err(APIError::err("not_logged_in").into())
+  }
+
+  let time_to_refresh = naive_now() + Duration::hours(6);
+  if token.expires_at > time_to_refresh {
+    blocking(pool, move |conn| {
+      UserToken::renew(conn, token.id)
+    }).await??;
+  }
+
+  Ok(())
 }
 
 pub(in crate::api) async fn get_user_from_jwt_opt(
