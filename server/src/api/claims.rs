@@ -25,7 +25,11 @@ impl Claims {
     )
   }
 
-  pub fn jwt(user_id: i32, token_id: uuid::Uuid, hostname: String) -> Result<Jwt, jsonwebtoken::errors::Error> {
+  pub fn jwt(
+    user_id: i32,
+    token_id: uuid::Uuid,
+    hostname: String,
+  ) -> Result<Jwt, jsonwebtoken::errors::Error> {
     let my_claims = Claims {
       id: user_id,
       token_id,

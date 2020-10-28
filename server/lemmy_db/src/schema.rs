@@ -646,5 +646,5 @@ allow_tables_to_appear_in_same_query!(
   user_fast,
   user_mention,
   user_tag,
-    user_tokens,
+  user_tokens,
 );

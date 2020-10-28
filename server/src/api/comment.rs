@@ -5,26 +5,51 @@ use log::error;
 
 use lemmy_api_structs::{comment::*, APIError};
 use lemmy_db::{
-  comment::*, comment_view::*, community_settings::*, moderator::*, post::*, site_view::*, user::*,
-  user_mention::*, Crud, Likeable, ListingType, Saveable, SortType,
+  comment::*,
+  comment_view::*,
+  community_settings::*,
+  moderator::*,
+  post::*,
+  site_view::*,
+  user::*,
+  user_mention::*,
+  Crud,
+  Likeable,
+  ListingType,
+  Saveable,
+  SortType,
 };
 use lemmy_utils::{
-  make_apub_endpoint, num_md_images, remove_slurs, scrape_text_for_mentions, send_email,
-  settings::Settings, ConnectionId, EndpointType, LemmyError, MentionData,
+  make_apub_endpoint,
+  num_md_images,
+  remove_slurs,
+  scrape_text_for_mentions,
+  send_email,
+  settings::Settings,
+  ConnectionId,
+  EndpointType,
+  LemmyError,
+  MentionData,
 };
 
 use crate::{
   api::{
-    check_community_ban, get_post, get_user_from_jwt, get_user_from_jwt_opt, is_mod_or_admin,
+    check_community_ban,
+    get_post,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_mod_or_admin,
     Perform,
   },
   apub::{ApubLikeableType, ApubObjectType},
-  blocking, is_within_comment_char_limit,
+  blocking,
+  is_within_comment_char_limit,
   websocket::{
     messages::{JoinCommunityRoom, SendComment},
     UserOperation,
   },
-  DbPool, LemmyContext,
+  DbPool,
+  LemmyContext,
 };
 
 #[async_trait::async_trait(?Send)]
