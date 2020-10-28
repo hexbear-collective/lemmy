@@ -67,7 +67,7 @@ impl CodeCacheHandler {
     }
     Ok(())
   }
-  pub fn check_2fa(&self, user: &User_, code: &String) -> Result<bool, LemmyError> {
+  pub fn check_2fa(&self, user: &User_, code: &str) -> Result<bool, LemmyError> {
     if !user.has_2fa || user.email.is_none() {
       return Err(APIError::err("user_has_no_2fa").into());
     }
@@ -86,5 +86,11 @@ impl CodeCacheHandler {
       }
       None => Ok(false), //no matching code
     }
+  }
+}
+
+impl Default for CodeCacheHandler {
+  fn default() -> Self {
+    CodeCacheHandler::new()
   }
 }
