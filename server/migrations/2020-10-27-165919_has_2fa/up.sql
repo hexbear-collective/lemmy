@@ -20,7 +20,7 @@ CREATE OR REPLACE VIEW hexbear.user_view
     u.banned,
     u.show_avatars,
     u.send_notifications_to_email,
-    u.has_2fa
+    u.has_2fa,
     u.published,
     COALESCE(s.number_of_posts, 0)::bigint AS number_of_posts,
     COALESCE(s.post_score, 0)::bigint AS post_score,
