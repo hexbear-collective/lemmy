@@ -36,6 +36,7 @@ use crate::{
   },
   LemmyContext,
 };
+use lemmy_db::user_token::{UserTokenForm, UserToken};
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -155,9 +156,10 @@ impl Perform for Login {
         Some(code) => match context.code_cache_2fa().check_2fa(&user, code) {
           Ok(matches) => {
             if matches {
+              let jwt = generate_token(context, user.id).await?;
               return Ok(LoginResponse {
                 requires_2fa: false,
-                jwt: Claims::jwt(user, Settings::get().hostname)?,
+                jwt: jwt.token_hash,
               });
             }
             return Err(APIError::err("invalid_2fa_code").into());
@@ -178,9 +180,10 @@ impl Perform for Login {
     }
 
     // Return the jwt
+    let jwt = generate_token(context, user.id).await?;
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: Claims::jwt(user, Settings::get().hostname)?,
+      jwt: jwt.token_hash,
     })
   }
 }
@@ -405,11 +408,12 @@ impl Perform for Register {
       })
       .await??;
     }
+    let jwt = generate_token(context, inserted_user.id).await?;
 
     // Return the jwt
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: Claims::jwt(inserted_user, Settings::get().hostname)?,
+      jwt: jwt.token_hash,
     })
   }
 }
@@ -600,10 +604,12 @@ impl Perform for SaveUserSettings {
       }
     };
 
+    let jwt = generate_token(context, updated_user.id).await?;
+
     // Return the jwt
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: Claims::jwt(updated_user, Settings::get().hostname)?,
+      jwt: jwt.token_hash,
     })
   }
 }
@@ -1207,10 +1213,12 @@ impl Perform for PasswordChange {
       Err(_e) => return Err(APIError::err("couldnt_update_user").into()),
     };
 
+    let jwt = generate_token(context, updated_user.id).await?;
+
     // Return the jwt
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: Claims::jwt(updated_user, Settings::get().hostname)?,
+      jwt: jwt.token_hash,
     })
   }
 }
@@ -1721,4 +1729,25 @@ impl Perform for RemoveUserContent {
 
     Ok(res)
   }
+}
+
+async fn generate_token(context: &Data<LemmyContext>, user_id: i32) -> Result<UserToken, LemmyError> {
+  let uuid = uuid::Uuid::new_v4();
+  let token = Claims::jwt(user_id, uuid, Settings::get().hostname)?;
+
+  let form = UserTokenForm {
+    id: uuid,
+    user_id,
+    token_hash: token,
+    expires_at: naive_now(), // implement expiration
+  };
+
+  let user_token = match blocking(context.pool(), move |conn| {
+    UserToken::create(conn, &form)
+  }).await? {
+    Ok(user_token) => user_token,
+    Err(_e) => return Err(APIError::err("couldnt_update_private_message").into()),
+  };
+
+  return Ok(user_token)
 }
