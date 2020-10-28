@@ -20,7 +20,7 @@ pub struct Settings {
   pub federation: FederationConfig,
   pub captcha: CaptchaConfig,
   pub auth_token: AuthTokenConfig,
-  pub two_factor: TwoFactorConfig,
+  pub twofactor: TwoFactorConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -89,7 +89,9 @@ pub struct AuthTokenConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct TwoFactorConfig {
-  pub code_cache_size: usize,
+  pub cache_size: usize,
+  pub allowed_characters: String,
+  pub code_length: usize,
 }
 
 lazy_static! {
