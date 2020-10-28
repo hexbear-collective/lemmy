@@ -545,6 +545,18 @@ table! {
     }
 }
 
+table! {
+    user_tokens (id) {
+        id -> Uuid,
+        user_id -> Int4,
+        token_hash -> Text,
+        created_at -> Timestamp,
+        expires_at -> Timestamp,
+        renewed_at -> Timestamp,
+        is_revoked -> Bool,
+    }
+}
+
 joinable!(activity -> user_ (user_id));
 joinable!(comment -> post (post_id));
 joinable!(comment -> user_ (creator_id));
@@ -594,6 +606,7 @@ joinable!(user_ban -> user_ (user_id));
 joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
 joinable!(user_tag -> user_ (user_id));
+joinable!(user_tokens -> user_ (user_id));
 
 allow_tables_to_appear_in_same_query!(
   activity,
@@ -633,4 +646,5 @@ allow_tables_to_appear_in_same_query!(
   user_fast,
   user_mention,
   user_tag,
+    user_tokens,
 );
