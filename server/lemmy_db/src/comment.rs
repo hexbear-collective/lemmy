@@ -185,14 +185,13 @@ impl Comment {
     use crate::schema::comment::dsl::*;
 
     diesel::update(comment.find(comment_id))
-        .set((
-          content.eq("*Permananently Deleted*"),
-          deleted.eq(true),
-          updated.eq(naive_now()),
-        ))
-        .get_result::<Self>(conn)
+      .set((
+        content.eq("*Permananently Deleted*"),
+        deleted.eq(true),
+        updated.eq(naive_now()),
+      ))
+      .get_result::<Self>(conn)
   }
-
 }
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug, Clone)]
@@ -346,6 +345,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
+      has_2fa: false,
       actor_id: None,
       bio: None,
       local: true,

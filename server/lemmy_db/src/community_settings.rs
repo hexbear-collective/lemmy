@@ -33,7 +33,9 @@ impl CommunitySettings {
 
   pub fn list_allowed_as_default(conn: &PgConnection) -> Result<Vec<Self>, Error> {
     use crate::schema::community_settings::dsl::*;
-    community_settings.filter(allow_as_default.eq(true)).load::<CommunitySettings>(conn)
+    community_settings
+      .filter(allow_as_default.eq(true))
+      .load::<CommunitySettings>(conn)
   }
 }
 

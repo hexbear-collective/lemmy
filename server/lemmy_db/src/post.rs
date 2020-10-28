@@ -199,14 +199,14 @@ impl Post {
     let perma_deleted_url = "https://deleted.com";
 
     diesel::update(post.find(post_id))
-        .set((
-          name.eq(perma_deleted),
-          url.eq(perma_deleted_url),
-          body.eq(perma_deleted),
-          deleted.eq(true),
-          updated.eq(naive_now()),
-        ))
-        .get_result::<Self>(conn)
+      .set((
+        name.eq(perma_deleted),
+        url.eq(perma_deleted_url),
+        body.eq(perma_deleted),
+        deleted.eq(true),
+        updated.eq(naive_now()),
+      ))
+      .get_result::<Self>(conn)
   }
 
   pub fn update_featured(
@@ -216,8 +216,8 @@ impl Post {
   ) -> Result<Self, Error> {
     use crate::schema::post::dsl::*;
     diesel::update(post.find(post_id))
-        .set(featured.eq(new_featured))
-        .get_result::<Self>(conn)
+      .set(featured.eq(new_featured))
+      .get_result::<Self>(conn)
   }
 }
 
@@ -436,6 +436,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
+      has_2fa: false,
       actor_id: None,
       bio: None,
       local: true,

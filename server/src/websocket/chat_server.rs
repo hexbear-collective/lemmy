@@ -1,4 +1,5 @@
 use crate::{
+  twofactor::CodeCacheHandler,
   websocket::{
     handlers::{do_user_operation, to_json_string, Args},
     messages::*,
@@ -14,15 +15,8 @@ use diesel::{
   PgConnection,
 };
 use lemmy_api_structs::{
-  comment::*,
-  community::*,
-  community_settings::*,
-  post::*,
-  post_hexbear::FeaturePost,
-  report::*,
-  site::*,
-  user::*,
-  APIError,
+  comment::*, community::*, community_settings::*, post::*, post_hexbear::FeaturePost, report::*,
+  site::*, user::*, APIError,
 };
 use lemmy_rate_limit::RateLimit;
 use lemmy_utils::{location_info, CommunityId, ConnectionId, IPAddr, LemmyError, PostId, UserId};
@@ -33,6 +27,7 @@ use serde_json::Value;
 use std::{
   collections::{HashMap, HashSet},
   str::FromStr,
+  sync::Arc,
 };
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat
@@ -62,6 +57,9 @@ pub struct ChatServer {
   /// A list of the current captchas
   pub(super) captchas: Vec<CaptchaItem>,
 
+  //A time-sensitive list of two-factor auth codes
+  pub cache_handler: Arc<CodeCacheHandler>,
+
   /// An HTTP Client
   client: Client,
 
@@ -82,6 +80,7 @@ impl ChatServer {
     rate_limiter: RateLimit,
     client: Client,
     activity_queue: QueueHandle,
+    cache_handler: Arc<CodeCacheHandler>,
   ) -> ChatServer {
     ChatServer {
       sessions: HashMap::new(),
@@ -94,6 +93,7 @@ impl ChatServer {
       captchas: Vec::new(),
       client,
       activity_queue,
+      cache_handler,
     }
   }
 
@@ -348,6 +348,7 @@ impl ChatServer {
     let addr = ctx.address();
     let pool = self.pool.clone();
     let rate_limiter = self.rate_limiter.clone();
+    let cache_handler = self.cache_handler.clone();
 
     let ip: IPAddr = match self.sessions.get(&msg.id) {
       Some(info) => info.ip.to_owned(),
@@ -371,6 +372,7 @@ impl ChatServer {
         chat_server: addr,
         client,
         activity_queue,
+        cache_handler,
       };
       let args = Args {
         context,

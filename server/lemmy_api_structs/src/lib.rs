@@ -5,10 +5,10 @@ pub mod comment;
 pub mod community;
 pub mod community_settings;
 pub mod post;
+pub mod post_hexbear;
 pub mod report;
 pub mod site;
 pub mod user;
-pub mod post_hexbear;
 
 use thiserror::Error;
 

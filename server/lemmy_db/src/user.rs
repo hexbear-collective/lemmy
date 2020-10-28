@@ -41,6 +41,7 @@ pub struct User_ {
   pub last_refreshed_at: chrono::NaiveDateTime,
   pub sitemod: bool,
   pub banner: Option<String>,
+  pub has_2fa: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -69,12 +70,13 @@ pub struct UserForm {
   pub public_key: Option<String>,
   pub last_refreshed_at: Option<chrono::NaiveDateTime>,
   pub banner: Option<Option<String>>,
+  pub has_2fa: bool,
 }
 
 #[derive(QueryableByName)]
 pub struct UserUnreadCount {
-    #[sql_type = "Integer"]
-    pub unreads: i32,
+  #[sql_type = "Integer"]
+  pub unreads: i32,
 }
 
 impl Crud<UserForm> for User_ {
@@ -237,6 +239,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
+      has_2fa: false,
       actor_id: None,
       bio: None,
       local: true,
@@ -268,6 +271,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
+      has_2fa: false,
       actor_id: inserted_user.actor_id.to_owned(),
       bio: None,
       local: true,

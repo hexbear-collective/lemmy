@@ -1,28 +1,17 @@
 use actix_web::web::Data;
 
-use lemmy_api_structs::{APIError, community_settings::*};
+use lemmy_api_structs::{community_settings::*, APIError};
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  Crud,
-  naive_now,
+  naive_now, Crud,
 };
-use lemmy_utils::{
-  ConnectionId,
-  LemmyError,
-};
+use lemmy_utils::{ConnectionId, LemmyError};
 
 use crate::{
-  api::{
-    get_user_from_jwt,
-    is_mod_or_admin,
-    Perform
-  },
+  api::{get_user_from_jwt, is_mod_or_admin, Perform},
   blocking,
+  websocket::{messages::SendCommunityRoomMessage, UserOperation},
   LemmyContext,
-  websocket::{
-    messages::SendCommunityRoomMessage,
-    UserOperation,
-  },
 };
 
 #[async_trait::async_trait(?Send)]
@@ -72,7 +61,7 @@ impl Perform for EditCommunitySettings {
     let data: &EditCommunitySettings = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
     is_mod_or_admin(context.pool(), user.id, data.community_id).await?;
-    
+
     let community_settings_form = CommunitySettingsForm {
       id: data.community_id.to_owned(),
       read_only: data.read_only.to_owned(),

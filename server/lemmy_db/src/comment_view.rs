@@ -497,6 +497,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
+      has_2fa: false,
       actor_id: None,
       bio: None,
       local: true,

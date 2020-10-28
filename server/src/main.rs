@@ -20,12 +20,8 @@ use diesel::{
 use lemmy_db::get_database_url_from_env;
 use lemmy_rate_limit::{rate_limiter::RateLimiter, RateLimit};
 use lemmy_server::{
-  apub::activity_queue::create_activity_queue,
-  blocking,
-  // code_migrations::run_advanced_migrations,
-  routes::*,
-  websocket::chat_server::ChatServer,
-  LemmyContext,
+  apub::activity_queue::create_activity_queue, blocking, routes::*, twofactor::CodeCacheHandler,
+  websocket::chat_server::ChatServer, LemmyContext,
 };
 use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_REGEX};
 use reqwest::Client;
@@ -76,11 +72,13 @@ async fn main() -> Result<(), LemmyError> {
   );
 
   let activity_queue = create_activity_queue();
+  let cache_handler = Arc::new(CodeCacheHandler::new());
   let chat_server = ChatServer::startup(
     pool.clone(),
     rate_limiter.clone(),
     Client::default(),
     activity_queue.clone(),
+    cache_handler.clone(),
   )
   .start();
 
@@ -91,6 +89,7 @@ async fn main() -> Result<(), LemmyError> {
       chat_server.to_owned(),
       Client::default(),
       activity_queue.to_owned(),
+      cache_handler.clone(),
     );
     let settings = Settings::get();
     let rate_limiter = rate_limiter.clone();

@@ -26,6 +26,7 @@ table! {
     post_score -> BigInt,
     number_of_comments -> BigInt,
     comment_score -> BigInt,
+    has_2fa -> Bool,
   }
 }
 
@@ -54,6 +55,7 @@ pub struct UserView {
   pub post_score: i64,
   pub number_of_comments: i64,
   pub comment_score: i64,
+  pub has_2fa: bool,
 }
 
 pub struct UserQueryBuilder<'a> {
@@ -155,6 +157,7 @@ impl<'a> UserQueryBuilder<'a> {
       post_score,
       number_of_comments,
       comment_score,
+      has_2fa,
     ));
     query.load::<UserView>(self.conn)
   }
@@ -192,6 +195,7 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
       ))
       .filter(admin.eq(true))
       .order_by(published)
@@ -224,6 +228,7 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
       ))
       .filter(sitemod.eq(true))
       .order_by(published)
@@ -255,6 +260,7 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
       ))
       .filter(banned.eq(true))
       .load::<Self>(conn)
@@ -285,6 +291,7 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
       ))
       .find(user_id)
       .first::<Self>(conn)

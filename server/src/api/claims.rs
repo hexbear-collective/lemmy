@@ -1,4 +1,4 @@
-use jsonwebtoken::{decode, DecodingKey, encode, EncodingKey, Header, TokenData, Validation};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 
 use lemmy_db::user::User_;
