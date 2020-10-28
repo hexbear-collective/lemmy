@@ -198,6 +198,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           .route("/purge", web::post().to(route_post::<RemoveUserContent>))
           // Account actions. I don't like that they're in /user maybe /accounts
           .route("/login", web::post().to(route_post::<Login>))
+          .route("/logout", web::post().to(route_post::<Logout>))
           .route("/get_captcha", web::get().to(route_post::<GetCaptcha>))
           .route(
             "/delete_account",

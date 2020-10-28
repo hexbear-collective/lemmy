@@ -6,7 +6,6 @@ use lemmy_utils::{slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
 
 use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 use lemmy_db::user_token::UserToken;
-use uuid::Uuid;
 use chrono::Duration;
 
 pub mod claims;

@@ -37,6 +37,7 @@ use crate::{
   LemmyContext,
 };
 use lemmy_db::user_token::{UserTokenForm, UserToken};
+use crate::api::validate_token;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -184,6 +185,35 @@ impl Perform for Login {
     Ok(LoginResponse {
       requires_2fa: false,
       jwt: jwt.token_hash,
+    })
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for Logout {
+  type Response = LoginResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
+  ) -> Result<LoginResponse, LemmyError> {
+    let data: &Logout = &self;
+
+    let claims = match Claims::decode(&data.auth) {
+      Ok(claims) => claims.claims,
+      Err(_e) => return Err(APIError::err("not_logged_in").into()),
+    };
+
+    validate_token(claims.token_id, context.pool()).await?;
+
+    blocking(context.pool(), move |conn| {
+      UserToken::revoke(conn, claims.token_id)
+    }).await??;
+
+    Ok(LoginResponse {
+      requires_2fa: false,
+      jwt: String::from(""),
     })
   }
 }
@@ -551,7 +581,7 @@ impl Perform for SaveUserSettings {
                 // cant return anything here? might break something?
                 blocking(context.pool(), move |conn| {
                   UserToken::revoke_all(conn, user_id)
-                }).await?;
+                }).await??;
 
                 user.password_encrypted
               }
@@ -1130,7 +1160,7 @@ impl Perform for DeleteAccount {
 
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: "".to_owned(),
+      jwt: String::from(""),
     })
   }
 }
@@ -1228,7 +1258,7 @@ impl Perform for PasswordChange {
     // cant return anything here, would brick the account
     blocking(context.pool(), move |conn| {
       UserToken::revoke_all(conn, user_id)
-    }).await?;
+    }).await??;
 
     let jwt = generate_token(context, updated_user.id).await?;
 
