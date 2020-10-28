@@ -3,7 +3,8 @@ use actix_web::web::Data;
 use lemmy_api_structs::{community_settings::*, APIError};
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now, Crud,
+  naive_now,
+  Crud,
 };
 use lemmy_utils::{ConnectionId, LemmyError};
 

@@ -19,6 +19,7 @@ pub struct Settings {
   pub email: Option<EmailConfig>,
   pub federation: FederationConfig,
   pub captcha: CaptchaConfig,
+  pub auth_token: AuthTokenConfig,
   pub twofactor: TwoFactorConfig,
 }
 
@@ -77,6 +78,13 @@ pub struct FederationConfig {
   pub tls_enabled: bool,
   pub allowed_instances: String,
   pub blocked_instances: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthTokenConfig {
+  pub auth_minutes: i32,
+  pub renew_minutes: i32,
+  pub renew_window_minutes: i32,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -15,8 +15,15 @@ use diesel::{
   PgConnection,
 };
 use lemmy_api_structs::{
-  comment::*, community::*, community_settings::*, post::*, post_hexbear::FeaturePost, report::*,
-  site::*, user::*, APIError,
+  comment::*,
+  community::*,
+  community_settings::*,
+  post::*,
+  post_hexbear::FeaturePost,
+  report::*,
+  site::*,
+  user::*,
+  APIError,
 };
 use lemmy_rate_limit::RateLimit;
 use lemmy_utils::{location_info, CommunityId, ConnectionId, IPAddr, LemmyError, PostId, UserId};
@@ -386,6 +393,7 @@ impl ChatServer {
       match user_operation {
         // User ops
         UserOperation::Login => do_user_operation::<Login>(args).await,
+        UserOperation::Logout => do_user_operation::<Logout>(args).await,
         UserOperation::Register => do_user_operation::<Register>(args).await,
         UserOperation::GetCaptcha => do_user_operation::<GetCaptcha>(args).await,
         UserOperation::GetUserDetails => do_user_operation::<GetUserDetails>(args).await,

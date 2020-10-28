@@ -1,7 +1,6 @@
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 
-use lemmy_db::user::User_;
 use lemmy_utils::settings::Settings;
 
 type Jwt = String;
@@ -9,6 +8,7 @@ type Jwt = String;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
   pub id: i32,
+  pub token_id: uuid::Uuid,
   pub iss: String,
 }
 
@@ -25,9 +25,14 @@ impl Claims {
     )
   }
 
-  pub fn jwt(user: User_, hostname: String) -> Result<Jwt, jsonwebtoken::errors::Error> {
+  pub fn jwt(
+    user_id: i32,
+    token_id: uuid::Uuid,
+    hostname: String,
+  ) -> Result<Jwt, jsonwebtoken::errors::Error> {
     let my_claims = Claims {
-      id: user.id,
+      id: user_id,
+      token_id,
       iss: hostname,
     };
     encode(

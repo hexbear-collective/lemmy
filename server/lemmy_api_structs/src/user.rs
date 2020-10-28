@@ -15,6 +15,11 @@ pub struct Login {
   pub code_2fa: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Logout {
+  pub auth: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Register {
   pub username: String,
