@@ -725,10 +725,19 @@ impl Perform for GetUserDetails {
       }
     };
 
-    let mut user_view = blocking(context.pool(), move |conn| {
-      UserView::get_user_secure(conn, user_details_id)
-    })
-    .await??;
+    let auth_user = user.clone();
+    let user_fun = move |conn: &'_ _| {
+      match auth_user {
+        Some(user) => if user_details_id == user.id {
+          UserView::read(conn, user.id)
+        } else {
+          UserView::get_user_secure(conn, user_details_id)
+        }
+        None => UserView::get_user_secure(conn, user_details_id)
+      }
+    };
+
+    let mut user_view = blocking(context.pool(),user_fun).await??;
 
     let page = data.page;
     let limit = data.limit;
@@ -786,13 +795,6 @@ impl Perform for GetUserDetails {
     admins.insert(0, creator_user);
 
     let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
-
-    // If its not the same user, remove the email, and settings
-    // TODO an if let chain would be better here, but can't figure it out
-    // TODO separate out settings into its own thing
-    if user_id.is_none() || user_details_id != user_id.unwrap_or(0) {
-      user_view.email = None;
-    }
 
     // temporarily disable avatars
     user_view.avatar = None;
