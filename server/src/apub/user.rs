@@ -265,6 +265,7 @@ impl FromApub for UserForm {
       private_key: None,
       public_key: Some(person.ext_one.public_key.to_owned().public_key_pem),
       last_refreshed_at: Some(naive_now()),
+      inbox_disabled: false,
     })
   }
 }

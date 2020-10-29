@@ -296,6 +296,7 @@ impl Perform for Register {
       private_key: Some(user_keypair.private_key),
       public_key: Some(user_keypair.public_key),
       last_refreshed_at: None,
+      inbox_disabled: false,
     };
 
     // Create the user
@@ -579,6 +580,7 @@ impl Perform for SaveUserSettings {
       private_key: read_user.private_key,
       public_key: read_user.public_key,
       last_refreshed_at: None,
+      inbox_disabled: data.inbox_disabled,
     };
 
     let res = blocking(context.pool(), move |conn| {
@@ -1227,6 +1229,17 @@ impl Perform for CreatePrivateMessage {
     let data: &CreatePrivateMessage = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
+    if (naive_now() - user.published) < Duration::days(1) {
+      return Err(APIError::err("new_user_24h_waiting_period_not_met").into());
+    }
+
+    let recipient_id = data.recipient_id;
+    let recipient = blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
+
+    if recipient.inbox_disabled {
+      return Err(APIError::err("user_not_accepting_private_messages").into());
+    }
+
     let hostname = &format!("https://{}", Settings::get().hostname);
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
@@ -1335,6 +1348,13 @@ impl Perform for EditPrivateMessage {
     .await??;
     if user.id != orig_private_message.creator_id {
       return Err(APIError::err("no_private_message_edit_allowed").into());
+    }
+
+    let recipient_id = orig_private_message.recipient_id;
+    let recipient = blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
+
+    if recipient.inbox_disabled {
+      return Err(APIError::err("user_not_accepting_private_messages").into());
     }
 
     // Doing the update

@@ -67,6 +67,7 @@ pub struct SaveUserSettings {
   pub send_notifications_to_email: bool,
   pub has_2fa: bool,
   pub auth: String,
+  pub inbox_disabled: bool,
 }
 
 #[derive(Serialize, Deserialize)]
