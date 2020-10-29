@@ -42,6 +42,7 @@ pub struct User_ {
   pub sitemod: bool,
   pub banner: Option<String>,
   pub has_2fa: bool,
+  pub inbox_disabled: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -71,6 +72,7 @@ pub struct UserForm {
   pub last_refreshed_at: Option<chrono::NaiveDateTime>,
   pub banner: Option<Option<String>>,
   pub has_2fa: bool,
+  pub inbox_disabled: bool,
 }
 
 #[derive(QueryableByName)]
@@ -246,6 +248,7 @@ mod tests {
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
+      inbox_disabled: false,
     };
 
     let inserted_user = User_::create(&conn, &new_user).unwrap();
@@ -278,6 +281,7 @@ mod tests {
       private_key: None,
       public_key: None,
       last_refreshed_at: inserted_user.published,
+      inbox_disabled: false,
     };
 
     let read_user = User_::read(&conn, inserted_user.id).unwrap();

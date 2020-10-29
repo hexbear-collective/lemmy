@@ -491,6 +491,7 @@ table! {
         sitemod -> Bool,
         banner -> Nullable<Text>,
         has_2fa -> Bool,
+        inbox_disabled -> Bool,
     }
 }
 
