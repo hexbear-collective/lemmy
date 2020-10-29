@@ -35,23 +35,25 @@ impl UserToken {
   pub fn read(conn: &PgConnection, uuid: uuid::Uuid) -> Result<Self, Error> {
     user_tokens.find(uuid).first::<Self>(conn)
   }
-  pub fn renew(conn: &PgConnection, uuid: uuid::Uuid, minutes: i64) -> Result<Self, Error> {
+
+  pub fn renew(conn: &PgConnection, uuid: uuid::Uuid, minutes: i64) -> Result<usize, Error> {
     diesel::update(user_tokens.find(uuid))
       .set((
         expires_at.eq(naive_now() + Duration::minutes(minutes)),
         renewed_at.eq(naive_now()),
       ))
-      .get_result::<Self>(conn)
-  }
-  pub fn revoke(conn: &PgConnection, uuid: uuid::Uuid) -> Result<Self, Error> {
-    diesel::update(user_tokens.find(uuid))
-      .set(is_revoked.eq(true))
-      .get_result::<Self>(conn)
+      .execute(conn)
   }
 
-  pub fn revoke_all(conn: &PgConnection, other_user_id: i32) -> Result<Self, Error> {
+  pub fn revoke(conn: &PgConnection, uuid: uuid::Uuid) -> Result<usize, Error> {
+    diesel::update(user_tokens.find(uuid))
+      .set(is_revoked.eq(true))
+      .execute(conn)
+  }
+
+  pub fn revoke_all(conn: &PgConnection, other_user_id: i32) -> Result<usize, Error> {
     diesel::update(user_tokens.filter(user_id.eq(other_user_id)))
       .set(is_revoked.eq(true))
-      .get_result::<Self>(conn)
+      .execute(conn)
   }
 }
