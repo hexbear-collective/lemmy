@@ -199,10 +199,15 @@ pub struct MentionData {
 
 impl MentionData {
   pub fn is_local(&self) -> bool {
-    Settings::get().hostname.eq(&self.domain)
+    self.domain.is_empty() || Settings::get().hostname.eq(&self.domain)
   }
   pub fn full_name(&self) -> String {
-    format!("@{}@{}", &self.name, &self.domain)
+    let domain = if self.domain.is_empty() {
+      Settings::get().hostname.clone()
+    } else {
+      self.domain.clone()
+    };
+    format!("@{}@{}", &self.name, &domain)
   }
 }
 
@@ -211,7 +216,7 @@ pub fn scrape_text_for_mentions(text: &str) -> Vec<MentionData> {
   for caps in MENTIONS_REGEX.captures_iter(text) {
     out.push(MentionData {
       name: caps["name"].to_string(),
-      domain: caps["domain"].to_string(),
+      domain: caps.name("domain").map_or("", |m| m.as_str()).to_string(),
     });
   }
   out.into_iter().unique().collect()
@@ -334,7 +339,7 @@ lazy_static! {
   static ref USERNAME_MATCHES_REGEX: Regex = Regex::new(r"/u/[a-zA-Z][0-9a-zA-Z_]*").unwrap();
   // TODO keep this old one, it didn't work with port well tho
   // static ref MENTIONS_REGEX: Regex = Regex::new(r"@(?P<name>[\w.]+)@(?P<domain>[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)").unwrap();
-  static ref MENTIONS_REGEX: Regex = Regex::new(r"@(?P<name>[\w.]+)@(?P<domain>[a-zA-Z0-9._:-]+)").unwrap();
+  static ref MENTIONS_REGEX: Regex = Regex::new(r"@(?P<name>[\w.]+)(@(?P<domain>[a-zA-Z0-9._:-]+))?").unwrap();
   static ref VALID_USERNAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_]{3,20}$").unwrap();
   static ref VALID_COMMUNITY_NAME_REGEX: Regex = Regex::new(r"^[a-z0-9_]{3,20}$").unwrap();
   static ref VALID_POST_TITLE_REGEX: Regex = Regex::new(r".*\S.*").unwrap();
