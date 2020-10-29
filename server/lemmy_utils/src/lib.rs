@@ -203,7 +203,7 @@ impl MentionData {
   }
   pub fn full_name(&self) -> String {
     let domain = if self.domain.is_empty() {
-      Settings::get().hostname.clone()
+      Settings::get().hostname
     } else {
       self.domain.clone()
     };
