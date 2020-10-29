@@ -9,62 +9,25 @@ use log::{error, info};
 
 use lemmy_api_structs::{user::*, APIError};
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community::*,
-  community_settings::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  naive_now,
-  password_reset_request::*,
-  post::*,
-  post_view::*,
-  private_message::*,
-  private_message_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  user_mention_view::*,
-  user_tag::*,
-  user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  comment::*, comment_view::*, community::*, community_settings::*, community_view::*,
+  diesel_option_overwrite, moderator::*, naive_now, password_reset_request::*, post::*,
+  post_view::*, private_message::*, private_message_view::*, site::*, site_view::*, user::*,
+  user_mention::*, user_mention_view::*, user_tag::*, user_view::*, Crud, Followable, Joinable,
+  ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_preferred_username,
-  is_valid_username,
-  location_info,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
+  generate_actor_keypair, generate_random_string, is_valid_preferred_username, is_valid_username,
+  location_info, make_apub_endpoint, naive_from_unix, remove_slurs, send_email, settings::Settings,
+  ConnectionId, EndpointType, LemmyError,
 };
 
 use crate::{
   api::{
-    check_slurs,
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    is_admin_or_sitemod,
-    validate_token,
-    Perform,
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_admin_or_sitemod, validate_token, Perform,
   },
   apub::ApubObjectType,
-  blocking,
-  captcha_espeak_wav_base64,
+  blocking, captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
@@ -728,18 +691,18 @@ impl Perform for GetUserDetails {
     };
 
     let auth_user = user.clone();
-    let user_fun = move |conn: &'_ _| {
-      match auth_user {
-        Some(user) => if user_details_id == user.id {
+    let user_fun = move |conn: &'_ _| match auth_user {
+      Some(user) => {
+        if user_details_id == user.id {
           UserView::read(conn, user.id)
         } else {
           UserView::get_user_secure(conn, user_details_id)
         }
-        None => UserView::get_user_secure(conn, user_details_id)
       }
+      None => UserView::get_user_secure(conn, user_details_id),
     };
 
-    let mut user_view = blocking(context.pool(),user_fun).await??;
+    let mut user_view = blocking(context.pool(), user_fun).await??;
 
     let page = data.page;
     let limit = data.limit;
@@ -1798,7 +1761,14 @@ impl Perform for RemoveUserContent {
         ModRemovePost::create(conn, &form)
       })
       .await??;
-      blocking(context.pool(), move |conn| Post::permadelete(conn, post_id)).await??;
+      // Commented out for transparency. Uncomment this to delete the content of mass removed posts
+      // blocking(context.pool(), move |conn| Post::permadelete(conn, post_id)).await??;
+
+      // This removes posts without overwriting their content
+      blocking(context.pool(), move |conn| {
+        Post::update_removed(conn, post_id, true)
+      })
+      .await??;
     }
 
     for comment_id in comment_id_list {
@@ -1813,8 +1783,15 @@ impl Perform for RemoveUserContent {
         ModRemoveComment::create(conn, &form)
       })
       .await??;
-      blocking(context.pool(), move |conn| {
+      // Commented out for transparency. Uncomment this to delete the content of mass removed comments
+      /*blocking(context.pool(), move |conn| {
         Comment::permadelete(conn, comment_id)
+      })
+      .await??;*/
+
+      // This removes comments without overwriting their content
+      blocking(context.pool(), move |conn| {
+        Comment::update_removed(conn, comment_id, true)
       })
       .await??;
     }
