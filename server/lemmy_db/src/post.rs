@@ -33,6 +33,7 @@ pub struct Post {
   pub thumbnail_url: Option<String>,
   pub ap_id: String,
   pub local: bool,
+  pub featured: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -50,17 +51,18 @@ pub struct PostForm {
   pub deleted: Option<bool>,
   pub nsfw: bool,
   pub stickied: Option<bool>,
+  pub featured: Option<bool>,
   pub embed_title: Option<String>,
   pub embed_description: Option<String>,
   pub embed_html: Option<String>,
   pub thumbnail_url: Option<String>,
-  pub ap_id: String,
+  pub ap_id: Option<String>,
   pub local: bool,
 }
 
 impl PostForm {
   pub fn get_ap_id(&self) -> Result<Url, ParseError> {
-    Url::parse(&self.ap_id)
+    Url::parse(&self.ap_id.as_ref().unwrap_or(&"not_a_url".to_string()))
   }
 }
 
@@ -96,13 +98,16 @@ impl Post {
       .get_result::<Self>(conn)
   }
 
-  pub fn permadelete(conn: &PgConnection, post_id: i32) -> Result<Self, Error> {
+  pub fn permadelete_for_creator(
+    conn: &PgConnection,
+    for_creator_id: i32,
+  ) -> Result<Vec<Self>, Error> {
     use crate::schema::post::dsl::*;
 
     let perma_deleted = "*Permananently Deleted*";
     let perma_deleted_url = "https://deleted.com";
 
-    diesel::update(post.find(post_id))
+    diesel::update(post.filter(creator_id.eq(for_creator_id)))
       .set((
         name.eq(perma_deleted),
         url.eq(perma_deleted_url),
@@ -110,7 +115,7 @@ impl Post {
         deleted.eq(true),
         updated.eq(naive_now()),
       ))
-      .get_result::<Self>(conn)
+      .get_results::<Self>(conn)
   }
 
   pub fn update_deleted(
@@ -135,6 +140,26 @@ impl Post {
       .get_result::<Self>(conn)
   }
 
+  pub fn update_removed_for_creator(
+    conn: &PgConnection,
+    for_creator_id: i32,
+    for_community_id: Option<i32>,
+    new_removed: bool,
+  ) -> Result<Vec<Self>, Error> {
+    use crate::schema::post::dsl::*;
+
+    let mut update = diesel::update(post).into_boxed();
+    update = update.filter(creator_id.eq(for_creator_id));
+
+    if let Some(for_community_id) = for_community_id {
+      update = update.filter(community_id.eq(for_community_id));
+    }
+
+    update
+      .set((removed.eq(new_removed), updated.eq(naive_now())))
+      .get_results::<Self>(conn)
+  }
+
   pub fn update_locked(conn: &PgConnection, post_id: i32, new_locked: bool) -> Result<Self, Error> {
     use crate::schema::post::dsl::*;
     diesel::update(post.find(post_id))
@@ -155,6 +180,44 @@ impl Post {
 
   pub fn is_post_creator(user_id: i32, post_creator_id: i32) -> bool {
     user_id == post_creator_id
+  }
+
+  pub fn upsert(conn: &PgConnection, post_form: &PostForm) -> Result<Post, Error> {
+    use crate::schema::post::dsl::*;
+    insert_into(post)
+      .values(post_form)
+      .on_conflict(ap_id)
+      .do_update()
+      .set(post_form)
+      .get_result::<Self>(conn)
+  }
+
+  pub fn permadelete(conn: &PgConnection, post_id: i32) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+
+    let perma_deleted = "*Permananently Deleted*";
+    let perma_deleted_url = "https://deleted.com";
+
+    diesel::update(post.find(post_id))
+      .set((
+        name.eq(perma_deleted),
+        url.eq(perma_deleted_url),
+        body.eq(perma_deleted),
+        deleted.eq(true),
+        updated.eq(naive_now()),
+      ))
+      .get_result::<Self>(conn)
+  }
+
+  pub fn update_featured(
+    conn: &PgConnection,
+    post_id: i32,
+    new_featured: bool,
+  ) -> Result<Self, Error> {
+    use crate::schema::post::dsl::*;
+    diesel::update(post.find(post_id))
+      .set(featured.eq(new_featured))
+      .get_result::<Self>(conn)
   }
 }
 
@@ -202,24 +265,18 @@ pub struct PostLikeForm {
 }
 
 impl Likeable<PostLikeForm> for PostLike {
-  fn read(conn: &PgConnection, post_id_from: i32) -> Result<Vec<Self>, Error> {
-    use crate::schema::post_like::dsl::*;
-    post_like
-      .filter(post_id.eq(post_id_from))
-      .load::<Self>(conn)
-  }
   fn like(conn: &PgConnection, post_like_form: &PostLikeForm) -> Result<Self, Error> {
     use crate::schema::post_like::dsl::*;
     insert_into(post_like)
       .values(post_like_form)
       .get_result::<Self>(conn)
   }
-  fn remove(conn: &PgConnection, post_like_form: &PostLikeForm) -> Result<usize, Error> {
-    use crate::schema::post_like::dsl::*;
+  fn remove(conn: &PgConnection, user_id: i32, post_id: i32) -> Result<usize, Error> {
+    use crate::schema::post_like::dsl;
     diesel::delete(
-      post_like
-        .filter(post_id.eq(post_like_form.post_id))
-        .filter(user_id.eq(post_like_form.user_id)),
+      dsl::post_like
+        .filter(dsl::post_id.eq(post_id))
+        .filter(dsl::user_id.eq(user_id)),
     )
     .execute(conn)
   }
@@ -311,8 +368,11 @@ impl Saveable<PostSavedForm> for PostSaved {
 #[table_name = "post_read"]
 pub struct PostRead {
   pub id: i32,
+
   pub post_id: i32,
+
   pub user_id: i32,
+
   pub published: chrono::NaiveDateTime,
 }
 
@@ -320,6 +380,7 @@ pub struct PostRead {
 #[table_name = "post_read"]
 pub struct PostReadForm {
   pub post_id: i32,
+
   pub user_id: i32,
 }
 
@@ -330,6 +391,7 @@ impl Readable<PostReadForm> for PostRead {
       .values(post_read_form)
       .get_result::<Self>(conn)
   }
+
   fn mark_as_unread(conn: &PgConnection, post_read_form: &PostReadForm) -> Result<usize, Error> {
     use crate::schema::post_read::dsl::*;
     diesel::delete(
@@ -364,6 +426,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -373,12 +436,14 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_8292683678".into(),
+      has_2fa: false,
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
+      inbox_disabled: false,
     };
 
     let inserted_user = User_::create(&conn, &new_user).unwrap();
@@ -393,7 +458,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_8223262378".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -415,13 +480,14 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       nsfw: false,
       updated: None,
       embed_title: None,
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -439,6 +505,7 @@ mod tests {
       removed: false,
       locked: false,
       stickied: false,
+      featured: false,
       nsfw: false,
       deleted: false,
       updated: None,
@@ -446,7 +513,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
     };
 
@@ -499,7 +566,7 @@ mod tests {
 
     let read_post = Post::read(&conn, inserted_post.id).unwrap();
     let updated_post = Post::update(&conn, inserted_post.id, &new_post).unwrap();
-    let like_removed = PostLike::remove(&conn, &post_like_form).unwrap();
+    let like_removed = PostLike::remove(&conn, inserted_user.id, inserted_post.id).unwrap();
     let saved_removed = PostSaved::unsave(&conn, &post_saved_form).unwrap();
     let read_removed = PostRead::mark_as_unread(&conn, &post_read_form).unwrap();
     let num_deleted = Post::delete(&conn, inserted_post.id).unwrap();

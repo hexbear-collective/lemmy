@@ -26,6 +26,8 @@ table! {
     post_score -> BigInt,
     number_of_comments -> BigInt,
     comment_score -> BigInt,
+    has_2fa -> Bool,
+    inbox_disabled -> Bool,
   }
 }
 
@@ -54,6 +56,8 @@ pub struct UserView {
   pub post_score: i64,
   pub number_of_comments: i64,
   pub comment_score: i64,
+  pub has_2fa: bool,
+  pub inbox_disabled: bool,
 }
 
 pub struct UserQueryBuilder<'a> {
@@ -104,7 +108,7 @@ impl<'a> UserQueryBuilder<'a> {
 
   pub fn list(self) -> Result<Vec<UserView>, Error> {
     use super::user_view::user_view::dsl::*;
-
+    use diesel::sql_types::{Nullable, Text};
     let mut query = self.query;
 
     query = match self.sort {
@@ -133,6 +137,31 @@ impl<'a> UserQueryBuilder<'a> {
     let (limit, offset) = limit_and_offset(self.page, self.limit);
     query = query.limit(limit).offset(offset);
 
+    // The select is necessary here to not get back emails
+    query = query.select((
+      id,
+      actor_id,
+      name,
+      preferred_username,
+      avatar,
+      banner,
+      "".into_sql::<Nullable<Text>>(),
+      matrix_user_id,
+      bio,
+      local,
+      admin,
+      sitemod,
+      banned,
+      show_avatars,
+      send_notifications_to_email,
+      published,
+      number_of_posts,
+      post_score,
+      number_of_comments,
+      comment_score,
+      has_2fa,
+      inbox_disabled,
+    ));
     query.load::<UserView>(self.conn)
   }
 }
@@ -169,6 +198,8 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
+        inbox_disabled,
       ))
       .filter(admin.eq(true))
       .order_by(published)
@@ -201,6 +232,8 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
+        inbox_disabled,
       ))
       .filter(sitemod.eq(true))
       .order_by(published)
@@ -232,8 +265,42 @@ impl UserView {
         post_score,
         number_of_comments,
         comment_score,
+        has_2fa,
+        inbox_disabled,
       ))
       .filter(banned.eq(true))
       .load::<Self>(conn)
+  }
+
+  pub fn get_user_secure(conn: &PgConnection, user_id: i32) -> Result<Self, Error> {
+    use super::user_view::user_view::dsl::*;
+    use diesel::sql_types::{Nullable, Text};
+    user_view
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        "".into_sql::<Nullable<Text>>(),
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        banned,
+        show_avatars,
+        send_notifications_to_email,
+        published,
+        number_of_posts,
+        post_score,
+        number_of_comments,
+        comment_score,
+        has_2fa,
+        inbox_disabled,
+      ))
+      .find(user_id)
+      .first::<Self>(conn)
   }
 }

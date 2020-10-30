@@ -335,6 +335,7 @@ table! {
         thumbnail_url -> Nullable<Text>,
         ap_id -> Varchar,
         local -> Bool,
+        featured -> Bool,
     }
 }
 
@@ -489,6 +490,8 @@ table! {
         last_refreshed_at -> Timestamp,
         sitemod -> Bool,
         banner -> Nullable<Text>,
+        has_2fa -> Bool,
+        inbox_disabled -> Bool,
     }
 }
 
@@ -517,6 +520,7 @@ table! {
         banned -> Nullable<Bool>,
         show_avatars -> Nullable<Bool>,
         send_notifications_to_email -> Nullable<Bool>,
+        has_2fa -> Nullable<Bool>,
         published -> Nullable<Timestamp>,
         number_of_posts -> Nullable<Int8>,
         post_score -> Nullable<Int8>,
@@ -539,6 +543,18 @@ table! {
     user_tag (user_id) {
         user_id -> Int4,
         tags -> Jsonb,
+    }
+}
+
+table! {
+    hexbear.user_tokens (id) {
+        id -> Uuid,
+        user_id -> Int4,
+        token_hash -> Text,
+        created_at -> Timestamp,
+        expires_at -> Timestamp,
+        renewed_at -> Timestamp,
+        is_revoked -> Bool,
     }
 }
 
@@ -591,43 +607,45 @@ joinable!(user_ban -> user_ (user_id));
 joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
 joinable!(user_tag -> user_ (user_id));
+joinable!(user_tokens -> user_ (user_id));
 
 allow_tables_to_appear_in_same_query!(
-    activity,
-    category,
-    comment,
-    comment_aggregates_fast,
-    comment_like,
-    comment_report,
-    comment_saved,
-    community,
-    community_aggregates_fast,
-    community_follower,
-    community_moderator,
-    community_settings,
-    community_user_ban,
-    community_user_tag,
-    mod_add,
-    mod_add_community,
-    mod_ban,
-    mod_ban_from_community,
-    mod_lock_post,
-    mod_remove_comment,
-    mod_remove_community,
-    mod_remove_post,
-    mod_sticky_post,
-    password_reset_request,
-    post,
-    post_aggregates_fast,
-    post_like,
-    post_read,
-    post_report,
-    post_saved,
-    private_message,
-    site,
-    user_,
-    user_ban,
-    user_fast,
-    user_mention,
-    user_tag,
+  activity,
+  category,
+  comment,
+  comment_aggregates_fast,
+  comment_like,
+  comment_report,
+  comment_saved,
+  community,
+  community_aggregates_fast,
+  community_follower,
+  community_moderator,
+  community_settings,
+  community_user_ban,
+  community_user_tag,
+  mod_add,
+  mod_add_community,
+  mod_ban,
+  mod_ban_from_community,
+  mod_lock_post,
+  mod_remove_comment,
+  mod_remove_community,
+  mod_remove_post,
+  mod_sticky_post,
+  password_reset_request,
+  post,
+  post_aggregates_fast,
+  post_like,
+  post_read,
+  post_report,
+  post_saved,
+  private_message,
+  site,
+  user_,
+  user_ban,
+  user_fast,
+  user_mention,
+  user_tag,
+  user_tokens,
 );

@@ -2,7 +2,7 @@ use crate::{
   schema::{password_reset_request, password_reset_request::dsl::*},
   Crud,
 };
-use diesel::{dsl::*, result::Error, *};
+use diesel::{dsl::*, result::Error, PgConnection, *};
 use sha2::{Digest, Sha256};
 
 #[derive(Queryable, Identifiable, PartialEq, Debug)]
@@ -27,9 +27,6 @@ impl Crud<PasswordResetRequestForm> for PasswordResetRequest {
     password_reset_request
       .find(password_reset_request_id)
       .first::<Self>(conn)
-  }
-  fn delete(conn: &PgConnection, password_reset_request_id: i32) -> Result<usize, Error> {
-    diesel::delete(password_reset_request.find(password_reset_request_id)).execute(conn)
   }
   fn create(conn: &PgConnection, form: &PasswordResetRequestForm) -> Result<Self, Error> {
     insert_into(password_reset_request)
@@ -81,8 +78,14 @@ impl PasswordResetRequest {
 
 #[cfg(test)]
 mod tests {
-  use super::{super::user::*, *};
-  use crate::{tests::establish_unpooled_connection, ListingType, SortType};
+  use super::super::user::*;
+  use crate::{
+    password_reset_request::PasswordResetRequest,
+    tests::establish_unpooled_connection,
+    Crud,
+    ListingType,
+    SortType,
+  };
 
   #[test]
   fn test_crud() {
@@ -96,6 +99,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -105,12 +109,14 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_8292378".into(),
+      has_2fa: false,
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
+      inbox_disabled: false,
     };
 
     let inserted_user = User_::create(&conn, &new_user).unwrap();

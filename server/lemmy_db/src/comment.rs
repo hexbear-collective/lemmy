@@ -1,5 +1,14 @@
-use super::{post::Post, *};
-use crate::schema::{comment, comment_like, comment_report, comment_saved};
+use super::post::Post;
+use crate::{
+  naive_now,
+  schema::{comment, comment_like, comment_report, comment_saved},
+  Crud,
+  Likeable,
+  Reportable,
+  Saveable,
+};
+use diesel::{dsl::*, result::Error, *};
+use serde::{Deserialize, Serialize};
 use url::{ParseError, Url};
 
 // WITH RECURSIVE MyTree AS (
@@ -39,13 +48,13 @@ pub struct CommentForm {
   pub published: Option<chrono::NaiveDateTime>,
   pub updated: Option<chrono::NaiveDateTime>,
   pub deleted: Option<bool>,
-  pub ap_id: String,
+  pub ap_id: Option<String>,
   pub local: bool,
 }
 
 impl CommentForm {
   pub fn get_ap_id(&self) -> Result<Url, ParseError> {
-    Url::parse(&self.ap_id)
+    Url::parse(&self.ap_id.as_ref().unwrap_or(&"not_a_url".to_string()))
   }
 }
 
@@ -97,16 +106,18 @@ impl Comment {
     comment.filter(ap_id.eq(object_id)).first::<Self>(conn)
   }
 
-  pub fn permadelete(conn: &PgConnection, comment_id: i32) -> Result<Self, Error> {
+  pub fn permadelete_for_creator(
+    conn: &PgConnection,
+    for_creator_id: i32,
+  ) -> Result<Vec<Self>, Error> {
     use crate::schema::comment::dsl::*;
-
-    diesel::update(comment.find(comment_id))
+    diesel::update(comment.filter(creator_id.eq(for_creator_id)))
       .set((
         content.eq("*Permananently Deleted*"),
         deleted.eq(true),
         updated.eq(naive_now()),
       ))
-      .get_result::<Self>(conn)
+      .get_results::<Self>(conn)
   }
 
   pub fn update_deleted(
@@ -131,6 +142,17 @@ impl Comment {
       .get_result::<Self>(conn)
   }
 
+  pub fn update_removed_for_creator(
+    conn: &PgConnection,
+    for_creator_id: i32,
+    new_removed: bool,
+  ) -> Result<Vec<Self>, Error> {
+    use crate::schema::comment::dsl::*;
+    diesel::update(comment.filter(creator_id.eq(for_creator_id)))
+      .set((removed.eq(new_removed), updated.eq(naive_now())))
+      .get_results::<Self>(conn)
+  }
+
   pub fn update_read(conn: &PgConnection, comment_id: i32, new_read: bool) -> Result<Self, Error> {
     use crate::schema::comment::dsl::*;
     diesel::update(comment.find(comment_id))
@@ -146,6 +168,28 @@ impl Comment {
     use crate::schema::comment::dsl::*;
     diesel::update(comment.find(comment_id))
       .set((content.eq(new_content), updated.eq(naive_now())))
+      .get_result::<Self>(conn)
+  }
+
+  pub fn upsert(conn: &PgConnection, comment_form: &CommentForm) -> Result<Self, Error> {
+    use crate::schema::comment::dsl::*;
+    insert_into(comment)
+      .values(comment_form)
+      .on_conflict(ap_id)
+      .do_update()
+      .set(comment_form)
+      .get_result::<Self>(conn)
+  }
+
+  pub fn permadelete(conn: &PgConnection, comment_id: i32) -> Result<Self, Error> {
+    use crate::schema::comment::dsl::*;
+
+    diesel::update(comment.find(comment_id))
+      .set((
+        content.eq("*Permananently Deleted*"),
+        deleted.eq(true),
+        updated.eq(naive_now()),
+      ))
       .get_result::<Self>(conn)
   }
 }
@@ -172,36 +216,20 @@ pub struct CommentLikeForm {
 }
 
 impl Likeable<CommentLikeForm> for CommentLike {
-  fn read(conn: &PgConnection, comment_id_from: i32) -> Result<Vec<Self>, Error> {
-    use crate::schema::comment_like::dsl::*;
-    comment_like
-      .filter(comment_id.eq(comment_id_from))
-      .load::<Self>(conn)
-  }
-
   fn like(conn: &PgConnection, comment_like_form: &CommentLikeForm) -> Result<Self, Error> {
     use crate::schema::comment_like::dsl::*;
     insert_into(comment_like)
       .values(comment_like_form)
       .get_result::<Self>(conn)
   }
-  fn remove(conn: &PgConnection, comment_like_form: &CommentLikeForm) -> Result<usize, Error> {
-    use crate::schema::comment_like::dsl::*;
+  fn remove(conn: &PgConnection, user_id: i32, comment_id: i32) -> Result<usize, Error> {
+    use crate::schema::comment_like::dsl;
     diesel::delete(
-      comment_like
-        .filter(comment_id.eq(comment_like_form.comment_id))
-        .filter(user_id.eq(comment_like_form.user_id)),
+      dsl::comment_like
+        .filter(dsl::comment_id.eq(comment_id))
+        .filter(dsl::user_id.eq(user_id)),
     )
     .execute(conn)
-  }
-}
-
-impl CommentLike {
-  pub fn from_post(conn: &PgConnection, post_id_from: i32) -> Result<Vec<Self>, Error> {
-    use crate::schema::comment_like::dsl::*;
-    comment_like
-      .filter(post_id.eq(post_id_from))
-      .load::<Self>(conn)
   }
 }
 
@@ -284,7 +312,16 @@ impl Saveable<CommentSavedForm> for CommentSaved {
 
 #[cfg(test)]
 mod tests {
-  use crate::{comment::*, community::*, post::*, tests::establish_unpooled_connection, user::*};
+  use crate::{
+    comment::*,
+    community::*,
+    post::*,
+    tests::establish_unpooled_connection,
+    user::*,
+    Crud,
+    ListingType,
+    SortType,
+  };
 
   #[test]
   fn test_crud() {
@@ -298,6 +335,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -307,12 +345,14 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_283687".into(),
+      has_2fa: false,
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
+      inbox_disabled: false,
     };
 
     let inserted_user = User_::create(&conn, &new_user).unwrap();
@@ -327,7 +367,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_928738972".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -349,13 +389,14 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       updated: None,
       nsfw: false,
       embed_title: None,
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -372,7 +413,7 @@ mod tests {
       parent_id: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -389,7 +430,7 @@ mod tests {
       parent_id: None,
       published: inserted_comment.published,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: inserted_comment.ap_id.to_owned(),
       local: true,
     };
 
@@ -403,7 +444,7 @@ mod tests {
       read: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -445,7 +486,7 @@ mod tests {
 
     let read_comment = Comment::read(&conn, inserted_comment.id).unwrap();
     let updated_comment = Comment::update(&conn, inserted_comment.id, &comment_form).unwrap();
-    let like_removed = CommentLike::remove(&conn, &comment_like_form).unwrap();
+    let like_removed = CommentLike::remove(&conn, inserted_user.id, inserted_comment.id).unwrap();
     let saved_removed = CommentSaved::unsave(&conn, &comment_saved_form).unwrap();
     let num_deleted = Comment::delete(&conn, inserted_comment.id).unwrap();
     Comment::delete(&conn, inserted_child_comment.id).unwrap();

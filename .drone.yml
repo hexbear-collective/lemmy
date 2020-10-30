@@ -5,7 +5,11 @@
 
   trigger:
     branch:
-      - chapo-dev
+      - dev
+      - prod
+    event:
+      exclude:
+      - pull_request
   
   globals: 
     - &docker_settings
@@ -36,8 +40,10 @@
       create_repository: true
       use_cache: true
       dockerfile: docker/prod/Dockerfile
-      tags: drone-test
       <<: *docker_settings
+      tags:
+        - ${DRONE_BRANCH}-latest
+        - ${DRONE_COMMIT_SHA:0:8}
     volumes:
       - name: docker
         path: /var/lib/docker

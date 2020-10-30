@@ -1,69 +1,33 @@
-use super::*;
-use crate::{
-  api::{claims::Claims, APIError, Oper, Perform},
-  blocking,
-  websocket::{server::SendCommunityRoomMessage, UserOperation, WebsocketInfo},
-  DbPool,
-  LemmyError,
-};
+use actix_web::web::Data;
+
+use lemmy_api_structs::{community_settings::*, APIError};
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
   naive_now,
   Crud,
 };
+use lemmy_utils::{ConnectionId, LemmyError};
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
-pub struct GetCommunitySettings {
-  pub community_id: i32,
-  auth: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct GetCommunitySettingsResponse {
-  pub read_only: bool,
-  pub private: bool,
-  pub post_links: bool,
-  pub comment_images: i32,
-  pub published: chrono::NaiveDateTime,
-  pub allow_as_default: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct EditCommunitySettings {
-  pub community_id: i32,
-  pub read_only: bool,
-  pub private: bool,
-  pub post_links: bool,
-  pub comment_images: i32,
-  pub allow_as_default: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct EditCommunitySettingsResponse {
-  pub read_only: bool,
-  pub private: bool,
-  pub post_links: bool,
-  pub comment_images: i32,
-  pub published: chrono::NaiveDateTime,
-  pub allow_as_default: bool,
-}
+use crate::{
+  api::{get_user_from_jwt, is_mod_or_admin, Perform},
+  blocking,
+  websocket::{messages::SendCommunityRoomMessage, UserOperation},
+  LemmyContext,
+};
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<GetCommunitySettings> {
+impl Perform for GetCommunitySettings {
   type Response = GetCommunitySettingsResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    _websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetCommunitySettingsResponse, LemmyError> {
-    let data: &GetCommunitySettings = &self.data;
+    let data: &GetCommunitySettings = &self;
 
     let community_id = data.community_id;
-    let community_settings = match blocking(pool, move |conn| {
+    let community_settings = match blocking(context.pool(), move |conn| {
       CommunitySettings::read_from_community_id(conn, community_id)
     })
     .await?
@@ -87,31 +51,17 @@ impl Perform for Oper<GetCommunitySettings> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Perform for Oper<EditCommunitySettings> {
+impl Perform for EditCommunitySettings {
   type Response = EditCommunitySettingsResponse;
 
   async fn perform(
     &self,
-    pool: &DbPool,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<EditCommunitySettingsResponse, LemmyError> {
-    let data: &EditCommunitySettings = &self.data;
-
-    let user_id: i32 = match Claims::decode(&data.auth) {
-      Ok(claims) => claims.claims.id,
-      Err(_e) => return Err(APIError::err("no_community_edit_allowed").into()),
-    };
-
-    // Verify it's a mod or admin
-    let community_id = data.community_id;
-    let _: Result<(), LemmyError> = blocking(pool, move |conn| {
-      if !User_::read(&conn, user_id)?.is_moderator(&conn, community_id)? {
-        Ok(())
-      } else {
-        Err(APIError::err("no_community_edit_allowed").into())
-      }
-    })
-    .await?;
+    let data: &EditCommunitySettings = &self;
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+    is_mod_or_admin(context.pool(), user.id, data.community_id).await?;
 
     let community_settings_form = CommunitySettingsForm {
       id: data.community_id.to_owned(),
@@ -123,7 +73,7 @@ impl Perform for Oper<EditCommunitySettings> {
     };
 
     let community_id = data.community_id;
-    let updated_community_settings = match blocking(pool, move |conn| {
+    let updated_community_settings = match blocking(context.pool(), move |conn| {
       CommunitySettings::update(conn, community_id, &community_settings_form)
     })
     .await?
@@ -141,16 +91,13 @@ impl Perform for Oper<EditCommunitySettings> {
       allow_as_default: updated_community_settings.allow_as_default,
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendCommunityRoomMessage {
-        op: UserOperation::EditCommunitySettings,
-        response: res.clone(),
-        community_id: data.community_id,
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendCommunityRoomMessage {
+      op: UserOperation::BanFromCommunity,
+      response: res.clone(),
+      community_id,
+      websocket_id,
+    });
 
-    // Return the jwt
     Ok(res)
   }
 }

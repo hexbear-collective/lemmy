@@ -8,7 +8,7 @@ static CONFIG_FILE: &str = "config/config.hjson";
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
   pub setup: Option<Setup>,
-  pub database: Database,
+  pub database: DatabaseConfig,
   pub hostname: String,
   pub bind: IpAddr,
   pub port: u16,
@@ -17,8 +17,10 @@ pub struct Settings {
   pub pictrs_url: String,
   pub rate_limit: RateLimitConfig,
   pub email: Option<EmailConfig>,
-  pub federation: Federation,
+  pub federation: FederationConfig,
   pub captcha: CaptchaConfig,
+  pub auth_token: AuthTokenConfig,
+  pub twofactor: TwoFactorConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -61,7 +63,7 @@ pub struct CaptchaConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Database {
+pub struct DatabaseConfig {
   pub user: String,
   pub password: String,
   pub host: String,
@@ -71,10 +73,25 @@ pub struct Database {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Federation {
+pub struct FederationConfig {
   pub enabled: bool,
   pub tls_enabled: bool,
   pub allowed_instances: String,
+  pub blocked_instances: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthTokenConfig {
+  pub auth_minutes: i32,
+  pub renew_minutes: i32,
+  pub renew_window_minutes: i32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TwoFactorConfig {
+  pub cache_size: usize,
+  pub allowed_characters: String,
+  pub code_length: usize,
 }
 
 lazy_static! {
@@ -125,16 +142,40 @@ impl Settings {
     )
   }
 
-  pub fn api_endpoint(&self) -> String {
-    format!("{}/api/v1", self.hostname)
-  }
-
   pub fn get_config_defaults_location() -> String {
     env::var("LEMMY_CONFIG_LOCATION").unwrap_or_else(|_| CONFIG_FILE_DEFAULTS.to_string())
   }
 
   pub fn read_config_file() -> Result<String, Error> {
     fs::read_to_string(CONFIG_FILE)
+  }
+
+  pub fn get_allowed_instances(&self) -> Vec<String> {
+    let mut allowed_instances: Vec<String> = self
+      .federation
+      .allowed_instances
+      .split(',')
+      .map(|d| d.to_string())
+      .collect();
+
+    // The defaults.hjson config always returns a [""]
+    allowed_instances.retain(|d| !d.eq(""));
+
+    allowed_instances
+  }
+
+  pub fn get_blocked_instances(&self) -> Vec<String> {
+    let mut blocked_instances: Vec<String> = self
+      .federation
+      .blocked_instances
+      .split(',')
+      .map(|d| d.to_string())
+      .collect();
+
+    // The defaults.hjson config always returns a [""]
+    blocked_instances.retain(|d| !d.eq(""));
+
+    blocked_instances
   }
 
   pub fn save_config_file(data: &str) -> Result<String, Error> {

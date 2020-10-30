@@ -199,12 +199,6 @@ impl<'a> CommunityQueryBuilder<'a> {
 
     // The view lets you pass a null user_id, if you're not logged in
     match self.sort {
-      SortType::Hot => {
-        query = query
-          .order_by(hot_rank.desc())
-          .then_order_by(number_of_subscribers.desc())
-          .filter(user_id.is_null())
-      }
       SortType::New => query = query.order_by(published.desc()).filter(user_id.is_null()),
       SortType::TopAll => match self.from_user_id {
         Some(from_user_id) => {
@@ -218,7 +212,13 @@ impl<'a> CommunityQueryBuilder<'a> {
             .filter(user_id.is_null())
         }
       },
-      _ => (),
+      // Covers all other sorts, including hot
+      _ => {
+        query = query
+          .order_by(hot_rank.desc())
+          .then_order_by(number_of_subscribers.desc())
+          .filter(user_id.is_null())
+      }
     };
 
     if !self.show_nsfw {
@@ -353,20 +353,6 @@ pub struct CommunityUserBanView {
 }
 
 impl CommunityUserBanView {
-  pub fn for_community(conn: &PgConnection, from_community_id: i32) -> Result<Vec<Self>, Error> {
-    use super::community_view::community_user_ban_view::dsl::*;
-    community_user_ban_view
-      .filter(community_id.eq(from_community_id))
-      .load::<Self>(conn)
-  }
-
-  pub fn for_user(conn: &PgConnection, from_user_id: i32) -> Result<Vec<Self>, Error> {
-    use super::community_view::community_user_ban_view::dsl::*;
-    community_user_ban_view
-      .filter(user_id.eq(from_user_id))
-      .load::<Self>(conn)
-  }
-
   pub fn get(
     conn: &PgConnection,
     from_user_id: i32,

@@ -12,30 +12,46 @@ COPY .git/ ./.git/
 RUN yarn build
 RUN su && rm -rf .git
 
-FROM ekidd/rust-musl-builder:1.42.0-openssl11 as rust
+FROM ekidd/rust-musl-builder:nightly-2020-05-07 as rust
 
 # Cache deps
 WORKDIR /app
 RUN sudo chown -R rust:rust .
 RUN USER=root cargo new server
+
+# Install cargo-build-deps
+RUN cargo install --git https://github.com/romac/cargo-build-deps.git
 WORKDIR /app/server
+RUN mkdir -p lemmy_db/src/ \
+      lemmy_utils/src/ \
+      lemmy_api_structs/src/ \
+      lemmy_rate_limit/src/ \
+      lemmy
+
+# Copy the cargo tomls
 COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
-COPY server/lemmy_db ./lemmy_db
-COPY server/lemmy_utils ./lemmy_utils
-COPY .git/ ./.git/
-RUN mkdir -p ./src/bin \
-   && echo 'fn main() { println!("Dummy") }' > ./src/bin/main.rs
-RUN cargo build
-RUN find target/debug -type f -name "$(echo "lemmy_server" | tr '-' '_')*" -exec touch -t 200001010000 {} +
+COPY server/lemmy_db/Cargo.toml ./lemmy_db/
+COPY server/lemmy_utils/Cargo.toml ./lemmy_utils/
+COPY server/lemmy_api_structs/Cargo.toml ./lemmy_api_structs/
+COPY server/lemmy_rate_limit/Cargo.toml ./lemmy_rate_limit/
+
+# Cache the deps
+RUN cargo build-deps
+
+# Copy the src folders
 COPY server/src ./src/
+COPY server/lemmy_db/src ./lemmy_db/src/
+COPY server/lemmy_utils/src/ ./lemmy_utils/src/
+COPY server/lemmy_api_structs/src/ ./lemmy_api_structs/src/
+COPY server/lemmy_rate_limit/src/ ./lemmy_rate_limit/src/
 COPY server/migrations ./migrations/
+
+COPY .git/ ./.git/
 
 # Build for debug
 RUN cargo build
 
-RUN sudo rm -rf .git
-
-FROM ekidd/rust-musl-builder:1.42.0-openssl11 as docs
+FROM ekidd/rust-musl-builder:nightly-2020-05-07 as docs
 WORKDIR /app
 COPY docs ./docs
 RUN sudo chown -R rust:rust .

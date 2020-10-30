@@ -15,7 +15,7 @@ pub extern crate sha2;
 pub extern crate strum;
 
 use chrono::NaiveDateTime;
-use diesel::{dsl::*, result::Error, *};
+use diesel::{result::Error, *};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{env, env::VarError};
@@ -44,6 +44,9 @@ pub mod user_mention_view;
 pub mod user_tag;
 pub mod user_view;
 
+// hexbear
+pub mod user_token;
+
 pub trait Crud<T> {
   fn create(conn: &PgConnection, form: &T) -> Result<Self, Error>
   where
@@ -54,9 +57,12 @@ pub trait Crud<T> {
   fn update(conn: &PgConnection, id: i32, form: &T) -> Result<Self, Error>
   where
     Self: Sized;
-  fn delete(conn: &PgConnection, id: i32) -> Result<usize, Error>
+  fn delete(_conn: &PgConnection, _id: i32) -> Result<usize, Error>
   where
-    Self: Sized;
+    Self: Sized,
+  {
+    unimplemented!()
+  }
 }
 
 pub trait Followable<T> {
@@ -78,13 +84,10 @@ pub trait Joinable<T> {
 }
 
 pub trait Likeable<T> {
-  fn read(conn: &PgConnection, id: i32) -> Result<Vec<Self>, Error>
-  where
-    Self: Sized;
   fn like(conn: &PgConnection, form: &T) -> Result<Self, Error>
   where
     Self: Sized;
-  fn remove(conn: &PgConnection, form: &T) -> Result<usize, Error>
+  fn remove(conn: &PgConnection, user_id: i32, item_id: i32) -> Result<usize, Error>
   where
     Self: Sized;
 }
@@ -160,6 +163,7 @@ pub enum SortType {
 #[derive(EnumString, ToString, Debug, Serialize, Deserialize)]
 pub enum ListingType {
   All,
+  Local,
   Subscribed,
   Community,
 }

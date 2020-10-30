@@ -1,12 +1,12 @@
-use crate::rate_limit::RateLimit;
 use actix::clock::Duration;
 use actix_web::{body::BodyStream, http::StatusCode, *};
 use awc::Client;
+use lemmy_rate_limit::RateLimit;
 use lemmy_utils::settings::Settings;
 use serde::{Deserialize, Serialize};
 
 pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
-  let client = Client::build()
+  let client = Client::builder()
     .header("User-Agent", "pict-rs-frontend, v0.1.0")
     .timeout(Duration::from_secs(30))
     .finish();

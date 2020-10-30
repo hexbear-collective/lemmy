@@ -1,17 +1,12 @@
-extern crate lemmy_server;
 #[macro_use]
 extern crate diesel_migrations;
 #[macro_use]
 pub extern crate lazy_static;
 
-pub type DbPool = Pool<ConnectionManager<PgConnection>>;
-
-use crate::lemmy_server::actix_web::dev::Service;
 use actix::prelude::*;
 use actix_web::{
   body::Body,
-  client::Client,
-  dev::{ServiceRequest, ServiceResponse},
+  dev::{Service, ServiceRequest, ServiceResponse},
   http::{
     header::{CACHE_CONTROL, CONTENT_TYPE},
     HeaderValue,
@@ -23,15 +18,17 @@ use diesel::{
   PgConnection,
 };
 use lemmy_db::get_database_url_from_env;
+use lemmy_rate_limit::{rate_limiter::RateLimiter, RateLimit};
 use lemmy_server::{
+  apub::activity_queue::create_activity_queue,
   blocking,
-  // code_migrations::run_advanced_migrations,
-  rate_limit::{rate_limiter::RateLimiter, RateLimit},
   routes::*,
-  websocket::server::*,
-  LemmyError,
+  twofactor::CodeCacheHandler,
+  websocket::chat_server::ChatServer,
+  LemmyContext,
 };
-use lemmy_utils::{settings::Settings, CACHE_CONTROL_REGEX};
+use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_REGEX};
+use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -73,25 +70,38 @@ async fn main() -> Result<(), LemmyError> {
     rate_limiter: Arc::new(Mutex::new(RateLimiter::default())),
   };
 
-  // Set up websocket server
-  let server = ChatServer::startup(pool.clone(), rate_limiter.clone(), Client::default()).start();
-
   println!(
     "Starting http server at {}:{}",
     settings.bind, settings.port
   );
 
+  let activity_queue = create_activity_queue();
+  let cache_handler = Arc::new(CodeCacheHandler::new());
+  let chat_server = ChatServer::startup(
+    pool.clone(),
+    rate_limiter.clone(),
+    Client::default(),
+    activity_queue.clone(),
+    cache_handler.clone(),
+  )
+  .start();
+
   // Create Http server with websocket support
   HttpServer::new(move || {
+    let context = LemmyContext::create(
+      pool.clone(),
+      chat_server.to_owned(),
+      Client::default(),
+      activity_queue.to_owned(),
+      cache_handler.clone(),
+    );
     let settings = Settings::get();
     let rate_limiter = rate_limiter.clone();
     App::new()
       .wrap_fn(add_cache_headers)
       .wrap(middleware::DefaultHeaders::new().header("Access-Control-Allow-Origin", "*"))
       .wrap(middleware::Logger::default())
-      .data(pool.clone())
-      .data(server.clone())
-      .data(Client::default())
+      .data(context)
       // The routes
       .configure(|cfg| api::config(cfg, &rate_limiter))
       .configure(federation::config)

@@ -211,9 +211,11 @@ impl<'a> CommentQueryBuilder<'a> {
       query = query.filter(content.ilike(fuzzy_search(&search_term)));
     };
 
-    if let ListingType::Subscribed = self.listing_type {
-      query = query.filter(subscribed.eq(true));
-    }
+    query = match self.listing_type {
+      ListingType::Subscribed => query.filter(subscribed.eq(true)),
+      ListingType::Local => query.filter(community_local.eq(true)),
+      _ => query,
+    };
 
     if self.saved_only {
       query = query.filter(saved.eq(true));
@@ -485,6 +487,7 @@ mod tests {
       matrix_user_id: None,
       avatar: None,
       banner: None,
+      admin: false,
       banned: false,
       updated: None,
       show_nsfw: false,
@@ -494,12 +497,14 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_92873982".into(),
+      has_2fa: false,
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
       public_key: None,
       last_refreshed_at: None,
+      inbox_disabled: false,
     };
 
     let inserted_user = User_::create(&conn, &new_user).unwrap();
@@ -514,7 +519,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_7625376".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -536,13 +541,14 @@ mod tests {
       deleted: None,
       locked: None,
       stickied: None,
+      featured: None,
       updated: None,
       nsfw: false,
       embed_title: None,
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -559,7 +565,7 @@ mod tests {
       read: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -606,7 +612,7 @@ mod tests {
       my_vote: None,
       subscribed: None,
       saved: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_comment.ap_id.to_owned(),
       local: true,
       community_actor_id: inserted_community.actor_id.to_owned(),
       community_local: true,
@@ -646,7 +652,7 @@ mod tests {
       my_vote: Some(1),
       subscribed: Some(false),
       saved: Some(false),
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_comment.ap_id.to_owned(),
       local: true,
       community_actor_id: inserted_community.actor_id.to_owned(),
       community_local: true,
@@ -669,7 +675,7 @@ mod tests {
     read_comment_views_with_user[0].hot_rank = 0;
     read_comment_views_with_user[0].hot_rank_active = 0;
 
-    let like_removed = CommentLike::remove(&conn, &comment_like_form).unwrap();
+    let like_removed = CommentLike::remove(&conn, inserted_user.id, inserted_comment.id).unwrap();
     let num_deleted = Comment::delete(&conn, inserted_comment.id).unwrap();
     Post::delete(&conn, inserted_post.id).unwrap();
     Community::delete(&conn, inserted_community.id).unwrap();
