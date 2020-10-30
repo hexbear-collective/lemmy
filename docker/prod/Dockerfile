@@ -23,6 +23,8 @@ RUN find target/$CARGO_BUILD_TARGET/$RUSTRELEASEDIR -type f -name "$(echo "lemmy
 COPY server/src ./src/
 COPY server/migrations ./migrations/
 
+COPY .git/ ./.git/
+
 # build for release
 # workaround for https://github.com/rust-lang/rust/issues/62896
 RUN cargo build --frozen --release

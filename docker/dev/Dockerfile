@@ -46,6 +46,8 @@ COPY server/lemmy_api_structs/src/ ./lemmy_api_structs/src/
 COPY server/lemmy_rate_limit/src/ ./lemmy_rate_limit/src/
 COPY server/migrations ./migrations/
 
+COPY .git/ ./.git/
+
 # Build for debug
 RUN cargo build
 
