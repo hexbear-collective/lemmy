@@ -30,6 +30,7 @@
     image: busybox
     commands:
       - mkdir -p /cache/${DRONE_REPO}/docker
+      - echo "test"
     volumes:
       - name: cache
         path: /cache
