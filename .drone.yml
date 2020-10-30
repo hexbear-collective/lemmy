@@ -7,7 +7,6 @@
     branch:
       - dev
       - prod
-      - main
     event:
       exclude:
       - pull_request
@@ -31,7 +30,6 @@
     image: busybox
     commands:
       - mkdir -p /cache/${DRONE_REPO}/docker
-      - echo "test"
     volumes:
       - name: cache
         path: /cache
