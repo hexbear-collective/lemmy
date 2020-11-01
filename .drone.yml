@@ -55,6 +55,16 @@
         from_secret: discord_webhook_id
       webhook_token:
         from_secret: discord_webhook_token
+      message: >
+        {{build.branch}} @ {{build.tag}} - {{build.ref}}
+        {{build.link}}
+        {{#success build.status}}
+          build {{build.number}} succeeded.
+        {{else}}
+          build {{build.number}} failed.
+        {{/success}}
+        Started {{since build.started}}
+        Ended {{datetime build.finished}}
     when:
       status:
       - success
@@ -139,6 +149,16 @@
         from_secret: discord_webhook_id
       webhook_token:
         from_secret: discord_webhook_token
+      message: >
+        {{build.branch}} @ {{build.tag}} - {{build.ref}}
+        {{build.link}}
+        {{#success build.status}}
+          build {{build.number}} succeeded.
+        {{else}}
+          build {{build.number}} failed.
+        {{/success}}
+        Started {{since build.started}}
+        Ended {{datetime build.finished}}
     when:
       status:
       - success
