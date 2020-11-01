@@ -1739,10 +1739,6 @@ impl Perform for RemoveUserContent {
     })
     .await??;
 
-    //
-    // if let Some(given_reason) = data.reason.to_owned() {
-    //   [reason, &given_reason].join(": ");
-    // }
     let default_reason = "USER CONTENT MASS REMOVED";
     let removal_reason = match data.reason.to_owned() {
       Some(given_reason) => [default_reason, &given_reason].join(": "),
