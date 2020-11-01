@@ -33,7 +33,7 @@
     volumes:
       - name: cache
         path: /cache
-      
+
   - name: docker
     image: plugins/docker
     settings:
@@ -48,6 +48,18 @@
       - name: docker
         path: /var/lib/docker
 
+  - name: notify
+    image: appleboy/drone-discord
+    settings:
+      webhook_id:
+        from_secret: discord_webhook_id
+      webhook_token:
+        from_secret: discord_webhook_token
+    when:
+      status:
+      - success
+      - failure
+
   volumes:
     - name: cache
       host:
@@ -55,6 +67,7 @@
     - name: docker
       host:
         path: /var/cache/${DRONE_REPO}/docker
+
 
 
 ---
@@ -79,7 +92,7 @@
 
   clone:
     skip_verify: true
-  
+
   steps:
   - name: prepare
     image: busybox
@@ -88,14 +101,46 @@
     volumes:
       - name: cache
         path: /cache
-      
+
   - name: docker
     image: plugins/docker
     settings:
       create_repository: true
       use_cache: true
       dockerfile: docker/prod/Dockerfile
+      dry_run: true
+    when:
+      event: [ push, pull_request ]
+    volumes:
+      - name: docker
+        path: /var/lib/docker
+
+
+  - name: publish
+    image: plugins/docker
+    settings:
+      create_repository: true
+      use_cache: true
+      dockerfile: docker/prod/Dockerfile
       <<: *docker_settings
+      tags:
+        - ${DRONE_BRANCH}-latest
+        - ${DRONE_COMMIT_SHA:0:8}
+    when:
+      event: [ push, pull_request ]
+
+  - name: notify
+    image: appleboy/drone-discord
+    settings:
+      webhook_id:
+        from_secret: discord_webhook_id
+      webhook_token:
+        from_secret: discord_webhook_token
+    when:
+      status:
+      - success
+      - failure
+
     volumes:
       - name: docker
         path: /var/lib/docker
