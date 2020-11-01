@@ -109,6 +109,9 @@
       use_cache: true
       dockerfile: docker/prod/Dockerfile
       dry_run: true
+      <<: *docker_settings
+      tags:
+        - ${DRONE_COMMIT_SHA:0:8}
     when:
       event: [ push, pull_request ]
     volumes:
