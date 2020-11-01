@@ -60,7 +60,7 @@
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
         ``` {{commit.message}} ```\n
         🌐 {{ build.link }}\n\n
-        ✅ duration: {{since build.started}\n\n
+        ✅ duration: {{since build.started}}\n\n
         ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
         ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{else}}
@@ -162,7 +162,7 @@
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
         ``` {{commit.message}} ```\n
         🌐 {{ build.link }}\n\n
-        ✅ duration: {{since build.started}\n\n
+        ✅ duration: {{since build.started}}\n\n
         ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
         ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{else}}
