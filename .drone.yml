@@ -10,8 +10,8 @@
     event:
       exclude:
       - pull_request
-  
-  globals: 
+
+  globals:
     - &docker_settings
       username:
         from_secret: CHAPO_REGISTRY_USER
@@ -24,7 +24,7 @@
 
   clone:
     skip_verify: true
-  
+
   steps:
   - name: prepare
     image: busybox
@@ -37,10 +37,9 @@
   - name: docker
     image: plugins/docker
     settings:
-      create_repository: true
+      <<: *docker_settings
       use_cache: true
       dockerfile: docker/prod/Dockerfile
-      <<: *docker_settings
       tags:
         - ${DRONE_BRANCH}-latest
         - ${DRONE_COMMIT_SHA:0:8}
@@ -57,20 +56,20 @@
         from_secret: discord_webhook_token
       message: >
         {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
-        🌐 {{ build.link }}
-        ✅ duration: {{duration build.started build.finished}}
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.\n\n
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
+        ``` {{commit.message}} ```\n
+        🌐 {{ build.link }}\n\n
+        ✅ duration: {{since build.started}\n\n
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
         ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
-        🌐 {{ build.link }}
-        ✅ duration: {{duration build.started build.finished}}
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.\n\n
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
+        ``` {{commit.message}} ```\n
+        🌐 {{ build.link }}\n\n
+        ✅ duration: {{since build.started}}\n\n
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
         ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{/success}}
     when:
@@ -97,7 +96,7 @@
     branch:
       - main
 
-  globals: 
+  globals:
     - &docker_settings
       username:
         from_secret: CHAPO_REGISTRY_USER
@@ -123,11 +122,10 @@
   - name: build
     image: plugins/docker
     settings:
-      create_repository: true
+      <<: *docker_settings
       use_cache: true
       dockerfile: docker/prod/Dockerfile
       dry_run: true
-      <<: *docker_settings
       tags:
         - ${DRONE_BRANCH}-latest
         - ${DRONE_COMMIT_SHA:0:8}
@@ -141,15 +139,15 @@
   - name: publish
     image: plugins/docker
     settings:
-      create_repository: true
+      <<: *docker_settings
       use_cache: true
       dockerfile: docker/prod/Dockerfile
-      <<: *docker_settings
       tags:
         - ${DRONE_BRANCH}-latest
         - ${DRONE_COMMIT_SHA:0:8}
     when:
-      event: [ push, pull_request ]
+      event:
+        - tag
 
   - name: notify
     image: appleboy/drone-discord
@@ -160,20 +158,20 @@
         from_secret: discord_webhook_token
       message: >
         {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
-        🌐 {{ build.link }}
-        ✅ duration: {{duration build.started build.finished}}
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.\n\n
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
+        ``` {{commit.message}} ```\n
+        🌐 {{ build.link }}\n\n
+        ✅ duration: {{since build.started}\n\n
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
         ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
-        🌐 {{ build.link }}
-        ✅ duration: {{duration build.started build.finished}}
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.\n\n
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
+        ``` {{commit.message}} ```\n
+        🌐 {{ build.link }}\n\n
+        ✅ duration: {{since build.started}}\n\n
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
         ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{/success}}
     when:
