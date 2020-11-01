@@ -66,6 +66,17 @@
     branch:
       - main
 
+  globals: 
+    - &docker_settings
+      username:
+        from_secret: CHAPO_REGISTRY_USER
+      password:
+        from_secret: CHAPO_REGISTRY_TOKEN
+      registry:
+        from_secret: CHAPO_REGISTRY_URL
+      repo:
+        from_secret: CHAPO_REGISTRY_URL_REPO
+
   clone:
     skip_verify: true
   
@@ -84,6 +95,7 @@
       create_repository: true
       use_cache: true
       dockerfile: docker/prod/Dockerfile
+      <<: *docker_settings
     volumes:
       - name: docker
         path: /var/lib/docker
