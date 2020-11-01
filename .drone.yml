@@ -56,15 +56,23 @@
       webhook_token:
         from_secret: discord_webhook_token
       message: >
-        {{build.branch}} @ {{build.tag}} - {{build.ref}}
-        {{build.link}}
         {{#success build.status}}
-          build {{build.number}} succeeded.
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        ✅ duration: {{duration build.started build.finished}}
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{else}}
-          build {{build.number}} failed.
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        ✅ duration: {{duration build.started build.finished}}
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{/success}}
-        Started {{since build.started}}
-        Ended {{datetime build.finished}}
     when:
       status:
       - success
@@ -112,7 +120,7 @@
       - name: cache
         path: /cache
 
-  - name: docker
+  - name: build
     image: plugins/docker
     settings:
       create_repository: true
@@ -121,6 +129,7 @@
       dry_run: true
       <<: *docker_settings
       tags:
+        - ${DRONE_BRANCH}-latest
         - ${DRONE_COMMIT_SHA:0:8}
     when:
       event: [ push, pull_request ]
@@ -150,15 +159,23 @@
       webhook_token:
         from_secret: discord_webhook_token
       message: >
-        {{build.branch}} @ {{build.tag}} - {{build.ref}}
-        {{build.link}}
         {{#success build.status}}
-          build {{build.number}} succeeded.
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        ✅ duration: {{duration build.started build.finished}}
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{else}}
-          build {{build.number}} failed.
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        ✅ duration: {{duration build.started build.finished}}
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
         {{/success}}
-        Started {{since build.started}}
-        Ended {{datetime build.finished}}
     when:
       status:
       - success
