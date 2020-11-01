@@ -1,7 +1,7 @@
 ---
   kind: pipeline
   type: docker
-  name: default
+  name: deploy
 
   trigger:
     branch:
@@ -56,3 +56,42 @@
       host:
         path: /var/cache/${DRONE_REPO}/docker
 
+
+---
+  kind: pipeline
+  type: docker
+  name: test
+
+  trigger:
+    branch:
+      - main
+
+  clone:
+    skip_verify: true
+  
+  steps:
+  - name: prepare
+    image: busybox
+    commands:
+      - mkdir -p /cache/${DRONE_REPO}/docker
+    volumes:
+      - name: cache
+        path: /cache
+      
+  - name: docker
+    image: plugins/docker
+    settings:
+      create_repository: true
+      use_cache: true
+      dockerfile: docker/prod/Dockerfile
+    volumes:
+      - name: docker
+        path: /var/lib/docker
+
+  volumes:
+    - name: cache
+      host:
+        path: /var/cache
+    - name: docker
+      host:
+        path: /var/cache/${DRONE_REPO}/docker
