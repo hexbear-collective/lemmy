@@ -25,8 +25,6 @@
   clone:
     skip_verify: true
 
-  
-
   steps:
   - name: fetch
     image: alpine/git
@@ -61,24 +59,25 @@
         from_secret: discord_webhook_id
       webhook_token:
         from_secret: discord_webhook_token
-      message: >
+      color: "0xffd930"
+      message: |
         {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.\n\n
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
-        ``` {{commit.message}} ```\n
-        🌐 {{ build.link }}\n\n
-        ✅ duration: {{since build.started}}\n\n
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
-        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
+        
         {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` failed.\n\n
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
-        ``` {{commit.message}} ```\n
-        🌐 {{ build.link }}\n\n
-        ✅ duration: {{since build.started}}\n\n
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
-        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
+        
         {{/success}}
+        
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        
+        ✅ duration: {{since build.started}}
+        
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+
+        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
     when:
       status:
       - success
@@ -122,7 +121,7 @@
     image: alpine/git
     commands:
     - git fetch --tags
-    
+
   - name: prepare
     image: busybox
     commands:
@@ -168,24 +167,25 @@
         from_secret: discord_webhook_id
       webhook_token:
         from_secret: discord_webhook_token
-      message: >
+      color: "0xffd930"
+      message: |
         {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.\n\n
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
-        ``` {{commit.message}} ```\n
-        🌐 {{ build.link }}\n\n
-        ✅ duration: {{since build.started}}\n\n
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
-        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
+        
         {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` failed.\n\n
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:\n
-        ``` {{commit.message}} ```\n
-        🌐 {{ build.link }}\n\n
-        ✅ duration: {{since build.started}}\n\n
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}\n\n
-        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
+        
         {{/success}}
+        
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        
+        ✅ duration: {{since build.started}}
+        
+        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
+        
+        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
     when:
       status:
       - success
