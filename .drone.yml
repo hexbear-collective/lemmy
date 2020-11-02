@@ -73,11 +73,6 @@
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
         
-        ✅ duration: {{since build.started}}
-        
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
-
-        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
     when:
       status:
       - success
@@ -181,12 +176,6 @@
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
         
-        ✅ duration: {{since build.started}}
-        
-        ✅ started: {{datetime build.started "2006/01/02 15:04" "UTC"}}
-        
-        ✅ finished: {{datetime build.finished "2006/01/02 15:04" "UTC"}}
-    when:
       status:
       - success
       - failure
