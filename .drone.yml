@@ -1,7 +1,7 @@
 ---
   kind: pipeline
   type: docker
-  name: default
+  name: deploy
 
   trigger:
     branch:
@@ -10,8 +10,8 @@
     event:
       exclude:
       - pull_request
-  
-  globals: 
+
+  globals:
     - &docker_settings
       username:
         from_secret: CHAPO_REGISTRY_USER
@@ -24,8 +24,13 @@
 
   clone:
     skip_verify: true
-  
+
   steps:
+  - name: fetch
+    image: alpine/git
+    commands:
+    - git fetch --tags
+
   - name: prepare
     image: busybox
     commands:
@@ -33,17 +38,148 @@
     volumes:
       - name: cache
         path: /cache
-      
+
   - name: docker
     image: plugins/docker
     settings:
-      create_repository: true
+      <<: *docker_settings
       use_cache: true
       dockerfile: docker/prod/Dockerfile
-      <<: *docker_settings
       tags:
         - ${DRONE_BRANCH}-latest
         - ${DRONE_COMMIT_SHA:0:8}
+    volumes:
+      - name: docker
+        path: /var/lib/docker
+
+  - name: notify
+    image: appleboy/drone-discord
+    settings:
+      webhook_id:
+        from_secret: discord_webhook_id
+      webhook_token:
+        from_secret: discord_webhook_token
+      color: "0xffd930"
+      message: |
+        {{#success build.status}}
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
+        
+        {{else}}
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
+        
+        {{/success}}
+        
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        
+    when:
+      status:
+      - success
+      - failure
+
+  volumes:
+    - name: cache
+      host:
+        path: /var/cache
+    - name: docker
+      host:
+        path: /var/cache/${DRONE_REPO}/docker
+
+
+
+---
+  kind: pipeline
+  type: docker
+  name: test
+
+  trigger:
+    branch:
+      - main
+
+  globals:
+    - &docker_settings
+      username:
+        from_secret: CHAPO_REGISTRY_USER
+      password:
+        from_secret: CHAPO_REGISTRY_TOKEN
+      registry:
+        from_secret: CHAPO_REGISTRY_URL
+      repo:
+        from_secret: CHAPO_REGISTRY_URL_REPO
+
+  clone:
+    skip_verify: true
+
+  steps:
+  - name: fetch
+    image: alpine/git
+    commands:
+    - git fetch --tags
+
+  - name: prepare
+    image: busybox
+    commands:
+      - mkdir -p /cache/${DRONE_REPO}/docker
+    volumes:
+      - name: cache
+        path: /cache
+
+  - name: build
+    image: plugins/docker
+    settings:
+      <<: *docker_settings
+      use_cache: true
+      dockerfile: docker/prod/Dockerfile
+      dry_run: true
+      tags:
+        - ${DRONE_BRANCH}-latest
+        - ${DRONE_COMMIT_SHA:0:8}
+    when:
+      event: [ push, pull_request ]
+    volumes:
+      - name: docker
+        path: /var/lib/docker
+
+
+  - name: publish
+    image: plugins/docker
+    settings:
+      <<: *docker_settings
+      use_cache: true
+      dockerfile: docker/prod/Dockerfile
+      tags:
+        - ${DRONE_BRANCH}-latest
+        - ${DRONE_COMMIT_SHA:0:8}
+    when:
+      event:
+        - tag
+
+  - name: notify
+    image: appleboy/drone-discord
+    settings:
+      webhook_id:
+        from_secret: discord_webhook_id
+      webhook_token:
+        from_secret: discord_webhook_token
+      color: "0xffd930"
+      message: |
+        {{#success build.status}}
+        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.
+        
+        {{else}}
+        ❌  Build #{{build.number}} of `{{repo.name}}` failed.
+        
+        {{/success}}
+        
+        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
+        ``` {{commit.message}} ```
+        🌐 {{ build.link }}
+        
+      status:
+      - success
+      - failure
+
     volumes:
       - name: docker
         path: /var/lib/docker
@@ -55,4 +191,3 @@
     - name: docker
       host:
         path: /var/cache/${DRONE_REPO}/docker
-
