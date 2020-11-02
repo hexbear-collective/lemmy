@@ -25,7 +25,14 @@
   clone:
     skip_verify: true
 
+  
+
   steps:
+  - name: fetch
+    image: alpine/git
+    commands:
+    - git fetch --tags
+
   - name: prepare
     image: busybox
     commands:
@@ -111,6 +118,11 @@
     skip_verify: true
 
   steps:
+  - name: fetch
+    image: alpine/git
+    commands:
+    - git fetch --tags
+    
   - name: prepare
     image: busybox
     commands:
