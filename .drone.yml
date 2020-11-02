@@ -176,6 +176,7 @@
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
         
+    when:
       status:
       - success
       - failure
