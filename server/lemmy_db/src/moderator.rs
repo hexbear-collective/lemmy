@@ -56,6 +56,15 @@ impl Crud<ModRemovePostForm> for ModRemovePost {
   }
 }
 
+impl ModRemovePost {
+  pub fn bulk_create(conn: &PgConnection, forms: &[ModRemovePostForm]) -> Result<Vec<Self>, Error> {
+    use crate::schema::mod_remove_post::dsl::*;
+    insert_into(mod_remove_post)
+      .values(forms)
+      .get_results::<Self>(conn)
+  }
+}
+
 #[derive(Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
 #[table_name = "mod_lock_post"]
 pub struct ModLockPost {
@@ -172,6 +181,15 @@ impl Crud<ModRemoveCommentForm> for ModRemoveComment {
     diesel::update(mod_remove_comment.find(from_id))
       .set(form)
       .get_result::<Self>(conn)
+  }
+}
+
+impl ModRemoveComment {
+  pub fn bulk_create(conn: &PgConnection, forms: &[ModRemoveCommentForm]) -> Result<Vec<Self>, Error> {
+    use crate::schema::mod_remove_comment::dsl::*;
+    insert_into(mod_remove_comment)
+      .values(forms)
+      .get_results::<Self>(conn)
   }
 }
 
