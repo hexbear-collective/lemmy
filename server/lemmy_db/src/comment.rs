@@ -192,6 +192,20 @@ impl Comment {
       ))
       .get_result::<Self>(conn)
   }
+
+  pub fn remove_user_comments(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
+    use crate::schema::comment::dsl::*;
+    diesel::update(comment
+      .filter(creator_id.eq(for_creator_id))
+      .filter(removed.eq(false))
+    )
+      .set((
+        removed.eq(true),
+        updated.eq(naive_now())
+      ))
+      .returning(id)
+      .get_results(conn)
+  }
 }
 
 #[derive(Identifiable, Queryable, Associations, PartialEq, Debug, Clone)]

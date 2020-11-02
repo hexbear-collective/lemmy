@@ -9,25 +9,62 @@ use log::{error, info};
 
 use lemmy_api_structs::{user::*, APIError};
 use lemmy_db::{
-  comment::*, comment_view::*, community::*, community_settings::*, community_view::*,
-  diesel_option_overwrite, moderator::*, naive_now, password_reset_request::*, post::*,
-  post_view::*, private_message::*, private_message_view::*, site::*, site_view::*, user::*,
-  user_mention::*, user_mention_view::*, user_tag::*, user_view::*, Crud, Followable, Joinable,
-  ListingType, SortType,
+  comment::*,
+  comment_view::*,
+  community::*,
+  community_settings::*,
+  community_view::*,
+  diesel_option_overwrite,
+  moderator::*,
+  naive_now,
+  password_reset_request::*,
+  post::*,
+  post_view::*,
+  private_message::*,
+  private_message_view::*,
+  site::*,
+  site_view::*,
+  user::*,
+  user_mention::*,
+  user_mention_view::*,
+  user_tag::*,
+  user_view::*,
+  Crud,
+  Followable,
+  Joinable,
+  ListingType,
+  SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair, generate_random_string, is_valid_preferred_username, is_valid_username,
-  location_info, make_apub_endpoint, naive_from_unix, remove_slurs, send_email, settings::Settings,
-  ConnectionId, EndpointType, LemmyError,
+  generate_actor_keypair,
+  generate_random_string,
+  is_valid_preferred_username,
+  is_valid_username,
+  location_info,
+  make_apub_endpoint,
+  naive_from_unix,
+  remove_slurs,
+  send_email,
+  settings::Settings,
+  ConnectionId,
+  EndpointType,
+  LemmyError,
 };
 
 use crate::{
   api::{
-    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
-    is_admin_or_sitemod, validate_token, Perform,
+    check_slurs,
+    claims::Claims,
+    get_user_from_jwt,
+    get_user_from_jwt_opt,
+    is_admin,
+    is_admin_or_sitemod,
+    validate_token,
+    Perform,
   },
   apub::ApubObjectType,
-  blocking, captcha_espeak_wav_base64,
+  blocking,
+  captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
@@ -1658,143 +1695,87 @@ impl Perform for RemoveUserContent {
 
     // Permissions checks
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
-    let admin = is_admin_or_sitemod(context.pool(), user.id).await.is_ok();
 
-    // Gather a list of communities the user moderates
-    let uid = user.id;
-    let mod_communities = blocking(context.pool(), move |conn| {
-      CommunityModeratorView::for_user(conn, uid)
+    // make sure they're an admin/sitemod
+    is_admin_or_sitemod(context.pool(), user.id).await?;
+
+    let target_user_id = data.user_id;
+    // Make sure target user is not an admin or sitemod
+    let target = blocking(context.pool(), move |conn| {
+      User_::read(&conn, target_user_id)
     })
-    .await??
-    .iter()
-    .map(|c| c.id)
-    .collect::<Vec<i32>>();
-
-    let remove_communities = match data.community_id {
-      Some(community_id) => {
-        if mod_communities.contains(&community_id) {
-          Ok(vec![community_id])
-        } else {
-          Err(LemmyError::from(APIError::err("couldnt_update_user")))
-        }
-      }
-      None => {
-        if admin {
-          Ok(Vec::new())
-        } else if !mod_communities.is_empty() {
-          Ok(mod_communities)
-        } else {
-          Err(LemmyError::from(APIError::err("couldnt_update_user")))
-        }
-      }
-    }?;
-
-    let mut post_id_list: Vec<i32> = Vec::new();
-    let mut comment_id_list: Vec<i32> = Vec::new();
-    let remove_user_id = data.user_id;
-    let reason = "USER CONTENT MASS REMOVED";
-    if let Some(given_reason) = data.reason.to_owned() {
-      [reason, &given_reason].join(": ");
-    }
-    if remove_communities.is_empty() {
-      let time = data.time;
-      blocking(context.pool(), move |conn| {
-        let posts_query = PostQueryBuilder::create(conn)
-          .for_creator_id(remove_user_id)
-          .max_age(time);
-        posts_query.list()
-      })
-      .await??
-      .iter()
-      .for_each(|pv| post_id_list.push(pv.id));
-
-      let time = data.time;
-      blocking(context.pool(), move |conn| {
-        let comments_query = CommentQueryBuilder::create(conn)
-          .for_creator_id(remove_user_id)
-          .max_age(time);
-        comments_query.list()
-      })
-      .await??
-      .iter()
-      .for_each(|cv| comment_id_list.push(cv.id));
-    } else {
-      for community_id in remove_communities {
-        blocking(context.pool(), move |conn| {
-          let posts_query = PostQueryBuilder::create(conn)
-            .for_creator_id(remove_user_id)
-            .for_community_id(community_id);
-          /*
-          let time = data.time;
-          if time != 0 {
-              posts_query.query.filter(published.gt(now - time.hours()))
-          }
-          */
-          posts_query.list()
-        })
-        .await??
-        .iter()
-        .for_each(|pv| post_id_list.push(pv.id));
-
-        blocking(context.pool(), move |conn| {
-          let comments_query = CommentQueryBuilder::create(conn)
-            .for_creator_id(remove_user_id)
-            .for_community_id(community_id);
-
-          comments_query.list()
-        })
-        .await??
-        .iter()
-        .for_each(|cv| comment_id_list.push(cv.id));
-      }
+    .await??;
+    if target.admin || target.sitemod {
+      return Err(APIError::err("couldnt_update_user").into());
     }
 
-    for post_id in post_id_list {
+    // ban the user first, so when we query the db we won't miss anything
+    let banned_user_id = data.user_id;
+    let ban_user = move |conn: &'_ _| User_::ban_user(conn, banned_user_id, true);
+    if blocking(context.pool(), ban_user).await?.is_err() {
+      return Err(APIError::err("couldnt_update_user").into());
+    }
+    let ban_reason = data.reason.clone();
+    let form = ModBanForm {
+      mod_user_id: user.id,
+      other_user_id: data.user_id,
+      reason: ban_reason,
+      banned: Some(true),
+      expires: None,
+    };
+
+    blocking(context.pool(), move |conn| ModBan::create(conn, &form)).await??;
+
+    // This removes posts/comments without overwriting their content
+    // also returns us the list of ids that were updated
+    let banned_user_id = data.user_id;
+    let post_ids = blocking(context.pool(), move |conn| {
+      Post::remove_user_posts(conn, banned_user_id)
+    })
+    .await??;
+
+    let comment_ids = blocking(context.pool(), move |conn| {
+      Comment::remove_user_comments(conn, banned_user_id)
+    })
+    .await??;
+
+    let default_reason = "USER CONTENT MASS REMOVED";
+    let removal_reason = match data.reason.to_owned() {
+      Some(given_reason) => [default_reason, &given_reason].join(": "),
+      None => default_reason.to_string(),
+    };
+
+    let mut remove_post_forms: Vec<ModRemovePostForm> = Vec::new();
+    for post_id in post_ids {
       let form = ModRemovePostForm {
         mod_user_id: user.id,
         post_id,
-        reason: Some(reason.to_string()),
+        reason: Some(removal_reason.clone()),
         removed: Some(true),
       };
-
-      blocking(context.pool(), move |conn| {
-        ModRemovePost::create(conn, &form)
-      })
-      .await??;
-      // Commented out for transparency. Uncomment this to delete the content of mass removed posts
-      // blocking(context.pool(), move |conn| Post::permadelete(conn, post_id)).await??;
-
-      // This removes posts without overwriting their content
-      blocking(context.pool(), move |conn| {
-        Post::update_removed(conn, post_id, true)
-      })
-      .await??;
+      remove_post_forms.push(form);
     }
 
-    for comment_id in comment_id_list {
+    blocking(context.pool(), move |conn| {
+      ModRemovePost::bulk_create(conn, &remove_post_forms)
+    })
+    .await??;
+
+    let mut remove_comment_forms: Vec<ModRemoveCommentForm> = Vec::new();
+    for comment_id in comment_ids {
       let form = ModRemoveCommentForm {
         mod_user_id: user.id,
         comment_id,
-        reason: Some(reason.to_string()),
+        reason: Some(removal_reason.clone()),
         removed: Some(true),
       };
-
-      blocking(context.pool(), move |conn| {
-        ModRemoveComment::create(conn, &form)
-      })
-      .await??;
-      // Commented out for transparency. Uncomment this to delete the content of mass removed comments
-      /*blocking(context.pool(), move |conn| {
-        Comment::permadelete(conn, comment_id)
-      })
-      .await??;*/
-
-      // This removes comments without overwriting their content
-      blocking(context.pool(), move |conn| {
-        Comment::update_removed(conn, comment_id, true)
-      })
-      .await??;
+      remove_comment_forms.push(form);
     }
+
+    blocking(context.pool(), move |conn| {
+      ModRemoveComment::bulk_create(conn, &remove_comment_forms)
+    })
+    .await??;
 
     let user_id = data.user_id;
     let user_view = blocking(context.pool(), move |conn| UserView::read(conn, user_id)).await??;
