@@ -47,9 +47,9 @@
         - ${DRONE_COMMIT_SHA:0:8}
         - ${DRONE_BRANCH}-${DRONE_COMMIT}
       cache_from:
-        - ${CHAPO_REGISTRY_URL_REPO}:main
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}-latest
+        - registry.chapo.chat/hexbear:main
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
     volumes:
       - name: docker
         path: /var/lib/docker
@@ -135,9 +135,9 @@
         - ${DRONE_COMMIT_SHA:0:8}
         - ${DRONE_BRANCH}-${DRONE_COMMIT}
       cache_from:
-        - ${CHAPO_REGISTRY_URL_REPO}:main
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}-latest
+        - registry.chapo.chat/hexbear:main
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
     when:
       event: 
         - push
@@ -158,9 +158,9 @@
         - ${DRONE_COMMIT_SHA:0:8}
         - ${DRONE_BRANCH}-${DRONE_COMMIT}
       cache_from:
-        - ${CHAPO_REGISTRY_URL_REPO}:main
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}-latest
+        - registry.chapo.chat/hexbear:main
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
     when:
       event:
         - tag
@@ -246,9 +246,9 @@
       tags:
         - ${DRONE_DEPLOY_TO}-latest
       cache_from:
-        - ${CHAPO_REGISTRY_URL_REPO}:main
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
-        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}-latest
+        - registry.chapo.chat/hexbear:main
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
     volumes:
       - name: docker
         path: /var/lib/docker
