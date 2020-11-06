@@ -98,9 +98,9 @@
   globals:
     - &docker_settings
       username:
-        from_secret: CHAPO_REGISTRY_USER
+        from_secret: CHAPO_REGISTRY_READONLY_USER
       password:
-        from_secret: CHAPO_REGISTRY_TOKEN
+        from_secret: CHAPO_REGISTRY_READONLY_TOKEN
       registry:
         from_secret: CHAPO_REGISTRY_URL
       repo:
