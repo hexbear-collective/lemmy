@@ -47,7 +47,12 @@
       dockerfile: docker/prod/Dockerfile
       tags:
         - ${DRONE_BRANCH}-latest
+        - ${DRONE_BRANCH}
         - ${DRONE_COMMIT_SHA:0:8}
+        - ${DRONE_BRANCH}-${DRONE_COMMIT}
+      cache_from:
+        - ${CHAPO_REGISTRY_URL_REPO}:main
+        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
     volumes:
       - name: docker
         path: /var/lib/docker
@@ -72,7 +77,6 @@
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
-        
     when:
       status:
       - success
@@ -134,9 +138,16 @@
       dry_run: true
       tags:
         - ${DRONE_BRANCH}-latest
+        - ${DRONE_BRANCH}
         - ${DRONE_COMMIT_SHA:0:8}
+        - ${DRONE_BRANCH}-${DRONE_COMMIT}
+      cache_from:
+        - ${CHAPO_REGISTRY_URL_REPO}:main
+        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
     when:
-      event: [ push, pull_request ]
+      event: 
+        - push
+        - pull_request
     volumes:
       - name: docker
         path: /var/lib/docker
@@ -150,7 +161,12 @@
       dockerfile: docker/prod/Dockerfile
       tags:
         - ${DRONE_BRANCH}-latest
+        - ${DRONE_BRANCH}
         - ${DRONE_COMMIT_SHA:0:8}
+        - ${DRONE_BRANCH}-${DRONE_COMMIT}
+      cache_from:
+        - ${CHAPO_REGISTRY_URL_REPO}:main
+        - ${CHAPO_REGISTRY_URL_REPO}:${DRONE_BRANCH}
     when:
       event:
         - tag
@@ -175,7 +191,6 @@
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
-        
     when:
       status:
       - success
