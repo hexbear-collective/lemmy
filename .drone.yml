@@ -7,6 +7,9 @@
     branch:
       - dev
       - prod
+    event:
+      - push
+      - tag
 
   globals:
     - &docker_settings
@@ -94,6 +97,11 @@
   trigger:
     branch:
       - main
+    event:
+      event:
+      - push
+      - pull_request
+      - tag
 
   globals:
     - &docker_settings
