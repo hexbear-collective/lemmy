@@ -125,19 +125,6 @@
         - tag
         - pull_request
 
-  - name: join_back_front
-    image: busybox
-    commands:
-      - echo "done"
-    depends_on: [ build_backend, build_frontend ]
-    when:
-      branch:
-        - main
-      event:
-        - push
-        - tag
-        - pull_request
-
   - name: notify
     image: appleboy/drone-discord
     settings:
@@ -155,7 +142,7 @@
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
-    depends_on: [ join_back_front, docker_build ]
+    depends_on: [ build_backend, build_frontend, docker_build ]
     when:
       status:
       - success
