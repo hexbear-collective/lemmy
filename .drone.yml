@@ -1,104 +1,14 @@
 ---
   kind: pipeline
   type: docker
-  name: pre-deploy
+  name: build
 
   trigger:
     branch:
       - dev
       - prod
-    event:
-      - push
-      - tag
-
-  globals:
-    - &docker_settings
-      username:
-        from_secret: CHAPO_REGISTRY_USER
-      password:
-        from_secret: CHAPO_REGISTRY_TOKEN
-      registry:
-        from_secret: CHAPO_REGISTRY_URL
-      repo:
-        from_secret: CHAPO_REGISTRY_URL_REPO
-
-  clone:
-    skip_verify: true
-
-  steps:
-  - name: fetch
-    image: alpine/git
-    commands:
-    - git fetch --tags
-
-  - name: prepare
-    image: busybox
-    commands:
-      - mkdir -p /cache/${DRONE_REPO}/docker
-    volumes:
-      - name: cache
-        path: /cache
-
-  - name: build
-    image: plugins/docker
-    settings:
-      <<: *docker_settings
-      use_cache: true
-      dockerfile: docker/prod/Dockerfile
-      tags:
-        - ${DRONE_BRANCH}
-        - ${DRONE_COMMIT_SHA:0:8}
-        - ${DRONE_BRANCH}-${DRONE_COMMIT}
-      cache_from:
-        - registry.chapo.chat/hexbear:main
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
-    volumes:
-      - name: docker
-        path: /var/lib/docker
-
-  - name: notify
-    image: appleboy/drone-discord
-    settings:
-      webhook_id:
-        from_secret: discord_webhook_id
-      webhook_token:
-        from_secret: discord_webhook_token
-      color: "0xffd930"
-      message: |
-        {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.  
-        {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` failed.  
-        {{/success}}
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
-        🌐 {{ build.link }}
-    when:
-      status:
-      - success
-      - failure
-
-  volumes:
-    - name: cache
-      host:
-        path: /var/cache
-    - name: docker
-      host:
-        path: /var/cache/${DRONE_REPO}/docker
-
-
-
----
-  kind: pipeline
-  type: docker
-  name: test-build
-
-  trigger:
-    branch:
       - main
     event:
-      event:
       - push
       - pull_request
       - tag
@@ -106,9 +16,9 @@
   globals:
     - &docker_settings
       username:
-        from_secret: CHAPO_REGISTRY_READONLY_USER
+        from_secret: CHAPO_REGISTRY_USER
       password:
-        from_secret: CHAPO_REGISTRY_READONLY_TOKEN
+        from_secret: CHAPO_REGISTRY_TOKEN
       registry:
         from_secret: CHAPO_REGISTRY_URL
       repo:
@@ -123,55 +33,107 @@
     commands:
     - git fetch --tags
 
-  - name: prepare
+  - name: prepare_docker_cache
     image: busybox
     commands:
       - mkdir -p /cache/${DRONE_REPO}/docker
     volumes:
       - name: cache
         path: /cache
-
-  - name: build
-    image: plugins/docker
-    settings:
-      <<: *docker_settings
-      use_cache: true
-      dockerfile: docker/prod/Dockerfile
-      dry_run: true
-      tags:
-        - ${DRONE_BRANCH}
-        - ${DRONE_COMMIT_SHA:0:8}
-        - ${DRONE_BRANCH}-${DRONE_COMMIT}
-      cache_from:
-        - registry.chapo.chat/hexbear:main
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
     when:
-      event: 
-        - pull_request
-    volumes:
-      - name: docker
-        path: /var/lib/docker
-
-
-  - name: publish
-    image: plugins/docker
-    settings:
-      <<: *docker_settings
-      use_cache: true
-      dockerfile: docker/prod/Dockerfile
-      tags:
-        - ${DRONE_BRANCH}
-        - ${DRONE_COMMIT_SHA:0:8}
-        - ${DRONE_BRANCH}-${DRONE_COMMIT}
-      cache_from:
-        - registry.chapo.chat/hexbear:main
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
-    when:
+      branch:
+        - dev
+        - prod
       event:
         - push
         - tag
+
+  - name: prepare_cargo_cache
+    image: busybox
+    commands:
+      - mkdir -p /cache/${DRONE_REPO}/cargo
+    volumes:
+      - name: cache
+        path: /cache
+    when:
+      branch:
+        - main
+      event:
+        - push
+        - tag
+        - pull_request
+
+  - name: docker_build
+    image: plugins/docker
+    settings:
+      <<: *docker_settings
+      use_cache: true
+      dockerfile: docker/prod/Dockerfile
+      tags:
+        - ${DRONE_BRANCH}-latest
+        - ${DRONE_BRANCH}
+        - ${DRONE_COMMIT_SHA:0:8}
+        - ${DRONE_BRANCH}-${DRONE_COMMIT}
+      cache_from:
+        - registry.chapo.chat/hexbear:main
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
+    volumes:
+      - name: docker
+        path: /var/lib/docker
+    when:
+      branch:
+        - dev
+        - prod
+      event:
+        - push
+        - tag
+
+  - name: build_backend
+    image: rust:1.47
+    env:
+      - CARGO_TARGET_DIR=/var/cache/drone/cargo
+      - CARGO_HOME=/var/cache/drone/cargo
+    commands:
+      - cd server
+      - cargo build
+    volumes:
+      - name: cargo
+        path: /var/cache/drone/cargo
+    when:
+      branch:
+        - main
+      event:
+        - push
+        - tag
+        - pull_request
+
+  - name: build_frontend
+    image: node:12-buster
+    commands:
+      - cd ui
+      - yarn install --pure-lockfile --network-timeout 600000
+      - yarn build
+    when:
+      branch:
+        - main
+      event:
+        - push
+        - tag
+        - pull_request
+
+    - name: join_back_front
+      image: busybox
+      commands:
+        - echo "done"
+      depends_on: [ build_backend, build_frontend ]
+      when:
+      branch:
+        - main
+      event:
+        - push
+        - tag
+        - pull_request
 
   - name: notify
     image: appleboy/drone-discord
@@ -195,10 +157,6 @@
       - success
       - failure
 
-    volumes:
-      - name: docker
-        path: /var/lib/docker
-
   volumes:
     - name: cache
       host:
@@ -206,87 +164,7 @@
     - name: docker
       host:
         path: /var/cache/${DRONE_REPO}/docker
-
-
----
-  kind: pipeline
-  type: docker
-  name: deploy
-
-  trigger:
-    event:
-      - promote
-
-  globals:
-    - &docker_settings
-      username:
-        from_secret: CHAPO_REGISTRY_USER
-      password:
-        from_secret: CHAPO_REGISTRY_TOKEN
-      registry:
-        from_secret: CHAPO_REGISTRY_URL
-      repo:
-        from_secret: CHAPO_REGISTRY_URL_REPO
-
-  clone:
-    skip_verify: true
-
-  steps:
-  - name: fetch
-    image: alpine/git
-    commands:
-    - git fetch --tags
-
-  - name: prepare
-    image: busybox
-    commands:
-      - mkdir -p /cache/${DRONE_REPO}/docker
-    volumes:
-      - name: cache
-        path: /cache
-
-  - name: deploy
-    image: plugins/docker
-    settings:
-      <<: *docker_settings
-      use_cache: true
-      dockerfile: docker/prod/Dockerfile
-      tags:
-        - ${DRONE_DEPLOY_TO}-latest
-      cache_from:
-        - registry.chapo.chat/hexbear:main
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
-    volumes:
-      - name: docker
-        path: /var/lib/docker
-
-  - name: notify
-    image: appleboy/drone-discord
-    settings:
-      webhook_id:
-        from_secret: discord_webhook_id
-      webhook_token:
-        from_secret: discord_webhook_token
-      color: "0xffd930"
-      message: |
-        {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` deploy to `${DRONE_DEPLOY_TO}` succeeded.  
-        {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` deploy to `${DRONE_DEPLOY_TO}` failed.  
-        {{/success}}
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
-        🌐 {{ build.link }}
-    when:
-      status:
-      - success
-      - failure
-
-  volumes:
-    - name: cache
+    - name: cargo
       host:
-        path: /var/cache
-    - name: docker
-      host:
-        path: /var/cache/${DRONE_REPO}/docker
+        path: /var/cache/${DRONE_REPO}/cargo
+
