@@ -81,6 +81,7 @@
     volumes:
       - name: docker
         path: /var/lib/docker
+    depends_on: [ fetch, prepare_docker_cache ]
     when:
       branch:
         - dev
@@ -100,6 +101,7 @@
     volumes:
       - name: cargo
         path: /var/cache/drone/cargo
+    depends_on: [ fetch, prepare_cargo_cache ]
     when:
       branch:
         - main
@@ -114,6 +116,7 @@
       - cd ui
       - yarn install --pure-lockfile --network-timeout 600000
       - yarn build
+    depends_on: [ fetch ]
     when:
       branch:
         - main
@@ -152,6 +155,7 @@
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:
         ``` {{commit.message}} ```
         🌐 {{ build.link }}
+    depends_on: [ join_back_front, docker_build ]
     when:
       status:
       - success
