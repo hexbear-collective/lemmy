@@ -31,7 +31,7 @@
   - name: fetch
     image: alpine/git
     commands:
-    - git fetch --tags
+      - git fetch --tags
 
   - name: prepare_docker_cache
     image: busybox
@@ -122,12 +122,12 @@
         - tag
         - pull_request
 
-    - name: join_back_front
-      image: busybox
-      commands:
-        - echo "done"
-      depends_on: [ build_backend, build_frontend ]
-      when:
+  - name: join_back_front
+    image: busybox
+    commands:
+      - echo "done"
+    depends_on: [ build_backend, build_frontend ]
+    when:
       branch:
         - main
       event:
