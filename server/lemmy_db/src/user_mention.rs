@@ -32,6 +32,7 @@ impl Crud<UserMentionForm> for UserMention {
     use crate::schema::user_mention::dsl::*;
     insert_into(user_mention)
       .values(user_mention_form)
+      .on_conflict_do_nothing()
       .get_result::<Self>(conn)
   }
 
