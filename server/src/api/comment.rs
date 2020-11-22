@@ -51,6 +51,103 @@ use crate::{
   DbPool,
   LemmyContext,
 };
+use lemmy_db::{
+  community_view::{CommunityModeratorView, CommunityView},
+  post_view::PostView,
+};
+
+#[async_trait::async_trait(?Send)]
+impl Perform for GetComment {
+  type Response = GetCommentResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
+  ) -> Result<GetCommentResponse, LemmyError> {
+    let data: &GetComment = &self;
+    let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
+    let user_id = match user {
+      Some(user) => Some(user.id),
+      None => None,
+    };
+
+    let type_ = ListingType::from_str("All")?;
+    let sort = SortType::from_str("Active")?;
+
+    let comment_id = data.comment_id;
+    let result_ids = blocking(context.pool(), move |conn| {
+      Comment::get_tree_ids(conn, comment_id)
+    })
+    .await??;
+
+    // i hate having to do this but diesel needs the CommentId struct for the query to compile
+    let mut comment_ids: Vec<i32> = Vec::new();
+    for i in result_ids.into_iter() {
+      comment_ids.push(i.id);
+    }
+
+    let comments = blocking(context.pool(), move |conn| {
+      CommentQueryBuilder::create(conn)
+        .listing_type(type_)
+        .sort(&sort)
+        .for_comment_ids(comment_ids.to_owned())
+        .my_user_id(user_id)
+        .limit(9999)
+        .list()
+    })
+    .await??;
+
+    let comment_info = comments.first().clone().unwrap();
+    let post_id = comment_info.post_id;
+    let post_view = match blocking(context.pool(), move |conn| {
+      PostView::read(conn, post_id, user_id)
+    })
+    .await?
+    {
+      Ok(post) => post,
+      Err(_e) => return Err(APIError::err("couldnt_find_post").into()),
+    };
+
+    let community_id = comment_info.community_id;
+    let settings = blocking(context.pool(), move |conn| {
+      CommunitySettings::read_from_community_id(conn, community_id)
+    })
+    .await??;
+    //Check community settings
+    if settings.private {
+      if let Some(user_id) = user_id {
+        let privileged = is_mod_or_admin(context.pool(), user_id, community_id)
+          .await
+          .is_ok();
+        if !privileged {
+          return Err(APIError::err("community_is_private").into());
+        }
+      } else {
+        return Err(APIError::err("community_is_private").into());
+      }
+    }
+
+    let community_id = comment_info.community_id;
+    let community = blocking(context.pool(), move |conn| {
+      CommunityView::read(conn, community_id, user_id)
+    })
+    .await??;
+
+    let community_id = comment_info.community_id;
+    let moderators = blocking(context.pool(), move |conn| {
+      CommunityModeratorView::for_community(conn, community_id)
+    })
+    .await??;
+
+    Ok(GetCommentResponse {
+      post: post_view,
+      comments,
+      community,
+      moderators,
+    })
+  }
+}
 
 #[async_trait::async_trait(?Send)]
 impl Perform for CreateComment {

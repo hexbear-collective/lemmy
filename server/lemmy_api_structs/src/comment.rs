@@ -1,5 +1,21 @@
 use lemmy_db::comment_view::CommentView;
 use serde::{Deserialize, Serialize};
+use lemmy_db::post_view::PostView;
+use lemmy_db::community_view::{CommunityView, CommunityModeratorView};
+
+#[derive(Serialize, Deserialize)]
+pub struct GetComment {
+  pub comment_id: i32,
+  pub auth: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCommentResponse {
+  pub post: PostView,
+  pub comments: Vec<CommentView>,
+  pub community: CommunityView,
+  pub moderators: Vec<CommunityModeratorView>,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateComment {

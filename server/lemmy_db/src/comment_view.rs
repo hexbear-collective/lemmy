@@ -96,6 +96,7 @@ pub struct CommentQueryBuilder<'a> {
   sort: &'a SortType,
   for_community_id: Option<i32>,
   for_post_id: Option<i32>,
+  for_comment_ids: Option<Vec<i32>>,
   for_creator_id: Option<i32>,
   search_term: Option<String>,
   my_user_id: Option<i32>,
@@ -118,6 +119,7 @@ impl<'a> CommentQueryBuilder<'a> {
       sort: &SortType::New,
       for_community_id: None,
       for_post_id: None,
+      for_comment_ids: None,
       for_creator_id: None,
       search_term: None,
       my_user_id: None,
@@ -140,6 +142,11 @@ impl<'a> CommentQueryBuilder<'a> {
 
   pub fn for_post_id<T: MaybeOptional<i32>>(mut self, for_post_id: T) -> Self {
     self.for_post_id = for_post_id.get_optional();
+    self
+  }
+
+  pub fn for_comment_ids<T: MaybeOptional<Vec<i32>>>(mut self, for_comment_ids: T) -> Self {
+    self.for_comment_ids = for_comment_ids.get_optional();
     self
   }
 
@@ -205,6 +212,10 @@ impl<'a> CommentQueryBuilder<'a> {
 
     if let Some(for_post_id) = self.for_post_id {
       query = query.filter(post_id.eq(for_post_id));
+    };
+
+    if let Some(for_comment_ids) = self.for_comment_ids {
+      query = query.filter(id.eq_any(for_comment_ids));
     };
 
     if let Some(search_term) = self.search_term {

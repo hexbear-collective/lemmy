@@ -7,7 +7,7 @@ use crate::{
   Reportable,
   Saveable,
 };
-use diesel::{dsl::*, result::Error, *};
+use diesel::{dsl::*, result::Error, sql_types::Integer, *};
 use serde::{Deserialize, Serialize};
 use url::{ParseError, Url};
 
@@ -86,6 +86,12 @@ impl Crud<CommentForm> for Comment {
       .set(comment_form)
       .get_result::<Self>(conn)
   }
+}
+
+#[derive(QueryableByName)]
+pub struct CommentId {
+  #[sql_type = "Integer"]
+  pub id: i32,
 }
 
 impl Comment {
@@ -205,6 +211,26 @@ impl Comment {
       ))
       .returning(id)
       .get_results(conn)
+  }
+
+  pub fn get_tree_ids(conn: &PgConnection, for_comment_id: i32) -> Result<Vec<CommentId>, Error> {
+    sql_query("
+      with recursive comment_tree as (
+        select id, parent_id, 1 AS depth
+        from comment
+        where id = $1
+
+        union all
+
+        select c.id, c.parent_id, ct.depth + 1
+        from comment c, comment_tree ct
+        where c.parent_id = ct.id
+      )
+      select id
+      from comment_tree
+    ")
+      .bind::<Integer, _>(for_comment_id)
+      .load::<CommentId>(conn)
   }
 }
 

@@ -144,6 +144,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
             "/resolve_report",
             web::post().to(route_post::<ResolveCommentReport>),
           )
+          .route("", web::get().to(route_get::<GetComment>))
           .route("/list", web::get().to(route_get::<GetComments>)),
       )
       // Private Message
