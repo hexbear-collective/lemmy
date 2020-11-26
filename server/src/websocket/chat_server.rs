@@ -182,6 +182,18 @@ impl ChatServer {
     Ok(())
   }
 
+  pub fn leave_rooms(&mut self, id: ConnectionId) -> Result<(), LemmyError> {
+    for sessions in self.post_rooms.values_mut() {
+      sessions.remove(&id);
+    }
+
+    for sessions in self.community_rooms.values_mut() {
+      sessions.remove(&id);
+    }
+
+    Ok(())
+  }
+
   fn send_post_room_message<Response>(
     &self,
     op: &UserOperation,
@@ -494,6 +506,7 @@ impl ChatServer {
 
         // chapo specific
         UserOperation::FeaturePost => do_user_operation::<FeaturePost>(args).await,
+        UserOperation::LeaveRooms => do_user_operation::<LeaveRooms>(args).await,
       }
     }
   }

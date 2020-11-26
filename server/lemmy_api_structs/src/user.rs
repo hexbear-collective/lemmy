@@ -255,6 +255,14 @@ pub struct UserJoinResponse {
   pub user_id: i32,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LeaveRooms {}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LeaveRoomsResponse {
+  pub success: bool,
+}
+
 // Hexbear ------------------------------------------------------------
 
 #[derive(Serialize, Deserialize)]

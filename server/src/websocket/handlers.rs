@@ -212,6 +212,14 @@ impl Handler<JoinPostRoom> for ChatServer {
   }
 }
 
+impl Handler<LeaveAllRooms> for ChatServer {
+  type Result = ();
+
+  fn handle(&mut self, msg: LeaveAllRooms, _: &mut Context<Self>) {
+    self.leave_rooms(msg.id).ok();
+  }
+}
+
 impl Handler<GetUsersOnline> for ChatServer {
   type Result = usize;
 
