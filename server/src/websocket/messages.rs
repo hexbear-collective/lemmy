@@ -101,6 +101,12 @@ pub struct JoinPostRoom {
 }
 
 #[derive(Message)]
+#[rtype(result = "()")]
+pub struct LeaveAllRooms {
+  pub id: ConnectionId,
+}
+
+#[derive(Message)]
 #[rtype(usize)]
 pub struct GetUsersOnline;
 
