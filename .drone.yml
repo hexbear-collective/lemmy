@@ -32,6 +32,7 @@
     image: alpine/git
     commands:
       - git fetch --tags
+      - git submodule update --recursive --remote
 
   - name: prepare_docker_cache
     image: busybox
