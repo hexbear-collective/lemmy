@@ -1,3 +1,5 @@
 [submodule "ui"]
 	path = ui
 	url = https://git.chapo.chat/chapo-collective/hexbear-frontend.git
+[submodule "ui/"]
+	branch = main
