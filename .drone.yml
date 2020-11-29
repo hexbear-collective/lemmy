@@ -79,6 +79,7 @@
         - registry.chapo.chat/hexbear:main
         - registry.chapo.chat/hexbear:${DRONE_BRANCH}
         - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
+      purge: false
     volumes:
       - name: docker
         path: /var/lib/docker
@@ -98,7 +99,7 @@
       - CARGO_HOME=/var/cache/drone/cargo
     commands:
       - cd server
-      - cargo build
+      - cargo build --target-dir /var/cache/drone/cargo
     volumes:
       - name: cargo
         path: /var/cache/drone/cargo
