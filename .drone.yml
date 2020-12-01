@@ -70,13 +70,14 @@
       <<: *docker_settings
       use_cache: true
       dockerfile: docker/prod/Dockerfile
+      build_args:
+        - FRONTEND_TAG=${DRONE_BRANCH}
       tags:
         - ${DRONE_BRANCH}-latest
         - ${DRONE_BRANCH}
         - ${DRONE_COMMIT_SHA:0:8}
         - ${DRONE_BRANCH}-${DRONE_COMMIT}
       cache_from:
-        - registry.chapo.chat/hexbear:main
         - registry.chapo.chat/hexbear:${DRONE_BRANCH}
         - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
       purge: false
@@ -112,21 +113,6 @@
         - tag
         - pull_request
 
-  - name: build_frontend
-    image: node:12-buster
-    commands:
-      - cd ui
-      - yarn install --pure-lockfile --network-timeout 600000
-      - yarn build
-    depends_on: [ fetch ]
-    when:
-      branch:
-        - main
-      event:
-        - push
-        - tag
-        - pull_request
-
   - name: notify
     image: appleboy/drone-discord
     settings:
@@ -141,10 +127,16 @@
         {{else}}
         ❌  Build #{{build.number}} of `{{repo.name}}` failed.  
         {{/success}}
+
         📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        ``` {{commit.message}} ```
+        --------
+        
+        {{commit.message}}
+        
+
         🌐 {{ build.link }}
-    depends_on: [ build_backend, build_frontend, docker_build ]
+
+    depends_on: [build_backend, docker_build ]
     when:
       status:
       - success
