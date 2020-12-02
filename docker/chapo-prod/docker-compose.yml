@@ -1,17 +1,24 @@
 version: '3.3'
 
 services:
+  hexbear-frontend:
+    image: registry.chapo.chat/hexbear-frontend:prod
+    volumes:
+      - frontend:/app/dist
+
   lemmy:
-    image: registry.gitlab.com/chapo-sandbox/lemmy:latest-prod
+    image: registry.chapo.chat/hexbear:prod-latest
     container_name: lemmy-prod
     ports:
       - "127.0.0.1:8546:8546"
     restart: always
     environment:
       - RUST_LOG=error
+      - ACTIX_THREADPOOL=256
       - LEMMY_DATABASE__PASSWORD=${LEMMYPROD_POSTGRES_PW}
       - LEMMY_DATABASE__HOST=postgres-prod
       - LEMMY_DATABASE__PORT=5433
+      - LEMMY_DATABASE__POOL_SIZE=75
       - LEMMY_HOSTNAME=${LEMMYPROD_LEMMY_HOSTNAME}
       - LEMMY_PORT=8546
       - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
@@ -32,10 +39,14 @@ services:
       - LEMMY_CAPTCHA__HCAPTCHA_SITE_KEY=${LEMMYPROD_HCAPTCHA_SITE_KEY}
     volumes:
       - ./lemmy.hjson:/config/config.hjson:ro
+      - frontend:/app/dist
     depends_on:
       - postgres
       - pictrs
       - iframely
+      - hexbear-frontend
+
+  
 
   postgres:
     image: postgres:12-alpine
@@ -96,3 +107,6 @@ secrets:
     file: /opt/app/lemmy-prod/secrets/cloudflare_token.txt
   postgres_pw:
     file: /opt/app/lemmy-prod/secrets/postgres_pw
+
+volumes:
+  frontend:

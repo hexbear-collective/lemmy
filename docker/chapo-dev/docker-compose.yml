@@ -1,8 +1,13 @@
 version: '3.3'
 
 services:
+  hexbear-frontend:
+    image: registry.chapo.chat/hexbear-frontend:dev
+    volumes:
+      - frontend:/app/dist
+
   lemmy:
-    image: registry.gitlab.com/chapo-sandbox/lemmy:latest-dev
+    image: registry.chapo.chat/hexbear:dev-latest
     container_name: lemmy-dev
     ports:
       - "127.0.0.1:8536:8536"
@@ -11,7 +16,8 @@ services:
       - RUST_LOG=error
       - LEMMY_DATABASE__PASSWORD=${LEMMYDEV_POSTGRES_PW}
       - LEMMY_DATABASE__HOST=postgres-dev
-      - LEMMY_HOSTNAME=${LEMMYDEV_LEMMY_HOSTNAME}
+      - LEMMY_DATABASE__POOL_SIZE=50
+      - LEMMY_HOSTNAME=dev.chapo.chat
       - LEMMY_PORT=8536
       - LEMMY_EMAIL__SMTP_SERVER=mail.chapo.chat
       - LEMMY_EMAIL__SMTP_FROM_ADDRESS=noreply@dev.chapo.chat
@@ -19,16 +25,18 @@ services:
       - LEMMY_EMAIL__SMTP_PASSWORD=${LEMMYDEV_SMTP_PASSWORD}
       - LEMMY_EMAIL__USE_TLS=true
       - LEMMY_JWT_SECRET=${LEMMYDEV_JWT_SECRET}
+      - HCAPTCHA_SECRET_KEY=${LEMMYDEV_HCAPTCHA_SECRET_KEY}
       - LEMMY_CAPTCHA__ENABLED=true
       - LEMMY_CAPTCHA__PROVIDER=hcaptcha
-      - LEMMY_CAPTHCA__HCAPTCHA_SECRET_KEY=${LEMMYDEV_HCAPTCHA_SECRET_KEY}
       - LEMMY_CAPTCHA__HCAPTCHA_SITE_KEY=${LEMMYDEV_HCAPTCHA_SITE_KEY}
+      - LEMMY_CAPTCHA__HCAPTCHA_SECRET_KEY=${LEMMYDEV_HCAPTCHA_SECRET_KEY}
     volumes:
       - ./lemmy.hjson:/config/config.hjson:ro
     depends_on:
       - postgres
       - pictrs
       - iframely
+      - hexbear-frontend
 
   postgres:
     image: postgres:12-alpine
@@ -42,7 +50,7 @@ services:
     restart: always
 
   pictrs:
-    image: asonix/pictrs:v0.1.13-r0
+    image: asonix/pictrs:amd64-v0.1.13-r0
     container_name: pictrs-dev
     user: 991:991
     environment:
@@ -86,3 +94,6 @@ secrets:
     file: /opt/app/lemmy-dev/secrets/cloudflare_token.txt
   postgres_pw:
     file: /opt/app/lemmy-dev/secrets/postgres_pw
+
+volumes:
+  frontend:

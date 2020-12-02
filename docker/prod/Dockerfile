@@ -1,4 +1,6 @@
 ARG RUST_BUILDER_IMAGE=ekidd/rust-musl-builder:1.47.0
+ARG FRONTEND_TAG=prod
+ARG FRONTEND_REPO=registry.chapo.chat/hexbear-frontend
 
 FROM $RUST_BUILDER_IMAGE as rust
 
@@ -41,6 +43,11 @@ COPY --chown=rust:rust docs ./docs
 RUN mdbook build docs/
 
 
+ARG FRONTEND_TAG
+ARG FRONTEND_REPO
+RUN echo ${FRONTEND_REPO}:${FRONTEND_TAG}
+FROM ${FRONTEND_REPO}:${FRONTEND_TAG} as frontend
+
 FROM alpine:3.12 as lemmy
 
 # Install libpq for postgres
@@ -57,10 +64,7 @@ COPY --chown=lemmy:lemmy server/config/defaults.hjson /config/defaults.hjson
 COPY --chown=lemmy:lemmy --from=rust /app/server/lemmy_server /app/lemmy
 COPY --chown=lemmy:lemmy --from=docs /app/docs/book/ /app/dist/documentation/
 
-ARG FRONTEND_TAG=prod
-ARG FRONTEND_IMAGE=registry.chapo.chat/hexbear-frontend:$FRONTEND_TAG
-
-COPY --chown=lemmy:lemmy --from=$FRONTEND_IMAGE /app/dist /app/dist
+COPY --chown=lemmy:lemmy --from=frontend /app/dist /app/dist
 
 RUN chown lemmy:lemmy /app/lemmy
 USER lemmy
