@@ -151,7 +151,7 @@
         from_secret: matrix_username
       password:
         from_secret: matrix_password
-    depends_on: [build_frontend, docker_build ]
+    depends_on: [build_backend, docker_build ]
     when:
       status:
       - success
