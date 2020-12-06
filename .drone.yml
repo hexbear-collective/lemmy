@@ -141,6 +141,21 @@
       status:
       - success
       - failure
+  
+  - name: notify-matrix
+    image: plugins/matrix
+    settings:
+      homeserver: https://matrix.chapo.chat
+      roomid: "!TjshsDXBWkOhmZIrmL:chapo.chat"
+      username:
+        from_secret: matrix_username
+      password:
+        from_secret: matrix_password
+    depends_on: [build_backend, docker_build ]
+    when:
+      status:
+      - success
+      - failure
 
   volumes:
     - name: cache
