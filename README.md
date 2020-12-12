@@ -1,5 +1,7 @@
 <div align="center">
 
+<h3>DOES NOT RUN IN RUST 1.48+ DUE TO AN ISSUE IN A DEPENDENCY. USE RUST 1.47</h3>
+
 **Main Branch:** [![Build Status](https://drone.chapo.chat/api/badges/chapo-collective/lemmy-hexbear/status.svg?ref=refs/heads/main)](https://drone.chapo.chat/chapo-collective/lemmy-hexbear)  
 
 
