@@ -101,12 +101,7 @@ async fn main() -> Result<(), LemmyError> {
       .allowed_origin(&format!("http://{}", "localhost:4444"))
       .allowed_origin(&format!("https://{}", Settings::get().hostname))
       .allowed_methods(vec!["GET", "POST", "PUT", "OPTIONS"])
-      .allowed_headers(vec![
-        http::header::CONTENT_TYPE,
-        http::header::AUTHORIZATION,
-        http::header::ACCEPT,
-        http::header::UPGRADE,
-      ])
+      .allow_any_header()
       .max_age(3600);
 
     let settings = Settings::get();
