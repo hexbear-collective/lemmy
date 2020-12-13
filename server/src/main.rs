@@ -98,8 +98,8 @@ async fn main() -> Result<(), LemmyError> {
     );
 
     let cors = Cors::default()
-      .allowed_origin(&format!("http://{}", "localhost:4444"))
-      .allowed_origin(&format!("https://{}", Settings::get().hostname))
+      .allow_any_origin()
+      .send_wildcard()
       .allowed_methods(vec!["GET", "POST", "PUT", "OPTIONS"])
       .allow_any_header()
       .max_age(3600);
