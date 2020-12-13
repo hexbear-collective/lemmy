@@ -31,6 +31,7 @@ use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_REGEX};
 use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use actix_cors::Cors;
 
 lazy_static! {
   // static ref CACHE_CONTROL_VALUE: String = format!("public, max-age={}", 365 * 24 * 60 * 60);
@@ -95,11 +96,20 @@ async fn main() -> Result<(), LemmyError> {
       activity_queue.to_owned(),
       cache_handler.clone(),
     );
+
+    let cors = Cors::default()
+      .allowed_origin(&format!("http://{}", "localhost:4444"))
+      .allowed_origin(&format!("https://{}", Settings::get().hostname))
+      .allowed_methods(vec!["GET", "POST", "PUT"])
+      .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+      .allowed_header(http::header::CONTENT_TYPE)
+      .max_age(3600);
+
     let settings = Settings::get();
     let rate_limiter = rate_limiter.clone();
     App::new()
       .wrap_fn(add_cache_headers)
-      .wrap(middleware::DefaultHeaders::new().header("Access-Control-Allow-Origin", "*"))
+      .wrap(cors)
       .wrap(middleware::Logger::default())
       .data(context)
       // The routes
