@@ -79,4 +79,5 @@ pub enum UserOperation {
   SetUserTag,
   FeaturePost,
   LeaveRooms,
+  PostJoin,
 }
