@@ -1,9 +1,12 @@
+## teeth 12/21/2020 - this is all legacy stuff from upstream for ansible
+## I don't think we need any of it
+
 # build folders and similar which are not needed for the docker build
 ui/node_modules
 server/target
-docker/dev/volumes
-docker/federation/volumes
-docker/federation-test/volumes
+# docker/dev/volumes
+# docker/federation/volumes
+# docker/federation-test/volumes
 #.git # needed to get git sha
 ansible
 
