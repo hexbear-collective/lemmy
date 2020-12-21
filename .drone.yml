@@ -84,6 +84,8 @@
     volumes:
       - name: docker
         path: /var/lib/docker
+      - name: dockersock
+        path: /var/run/docker.sock
     depends_on: [ fetch, prepare_docker_cache ]
     when:
       branch:
@@ -167,4 +169,6 @@
     - name: cargo
       host:
         path: /var/cache/${DRONE_REPO}/cargo
-
+    - name: dockersock
+      host:
+        path: /var/run/docker.sock
