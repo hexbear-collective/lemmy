@@ -907,3 +907,25 @@ impl Perform for SavePost {
     Ok(PostResponse { post: post_view })
   }
 }
+
+#[async_trait::async_trait(?Send)]
+impl Perform for PostJoin {
+  type Response = PostJoinResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
+  ) -> Result<PostJoinResponse, LemmyError> {
+    let data: &PostJoin = &self;
+
+    if let Some(ws_id) = websocket_id {
+      context.chat_server().do_send(JoinPostRoom {
+        post_id: data.post_id,
+        id: ws_id,
+      });
+    }
+
+    Ok(PostJoinResponse { post_id: data.post_id })
+  }
+}
