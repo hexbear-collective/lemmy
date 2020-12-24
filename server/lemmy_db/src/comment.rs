@@ -201,20 +201,19 @@ impl Comment {
 
   pub fn remove_user_comments(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
     use crate::schema::comment::dsl::*;
-    diesel::update(comment
-      .filter(creator_id.eq(for_creator_id))
-      .filter(removed.eq(false))
+    diesel::update(
+      comment
+        .filter(creator_id.eq(for_creator_id))
+        .filter(removed.eq(false)),
     )
-      .set((
-        removed.eq(true),
-        updated.eq(naive_now())
-      ))
-      .returning(id)
-      .get_results(conn)
+    .set((removed.eq(true), updated.eq(naive_now())))
+    .returning(id)
+    .get_results(conn)
   }
 
   pub fn get_tree_ids(conn: &PgConnection, for_comment_id: i32) -> Result<Vec<CommentId>, Error> {
-    sql_query("
+    sql_query(
+      "
       with recursive comment_tree as (
         select id, parent_id, 1 AS depth
         from comment
@@ -228,9 +227,10 @@ impl Comment {
       )
       select id
       from comment_tree
-    ")
-      .bind::<Integer, _>(for_comment_id)
-      .load::<CommentId>(conn)
+    ",
+    )
+    .bind::<Integer, _>(for_comment_id)
+    .load::<CommentId>(conn)
   }
 }
 

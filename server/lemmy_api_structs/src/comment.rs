@@ -1,7 +1,9 @@
-use lemmy_db::comment_view::CommentView;
+use lemmy_db::{
+  comment_view::CommentView,
+  community_view::{CommunityModeratorView, CommunityView},
+  post_view::PostView,
+};
 use serde::{Deserialize, Serialize};
-use lemmy_db::post_view::PostView;
-use lemmy_db::community_view::{CommunityView, CommunityModeratorView};
 
 #[derive(Serialize, Deserialize)]
 pub struct GetComment {

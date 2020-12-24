@@ -926,6 +926,8 @@ impl Perform for PostJoin {
       });
     }
 
-    Ok(PostJoinResponse { post_id: data.post_id })
+    Ok(PostJoinResponse {
+      post_id: data.post_id,
+    })
   }
 }

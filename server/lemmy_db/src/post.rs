@@ -222,16 +222,14 @@ impl Post {
 
   pub fn remove_user_posts(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
     use crate::schema::post::dsl::*;
-    diesel::update(post
+    diesel::update(
+      post
         .filter(creator_id.eq(for_creator_id))
-        .filter(removed.eq(false))
+        .filter(removed.eq(false)),
     )
-      .set((
-             removed.eq(true),
-             updated.eq(naive_now())
-      ))
-      .returning(id)
-      .get_results(conn)
+    .set((removed.eq(true), updated.eq(naive_now())))
+    .returning(id)
+    .get_results(conn)
   }
 }
 

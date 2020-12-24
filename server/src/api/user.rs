@@ -68,7 +68,14 @@ use crate::{
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
-    messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage, LeaveAllRooms},
+    messages::{
+      CaptchaItem,
+      CheckCaptcha,
+      JoinUserRoom,
+      LeaveAllRooms,
+      SendAllMessage,
+      SendUserRoomMessage,
+    },
     UserOperation,
   },
   LemmyContext,
@@ -1668,9 +1675,7 @@ impl Perform for LeaveRooms {
     websocket_id: Option<ConnectionId>,
   ) -> Result<LeaveRoomsResponse, LemmyError> {
     if let Some(ws_id) = websocket_id {
-      context.chat_server().do_send(LeaveAllRooms {
-        id: ws_id,
-      });
+      context.chat_server().do_send(LeaveAllRooms { id: ws_id });
     }
 
     Ok(LeaveRoomsResponse { success: true })
