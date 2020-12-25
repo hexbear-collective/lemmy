@@ -55,6 +55,7 @@ pub struct GetModlogResponse {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]    //enum type is inline with the internal data
 pub enum ModlogAction {
   RemovePost(ModRemovePostView),
   LockPost(ModLockPostView),

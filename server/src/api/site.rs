@@ -170,7 +170,7 @@ impl Perform for GetModlog {
       }
     }
 
-    log.sort_by(|a, b| get_action_timestamp(a).cmp(&get_action_timestamp(b)));
+    log.sort_by(|a, b| get_action_timestamp(b).cmp(&get_action_timestamp(a)));
 
     // Return the jwt
     Ok(GetModlogResponse {
