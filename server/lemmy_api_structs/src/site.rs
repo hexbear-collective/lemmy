@@ -38,27 +38,35 @@ pub struct SearchResponse {
   pub users: Vec<UserView>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetModlog {
   pub mod_user_id: Option<i32>,
   pub community_id: Option<i32>,
   pub page: Option<i64>,
   pub limit: Option<i64>,
+  pub action_filter: Option<i16>,   //9 bits for each type of mod action
   pub auth: Option<String>, // hexbear
 }
 
-#[derive(Serialize, Deserialize)]
+//exists in upstream, but is different from hexbear ----------
+#[derive(Serialize)]
 pub struct GetModlogResponse {
-  pub removed_posts: Vec<ModRemovePostView>,
-  pub locked_posts: Vec<ModLockPostView>,
-  pub stickied_posts: Vec<ModStickyPostView>,
-  pub removed_comments: Vec<ModRemoveCommentView>,
-  pub removed_communities: Vec<ModRemoveCommunityView>,
-  pub banned_from_community: Vec<ModBanFromCommunityView>,
-  pub banned: Vec<ModBanView>,
-  pub added_to_community: Vec<ModAddCommunityView>,
-  pub added: Vec<ModAddView>,
+  pub log: Vec<ModlogAction>
 }
+
+#[derive(Serialize, Deserialize)]
+pub enum ModlogAction {
+  RemovePost(ModRemovePostView),
+  LockPost(ModLockPostView),
+  StickyPost(ModStickyPostView),
+  RemoveComment(ModRemoveCommentView),
+  RemoveCommunity(ModRemoveCommunityView),
+  BanFromCommunity(ModBanFromCommunityView),
+  BanFromSite(ModBanView),
+  AddModToCommunity(ModAddCommunityView),
+  AddMod(ModAddView),
+}
+//-------------------------------------------------------------
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateSite {

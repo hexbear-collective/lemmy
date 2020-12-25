@@ -102,62 +102,95 @@ impl Perform for GetModlog {
     let mod_user_id = data.mod_user_id;
     let page = data.page;
     let limit = data.limit;
-    let removed_posts = blocking(context.pool(), move |conn| {
-      ModRemovePostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    let filter = data.action_filter.unwrap_or(511); //all actions on
 
-    let locked_posts = blocking(context.pool(), move |conn| {
-      ModLockPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    let mut log = Vec::new();
 
-    let stickied_posts = blocking(context.pool(), move |conn| {
-      ModStickyPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    if filter & 1 == 1 {
+      log.append(&mut blocking (context.pool(), move |conn| {
+        ModRemovePostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
+      })
+      .await??.into_iter().map(|item| ModlogAction::RemovePost(item)).collect());
+    }
 
-    let removed_comments = blocking(context.pool(), move |conn| {
-      ModRemoveCommentView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    if filter & (1 << 1) != 0 {
+      log.append(&mut blocking (context.pool(), move |conn| {
+        ModLockPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
+      })
+      .await??.into_iter().map(|item| ModlogAction::LockPost(item)).collect());
+    }
 
-    let banned_from_community = blocking(context.pool(), move |conn| {
-      ModBanFromCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    if filter & (1 << 2) != 0 {
+      log.append(&mut blocking (context.pool(), move |conn| {
+        ModStickyPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
+      })
+      .await??.into_iter().map(|item| ModlogAction::StickyPost(item)).collect());
+    }
 
-    let added_to_community = blocking(context.pool(), move |conn| {
-      ModAddCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    if filter & (1 << 3) != 0 {
+      log.append(&mut blocking (context.pool(), move |conn| {
+        ModRemoveCommentView::list(conn, community_id, mod_user_id, page, limit, anon_log)
+      })
+      .await??.into_iter().map(|item| ModlogAction::RemoveComment(item)).collect());
+    }
+
+    if filter & (1 << 4) != 0 {
+      log.append(&mut blocking (context.pool(), move |conn| {
+        ModBanFromCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
+      })
+      .await??.into_iter().map(|item| ModlogAction::BanFromCommunity(item)).collect());
+    }
+
+    if filter & (1 << 5) != 0 {
+      log.append(&mut blocking (context.pool(), move |conn| {
+        ModAddCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
+      })
+      .await??.into_iter().map(|item| ModlogAction::AddModToCommunity(item)).collect());
+    }
 
     // These arrays are only for the full modlog, when a community isn't given
-    let (removed_communities, banned, added) = if data.community_id.is_none() {
-      blocking(context.pool(), move |conn| {
-        Ok((
-          ModRemoveCommunityView::list(conn, mod_user_id, page, limit, anon_log)?,
-          ModBanView::list(conn, mod_user_id, page, limit, anon_log)?,
-          ModAddView::list(conn, mod_user_id, page, limit, anon_log)?,
-        )) as Result<_, LemmyError>
-      })
-      .await??
-    } else {
-      (Vec::new(), Vec::new(), Vec::new())
-    };
+    if data.community_id.is_none() {
+      if filter & (1 << 6) != 0 {
+        log.append(&mut blocking (context.pool(), move |conn| {
+          ModRemoveCommunityView::list(conn, mod_user_id, page, limit, anon_log)
+        })
+        .await??.into_iter().map(|item| ModlogAction::RemoveCommunity(item)).collect());
+      }
+      if filter & (1 << 7) != 0 {
+        log.append(&mut blocking (context.pool(), move |conn| {
+          ModBanView::list(conn, mod_user_id, page, limit, anon_log)
+        })
+        .await??.into_iter().map(|item| ModlogAction::BanFromSite(item)).collect());
+      }
+      if filter & (1 << 8) != 0 {
+        log.append(&mut blocking (context.pool(), move |conn| {
+          ModAddView::list(conn, mod_user_id, page, limit, anon_log)
+        })
+        .await??.into_iter().map(|item| ModlogAction::AddMod(item)).collect());
+      }
+    }
+
+    log.sort_by(|a, b| get_action_timestamp(a).cmp(&get_action_timestamp(b)));
 
     // Return the jwt
     Ok(GetModlogResponse {
-      removed_posts,
-      locked_posts,
-      stickied_posts,
-      removed_comments,
-      removed_communities,
-      banned_from_community,
-      banned,
-      added_to_community,
-      added,
+      log
     })
+  }
+}
+
+// we should make this more idiomatic in the future
+fn get_action_timestamp(action: &ModlogAction) -> chrono::NaiveDateTime {
+  match action {
+      ModlogAction::RemovePost(action) => action.when_,
+      ModlogAction::LockPost(action) => action.when_,
+      ModlogAction::StickyPost(action) => action.when_,
+      ModlogAction::RemoveComment(action) => action.when_,
+      ModlogAction::RemoveCommunity(action) => action.when_,
+      ModlogAction::BanFromCommunity(action) => action.when_,
+      ModlogAction::BanFromSite(action) => action.when_,
+      ModlogAction::AddModToCommunity(action) => action.when_,
+      ModlogAction::AddMod(action) => action.when_,
   }
 }
 
