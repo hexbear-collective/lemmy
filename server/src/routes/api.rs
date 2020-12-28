@@ -258,21 +258,35 @@ where
 }
 
 async fn route_get<Data>(
-  data: web::Query<Data>,
+  data_query: Result<web::Query<Data>>,
+  data_json: Result<web::Json<Data>>,
   context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error>
 where
   Data: Serialize + Send + 'static + Perform,
 {
-  perform::<Data>(data.0, context).await
+  match data_json {
+    Ok(data_j) => perform::<Data>(data_j.0, context).await,
+    Err(_) => match data_query {
+      Ok(data_q) => perform::<Data>(data_q.0, context).await,
+      Err(err_q) => Err(err_q),
+    },
+  }
 }
 
 async fn route_post<Data>(
-  data: web::Json<Data>,
+  data_json: Result<web::Json<Data>>,
+  data_form: Result<web::Form<Data>>,
   context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error>
 where
   Data: Serialize + Send + 'static + Perform,
 {
-  perform::<Data>(data.0, context).await
+  match data_json {
+    Ok(data_j) => perform::<Data>(data_j.0, context).await,
+    Err(err_j) => match data_form {
+      Ok(data_f) => perform::<Data>(data_f.0, context).await,
+      Err(_) => Err(err_j),
+    },
+  }
 }

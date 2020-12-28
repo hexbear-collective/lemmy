@@ -4,6 +4,7 @@ extern crate diesel_migrations;
 pub extern crate lazy_static;
 
 use actix::prelude::*;
+use actix_cors::Cors;
 use actix_web::{
   body::Body,
   dev::{Service, ServiceRequest, ServiceResponse},
@@ -31,7 +32,6 @@ use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_REGEX};
 use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use actix_cors::Cors;
 
 lazy_static! {
   // static ref CACHE_CONTROL_VALUE: String = format!("public, max-age={}", 365 * 24 * 60 * 60);

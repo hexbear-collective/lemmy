@@ -185,7 +185,10 @@ impl Crud<ModRemoveCommentForm> for ModRemoveComment {
 }
 
 impl ModRemoveComment {
-  pub fn bulk_create(conn: &PgConnection, forms: &[ModRemoveCommentForm]) -> Result<Vec<Self>, Error> {
+  pub fn bulk_create(
+    conn: &PgConnection,
+    forms: &[ModRemoveCommentForm],
+  ) -> Result<Vec<Self>, Error> {
     use crate::schema::mod_remove_comment::dsl::*;
     insert_into(mod_remove_comment)
       .values(forms)
