@@ -3,14 +3,16 @@ use diesel::{result::Error, *};
 use serde::{Deserialize, Serialize};
 
 table! {
-  mod_remove_post_view (id) {
+  hexbear.mod_remove_post_view (id) {
     id -> Int4,
     mod_user_id -> Int4,
+    other_user_id -> Int4,
     post_id -> Int4,
     reason -> Nullable<Text>,
     removed -> Nullable<Bool>,
     when_ -> Timestamp,
     mod_user_name -> Varchar,
+    other_user_name -> Varchar,
     post_name -> Varchar,
     community_id -> Int4,
     community_name -> Varchar,
@@ -24,11 +26,13 @@ table! {
 pub struct ModRemovePostView {
   pub id: i32,
   pub mod_user_id: i32,
+  pub other_user_id: i32,
   pub post_id: i32,
   pub reason: Option<String>,
   pub removed: Option<bool>,
   pub when_: chrono::NaiveDateTime,
   pub mod_user_name: String,
+  pub other_user_name: String,
   pub post_name: String,
   pub community_id: i32,
   pub community_name: String,
@@ -38,6 +42,7 @@ impl ModRemovePostView {
   pub fn list(
     conn: &PgConnection,
     from_community_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     from_mod_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
@@ -56,16 +61,22 @@ impl ModRemovePostView {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
 
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
+    };
+
     if anon {
       use diesel::sql_types::{Int4, Text};
       query = query.select((
         id,
         0.into_sql::<Int4>(),
+        other_user_id,
         post_id,
         reason,
         removed,
         when_,
         "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
         post_name,
         community_id,
         community_name,
@@ -81,13 +92,15 @@ impl ModRemovePostView {
 }
 
 table! {
-  mod_lock_post_view (id) {
+  hexbear.mod_lock_post_view (id) {
     id -> Int4,
     mod_user_id -> Int4,
+    other_user_id -> Int4,
     post_id -> Int4,
     locked -> Nullable<Bool>,
     when_ -> Timestamp,
     mod_user_name -> Varchar,
+    other_user_name -> Varchar,
     post_name -> Varchar,
     community_id -> Int4,
     community_name -> Varchar,
@@ -101,10 +114,12 @@ table! {
 pub struct ModLockPostView {
   pub id: i32,
   pub mod_user_id: i32,
+  pub other_user_id: i32,
   pub post_id: i32,
   pub locked: Option<bool>,
   pub when_: chrono::NaiveDateTime,
   pub mod_user_name: String,
+  pub other_user_name: String,
   pub post_name: String,
   pub community_id: i32,
   pub community_name: String,
@@ -115,6 +130,7 @@ impl ModLockPostView {
     conn: &PgConnection,
     from_community_id: Option<i32>,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -132,15 +148,21 @@ impl ModLockPostView {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
 
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
+    };
+
     if anon {
       use diesel::sql_types::{Int4, Text};
       query = query.select((
         id,
         0.into_sql::<Int4>(),
+        other_user_id,
         post_id,
         locked,
         when_,
         "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
         post_name,
         community_id,
         community_name,
@@ -156,13 +178,15 @@ impl ModLockPostView {
 }
 
 table! {
-  mod_sticky_post_view (id) {
+  hexbear.mod_sticky_post_view (id) {
     id -> Int4,
     mod_user_id -> Int4,
+    other_user_id -> Int4,
     post_id -> Int4,
     stickied -> Nullable<Bool>,
     when_ -> Timestamp,
     mod_user_name -> Varchar,
+    other_user_name -> Varchar,
     post_name -> Varchar,
     community_id -> Int4,
     community_name -> Varchar,
@@ -176,10 +200,12 @@ table! {
 pub struct ModStickyPostView {
   pub id: i32,
   pub mod_user_id: i32,
+  pub other_user_id: i32,
   pub post_id: i32,
   pub stickied: Option<bool>,
   pub when_: chrono::NaiveDateTime,
   pub mod_user_name: String,
+  pub other_user_name: String,
   pub post_name: String,
   pub community_id: i32,
   pub community_name: String,
@@ -190,6 +216,7 @@ impl ModStickyPostView {
     conn: &PgConnection,
     from_community_id: Option<i32>,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -207,15 +234,21 @@ impl ModStickyPostView {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
     };
 
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
+    };
+
     if anon {
       use diesel::sql_types::{Int4, Text};
       query = query.select((
         id,
         0.into_sql::<Int4>(),
+        other_user_id,
         post_id,
         stickied,
         when_,
         "ChapoModerator".into_sql::<Text>(),
+        other_user_name,
         post_name,
         community_id,
         community_name,
@@ -275,6 +308,7 @@ impl ModRemoveCommentView {
     conn: &PgConnection,
     from_community_id: Option<i32>,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -290,6 +324,10 @@ impl ModRemoveCommentView {
 
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
+    };
+
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(comment_user_id.eq(to_other_user_id));
     };
 
     if anon {
@@ -429,6 +467,7 @@ impl ModBanFromCommunityView {
     conn: &PgConnection,
     from_community_id: Option<i32>,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -444,6 +483,10 @@ impl ModBanFromCommunityView {
 
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
+    };
+
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
     };
 
     if anon {
@@ -505,6 +548,7 @@ impl ModBanView {
   pub fn list(
     conn: &PgConnection,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -516,6 +560,10 @@ impl ModBanView {
 
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
+    };
+
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
     };
 
     if anon {
@@ -576,6 +624,7 @@ impl ModAddCommunityView {
     conn: &PgConnection,
     from_community_id: Option<i32>,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -591,6 +640,10 @@ impl ModAddCommunityView {
 
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
+    };
+
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
     };
 
     if anon {
@@ -646,6 +699,7 @@ impl ModAddView {
   pub fn list(
     conn: &PgConnection,
     from_mod_user_id: Option<i32>,
+    to_other_user_id: Option<i32>,
     page: Option<i64>,
     limit: Option<i64>,
     anon: bool,
@@ -657,6 +711,10 @@ impl ModAddView {
 
     if let Some(from_mod_user_id) = from_mod_user_id {
       query = query.filter(mod_user_id.eq(from_mod_user_id));
+    };
+
+    if let Some(to_other_user_id) = to_other_user_id {
+      query = query.filter(other_user_id.eq(to_other_user_id));
     };
 
     if anon {

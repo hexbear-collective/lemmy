@@ -41,6 +41,7 @@ pub struct SearchResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetModlog {
   pub mod_user_id: Option<i32>,
+  pub user_id: Option<i32>,
   pub community_id: Option<i32>,
   pub page: Option<i64>,
   pub limit: Option<i64>,
