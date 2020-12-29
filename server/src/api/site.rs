@@ -100,7 +100,7 @@ impl Perform for GetModlog {
     }
 
     let mod_user_id = data.mod_user_id;
-    let other_user_id = data.user_id;
+    let other_user_id = data.other_user_id;
     let page = data.page;
     let limit = data.limit;
     let filter = data.action_filter.unwrap_or(511); //all actions on
