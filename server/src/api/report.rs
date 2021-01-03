@@ -13,7 +13,7 @@ use lemmy_db::{
     PostReportQueryBuilder,
     PostReportView,
   },
-  user_view::UserView,
+  user_view::UserViewSafe,
   Reportable,
 };
 use lemmy_utils::{ConnectionId, LemmyError};
@@ -171,7 +171,7 @@ impl Perform for GetReportCount {
     );
     mod_ids.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
@@ -236,7 +236,7 @@ impl Perform for ListCommentReports {
     );
     mod_ids.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
@@ -291,7 +291,7 @@ impl Perform for ListPostReports {
     );
     mod_ids.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
@@ -347,7 +347,7 @@ impl Perform for ResolveCommentReport {
     );
     mod_ids.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
@@ -400,7 +400,7 @@ impl Perform for ResolvePostReport {
     );
     mod_ids.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );

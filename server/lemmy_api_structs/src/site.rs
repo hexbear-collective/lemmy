@@ -35,7 +35,7 @@ pub struct SearchResponse {
   pub comments: Vec<CommentView>,
   pub posts: Vec<PostView>,
   pub communities: Vec<CommunityView>,
-  pub users: Vec<UserView>,
+  pub users: Vec<UserViewSafe>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -108,13 +108,13 @@ pub struct SiteResponse {
 #[derive(Serialize, Deserialize)]
 pub struct GetSiteResponse {
   pub site: Option<SiteView>,
-  pub admins: Vec<UserView>,
-  pub banned: Vec<UserView>,
+  pub admins: Vec<UserViewSafe>,
+  pub banned: Vec<UserViewSafe>,
   pub online: usize,
   pub version: String,
   pub my_user: Option<User_>,
   pub federated_instances: Vec<String>,
-  pub sitemods: Vec<UserView>, // hexbear
+  pub sitemods: Vec<UserViewSafe>, // hexbear
 }
 
 #[derive(Serialize, Deserialize)]

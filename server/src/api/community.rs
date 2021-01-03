@@ -99,8 +99,8 @@ impl Perform for GetCommunity {
       Err(_e) => return Err(APIError::err("couldnt_find_community").into()),
     };
 
-    let admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
 
     if let Some(id) = websocket_id {
       context
@@ -672,7 +672,7 @@ impl Perform for BanFromCommunity {
 
     let user_id = data.user_id;
     let user_view = blocking(context.pool(), move |conn| {
-      UserView::get_user_secure(conn, user_id)
+      UserViewSafe::read(conn, user_id)
     })
     .await??;
 
@@ -780,9 +780,9 @@ impl Perform for TransferCommunity {
     })
     .await??;
 
-    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
 
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
     let creator_index = admins
       .iter()
       .position(|r| r.id == site_creator_id)
