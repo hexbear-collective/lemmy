@@ -18,6 +18,7 @@ table! {
     local -> Bool,
     admin -> Bool,
     sitemod -> Bool,
+    moderator -> Bool,
     banned -> Bool,
     show_avatars -> Bool,
     send_notifications_to_email -> Bool,
@@ -48,6 +49,7 @@ pub struct UserView {
   pub local: bool,
   pub admin: bool,
   pub sitemod: bool,
+  pub moderator: bool,
   pub banned: bool,
   pub show_avatars: bool, // TODO this is a setting, probably doesn't need to be here
   pub send_notifications_to_email: bool, // TODO also never used
@@ -151,6 +153,7 @@ impl<'a> UserQueryBuilder<'a> {
       local,
       admin,
       sitemod,
+      moderator,
       banned,
       show_avatars,
       send_notifications_to_email,
@@ -190,6 +193,7 @@ impl UserView {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         show_avatars,
         send_notifications_to_email,
@@ -224,6 +228,7 @@ impl UserView {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         show_avatars,
         send_notifications_to_email,
@@ -236,6 +241,41 @@ impl UserView {
         inbox_disabled,
       ))
       .filter(sitemod.eq(true))
+      .order_by(published)
+      .load::<Self>(conn)
+  }
+
+  pub fn moderators(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_view::dsl::*;
+    use diesel::sql_types::{Nullable, Text};
+    user_view
+      // The select is necessary here to not get back emails
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        "".into_sql::<Nullable<Text>>(),
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        show_avatars,
+        send_notifications_to_email,
+        published,
+        number_of_posts,
+        post_score,
+        number_of_comments,
+        comment_score,
+        has_2fa,
+        inbox_disabled,
+      ))
+      .filter(moderator.eq(true))
       .order_by(published)
       .load::<Self>(conn)
   }
@@ -257,6 +297,7 @@ impl UserView {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         show_avatars,
         send_notifications_to_email,
@@ -289,6 +330,7 @@ impl UserView {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         show_avatars,
         send_notifications_to_email,

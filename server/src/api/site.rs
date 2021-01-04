@@ -1,42 +1,25 @@
-use std::{str::FromStr, time::Duration};
+use std::{convert::TryFrom, str::FromStr, time::Duration};
 
 use actix_web::web::Data;
 use anyhow::Context;
 use log::{debug, info};
 
+use enumflags2::BitFlags;
 use lemmy_api_structs::{site::*, user::Register, APIError};
 use lemmy_db::{
-  category::*,
-  comment_view::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  moderator_views::*,
-  naive_now,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user_view::*,
-  Crud,
-  SearchType,
-  SortType,
+  category::*, comment_view::*, community_view::*, diesel_option_overwrite, moderator::*,
+  moderator_views::*, naive_now, post_view::*, site::*, site_view::*, user_view::*, Crud,
+  SearchType, SortType,
 };
 use lemmy_utils::{location_info, settings::Settings, ConnectionId, LemmyError};
 
 use crate::{
   api::{
-    check_slurs,
-    check_slurs_opt,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    is_admin_or_sitemod,
-    is_mod_or_admin,
-    Perform,
+    check_slurs, check_slurs_opt, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_admin_or_sitemod, is_mod_or_admin, Perform,
   },
   apub::fetcher::search_by_apub_id,
-  blocking,
-  version,
+  blocking, version,
   websocket::{
     messages::{GetUsersOnline, SendAllMessage},
     UserOperation,
@@ -60,6 +43,20 @@ impl Perform for ListCategories {
     // Return the jwt
     Ok(ListCategoriesResponse { categories })
   }
+}
+
+#[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
+#[repr(u16)]
+pub enum ModlogActionFlag {
+  RemovePost = 0b000000001,
+  LockPost = 0b000000010,
+  StickyPost = 0b000000100,
+  RemoveComment = 0b000001000,
+  BanFromCommunity = 0b000010000,
+  AddModToCommunity = 0b000100000,
+  RemoveCommunity = 0b001000000,
+  BanFromSite = 0b010000000,
+  AddMod = 0b100000000,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -100,64 +97,195 @@ impl Perform for GetModlog {
     }
 
     let mod_user_id = data.mod_user_id;
+    let other_user_id = data.other_user_id;
     let page = data.page;
     let limit = data.limit;
-    let removed_posts = blocking(context.pool(), move |conn| {
-      ModRemovePostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+    if let Ok(filter) = BitFlags::<ModlogActionFlag>::try_from(
+      data
+        .action_filter
+        .unwrap_or(BitFlags::<ModlogActionFlag>::all().bits()),
+    ) {
+      let mut log = Vec::new();
+      for flag in filter.iter() {
+        match flag {
+          ModlogActionFlag::RemovePost => {
+            log.append(
+              &mut blocking(context.pool(), move |conn| {
+                ModRemovePostView::list(
+                  conn,
+                  community_id,
+                  other_user_id,
+                  mod_user_id,
+                  page,
+                  limit,
+                  anon_log,
+                )
+              })
+              .await??
+              .into_iter()
+              .map(|item| ModlogAction::RemovePost(item))
+              .collect(),
+            );
+          }
+          ModlogActionFlag::LockPost => {
+            log.append(
+              &mut blocking(context.pool(), move |conn| {
+                ModLockPostView::list(
+                  conn,
+                  community_id,
+                  mod_user_id,
+                  other_user_id,
+                  page,
+                  limit,
+                  anon_log,
+                )
+              })
+              .await??
+              .into_iter()
+              .map(|item| ModlogAction::LockPost(item))
+              .collect(),
+            );
+          }
+          ModlogActionFlag::StickyPost => {
+            log.append(
+              &mut blocking(context.pool(), move |conn| {
+                ModStickyPostView::list(
+                  conn,
+                  community_id,
+                  mod_user_id,
+                  other_user_id,
+                  page,
+                  limit,
+                  anon_log,
+                )
+              })
+              .await??
+              .into_iter()
+              .map(|item| ModlogAction::StickyPost(item))
+              .collect(),
+            );
+          }
+          ModlogActionFlag::RemoveComment => {
+            log.append(
+              &mut blocking(context.pool(), move |conn| {
+                ModRemoveCommentView::list(
+                  conn,
+                  community_id,
+                  mod_user_id,
+                  other_user_id,
+                  page,
+                  limit,
+                  anon_log,
+                )
+              })
+              .await??
+              .into_iter()
+              .map(|item| ModlogAction::RemoveComment(item))
+              .collect(),
+            );
+          }
+          ModlogActionFlag::BanFromCommunity => {
+            log.append(
+              &mut blocking(context.pool(), move |conn| {
+                ModBanFromCommunityView::list(
+                  conn,
+                  community_id,
+                  mod_user_id,
+                  other_user_id,
+                  page,
+                  limit,
+                  anon_log,
+                )
+              })
+              .await??
+              .into_iter()
+              .map(|item| ModlogAction::BanFromCommunity(item))
+              .collect(),
+            );
+          }
+          ModlogActionFlag::AddModToCommunity => {
+            log.append(
+              &mut blocking(context.pool(), move |conn| {
+                ModAddCommunityView::list(
+                  conn,
+                  community_id,
+                  mod_user_id,
+                  other_user_id,
+                  page,
+                  limit,
+                  anon_log,
+                )
+              })
+              .await??
+              .into_iter()
+              .map(|item| ModlogAction::AddModToCommunity(item))
+              .collect(),
+            );
+          }
+          ModlogActionFlag::RemoveCommunity => {
+            if data.community_id.is_none() {
+              log.append(
+                &mut blocking(context.pool(), move |conn| {
+                  ModRemoveCommunityView::list(conn, mod_user_id, page, limit, anon_log)
+                })
+                .await??
+                .into_iter()
+                .map(|item| ModlogAction::RemoveCommunity(item))
+                .collect(),
+              );
+            }
+          }
+          ModlogActionFlag::BanFromSite => {
+            if data.community_id.is_none() {
+              log.append(
+                &mut blocking(context.pool(), move |conn| {
+                  ModBanView::list(conn, mod_user_id, other_user_id, page, limit, anon_log)
+                })
+                .await??
+                .into_iter()
+                .map(|item| ModlogAction::BanFromSite(item))
+                .collect(),
+              );
+            }
+          }
+          ModlogActionFlag::AddMod => {
+            if data.community_id.is_none() {
+              log.append(
+                &mut blocking(context.pool(), move |conn| {
+                  ModAddView::list(conn, mod_user_id, other_user_id, page, limit, anon_log)
+                })
+                .await??
+                .into_iter()
+                .map(|item| ModlogAction::AddMod(item))
+                .collect(),
+              );
+            }
+          }
+        }
+      }
 
-    let locked_posts = blocking(context.pool(), move |conn| {
-      ModLockPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
+      log.sort_by(|a, b| get_action_timestamp(b).cmp(&get_action_timestamp(a)));
 
-    let stickied_posts = blocking(context.pool(), move |conn| {
-      ModStickyPostView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
-
-    let removed_comments = blocking(context.pool(), move |conn| {
-      ModRemoveCommentView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
-
-    let banned_from_community = blocking(context.pool(), move |conn| {
-      ModBanFromCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
-
-    let added_to_community = blocking(context.pool(), move |conn| {
-      ModAddCommunityView::list(conn, community_id, mod_user_id, page, limit, anon_log)
-    })
-    .await??;
-
-    // These arrays are only for the full modlog, when a community isn't given
-    let (removed_communities, banned, added) = if data.community_id.is_none() {
-      blocking(context.pool(), move |conn| {
-        Ok((
-          ModRemoveCommunityView::list(conn, mod_user_id, page, limit, anon_log)?,
-          ModBanView::list(conn, mod_user_id, page, limit, anon_log)?,
-          ModAddView::list(conn, mod_user_id, page, limit, anon_log)?,
-        )) as Result<_, LemmyError>
-      })
-      .await??
+      // Return the jwt
+      return Ok(GetModlogResponse { log });
     } else {
-      (Vec::new(), Vec::new(), Vec::new())
-    };
+      return Err(APIError::err("malformed-flags").into());
+    }
+  }
+}
 
-    // Return the jwt
-    Ok(GetModlogResponse {
-      removed_posts,
-      locked_posts,
-      stickied_posts,
-      removed_comments,
-      removed_communities,
-      banned_from_community,
-      banned,
-      added_to_community,
-      added,
-    })
+// we should make this more idiomatic in the future
+fn get_action_timestamp(action: &ModlogAction) -> chrono::NaiveDateTime {
+  match action {
+    ModlogAction::RemovePost(action) => action.when_,
+    ModlogAction::LockPost(action) => action.when_,
+    ModlogAction::StickyPost(action) => action.when_,
+    ModlogAction::RemoveComment(action) => action.when_,
+    ModlogAction::RemoveCommunity(action) => action.when_,
+    ModlogAction::BanFromCommunity(action) => action.when_,
+    ModlogAction::BanFromSite(action) => action.when_,
+    ModlogAction::AddModToCommunity(action) => action.when_,
+    ModlogAction::AddMod(action) => action.when_,
   }
 }
 
