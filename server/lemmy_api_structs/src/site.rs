@@ -108,13 +108,13 @@ pub struct SiteResponse {
 #[derive(Serialize, Deserialize)]
 pub struct GetSiteResponse {
   pub site: Option<SiteView>,
-  pub admins: Vec<UserViewSafe>,
-  pub banned: Vec<UserViewSafe>,
-  pub online: usize,
   pub version: String,
+  pub online: usize,
   pub my_user: Option<User_>,
-  pub federated_instances: Vec<String>,
+  pub admins: Vec<UserViewSafe>,
   pub sitemods: Vec<UserViewSafe>, // hexbear
+  pub banned: Vec<UserViewSafe>,
+  pub federated_instances: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]

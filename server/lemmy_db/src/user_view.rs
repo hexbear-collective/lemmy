@@ -77,6 +77,7 @@ pub struct UserViewSafe {
   pub local: bool,
   pub admin: bool,
   pub sitemod: bool,
+  pub moderator: bool,
   pub banned: bool,
   pub published: chrono::NaiveDateTime,
 }
@@ -94,6 +95,7 @@ pub struct UserQueryBuilder<'a> {
       sql_types::Nullable<sql_types::Text>,
       sql_types::Nullable<sql_types::Text>,
       sql_types::Nullable<sql_types::Text>,
+      sql_types::Bool,
       sql_types::Bool,
       sql_types::Bool,
       sql_types::Bool,
@@ -125,6 +127,7 @@ impl<'a> UserQueryBuilder<'a> {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         published,
       ))
@@ -390,6 +393,7 @@ impl UserViewSafe {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         published,
       ))
@@ -412,6 +416,7 @@ impl UserViewSafe {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         published,
       ))
@@ -435,6 +440,7 @@ impl UserViewSafe {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         published,
       ))
@@ -458,6 +464,7 @@ impl UserViewSafe {
         local,
         admin,
         sitemod,
+        moderator,
         banned,
         published,
       ))
