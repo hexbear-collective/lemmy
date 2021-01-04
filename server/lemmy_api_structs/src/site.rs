@@ -45,7 +45,7 @@ pub struct GetModlog {
   pub community_id: Option<i32>,
   pub page: Option<i64>,
   pub limit: Option<i64>,
-  pub action_filter: Option<i16>,   //9 bits for each type of mod action
+  pub action_filter: Option<u16>,   //9 bits for each type of mod action
   pub auth: Option<String>, // hexbear
 }
 
