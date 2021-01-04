@@ -26,8 +26,8 @@ services:
       - iframely
 
   pictrs:
-    image: asonix/pictrs:v0.1.13-r0
-    ports: 
+    image: asonix/pictrs:v0.2.5-r0
+    ports:
       - "127.0.0.1:8537:8080"
     user: 991:991
     volumes:
