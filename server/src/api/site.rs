@@ -223,7 +223,7 @@ impl Perform for GetModlog {
             );
           }
           ModlogActionFlag::RemoveCommunity => {
-            if data.community_id.is_none() {
+            if data.community_id.is_none() && other_user_id.is_none() {
               log.append(
                 &mut blocking(context.pool(), move |conn| {
                   ModRemoveCommunityView::list(conn, mod_user_id, page, limit, anon_log)
