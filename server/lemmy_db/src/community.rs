@@ -153,6 +153,8 @@ impl Community {
     );
     mods_and_admins
       .append(&mut UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())?);
+      mods_and_admins
+      .append(&mut UserView::sitemods(conn).map(|v| v.into_iter().map(|a| a.id).collect())?);
     Ok(mods_and_admins)
   }
 
