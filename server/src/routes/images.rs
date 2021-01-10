@@ -49,10 +49,9 @@ async fn upload(
 ) -> Result<HttpResponse, Error> {
   // TODO: check rate limit here
   let jwt = req
-    .cookie("jwt")
-    .expect("No auth header for picture upload");
+    .cookie("jwt");
 
-  if Claims::decode(jwt.value()).is_err() {
+  if jwt.is_none() || Claims::decode(jwt.unwrap().value()).is_err() {
     return Ok(HttpResponse::Unauthorized().finish());
   };
 

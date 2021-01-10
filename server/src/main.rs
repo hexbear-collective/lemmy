@@ -99,7 +99,7 @@ async fn main() -> Result<(), LemmyError> {
 
     let cors = Cors::default()
       .allow_any_origin()
-      .send_wildcard()
+      .supports_credentials()
       .allowed_methods(vec!["GET", "POST", "PUT", "OPTIONS"])
       .allow_any_header()
       .max_age(3600);
