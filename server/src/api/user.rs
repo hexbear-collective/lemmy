@@ -1754,12 +1754,12 @@ impl Perform for RemoveUserContent {
     // also returns us the list of ids that were updated
     let banned_user_id = data.user_id;
     let post_ids = blocking(context.pool(), move |conn| {
-      Post::remove_user_posts(conn, banned_user_id)
+      Post::permadelete_user_posts(conn, banned_user_id)
     })
     .await??;
 
     let comment_ids = blocking(context.pool(), move |conn| {
-      Comment::remove_user_comments(conn, banned_user_id)
+      Comment::permadelete_user_comments(conn, banned_user_id)
     })
     .await??;
 
