@@ -209,6 +209,26 @@ impl Post {
       .get_result::<Self>(conn)
   }
 
+  pub fn permadelete_user_posts(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
+    use crate::schema::post::dsl::*;
+
+    let perma_deleted = "*Permananently Deleted*";
+    let perma_deleted_url = "https://deleted.com";
+
+    diesel::update(
+      post
+        .filter(creator_id.eq(for_creator_id)),
+    )
+    .set((
+        deleted.eq(true),
+        updated.eq(naive_now()),
+      name.eq(perma_deleted),
+      url.eq(perma_deleted_url),
+      body.eq(perma_deleted)))
+    .returning(id)
+    .get_results(conn)
+  }
+
   pub fn update_featured(
     conn: &PgConnection,
     post_id: i32,
