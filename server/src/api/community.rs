@@ -883,6 +883,30 @@ impl Perform for TransferCommunity {
   }
 }
 
+#[async_trait::async_trait(?Send)]
+impl Perform for CommunityJoinRoom {
+  type Response = CommunityJoinRoomResponse;
+
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    websocket_id: Option<ConnectionId>,
+  ) -> Result<CommunityJoinRoomResponse, LemmyError> {
+    let data: &CommunityJoinRoom = &self;
+
+    if let Some(ws_id) = websocket_id {
+      context.chat_server().do_send(JoinCommunityRoom {
+        community_id: data.community_id,
+        id: ws_id,
+      });
+    }
+
+    Ok(CommunityJoinRoomResponse {
+      community_id: data.community_id,
+    })
+  }
+}
+
 pub fn send_community_websocket(
   res: &CommunityResponse,
   context: &Data<LemmyContext>,

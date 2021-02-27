@@ -80,4 +80,5 @@ pub enum UserOperation {
   FeaturePost,
   LeaveRooms,
   PostJoin,
+  CommunityJoinRoom,
 }

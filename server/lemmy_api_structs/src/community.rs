@@ -131,3 +131,13 @@ pub struct TransferCommunity {
   pub user_id: i32,
   pub auth: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct CommunityJoinRoom {
+  pub community_id: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CommunityJoinRoomResponse {
+  pub community_id: i32,
+}
