@@ -353,8 +353,10 @@ lazy_static! {
     Settings::get().hostname
   ))
   .unwrap();
-  pub static ref CACHE_CONTROL_REGEX: Regex =
-    Regex::new("^((text|image)/.+|application/javascript)$").unwrap();
+  pub static ref CACHE_CONTROL_IMAGE_REGEX: Regex =
+    Regex::new("^(image/.+)$").unwrap();
+  pub static ref CACHE_CONTROL_APPLICATION_REGEX: Regex =
+    Regex::new("^((text/.+)|(application/javascript)$").unwrap();
 }
 
 pub struct Keypair {
