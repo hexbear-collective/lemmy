@@ -356,7 +356,7 @@ lazy_static! {
   pub static ref CACHE_CONTROL_IMAGE_REGEX: Regex =
     Regex::new("^(image/.+)$").unwrap();
   pub static ref CACHE_CONTROL_APPLICATION_REGEX: Regex =
-    Regex::new("^((text/.+)|(application/javascript)$").unwrap();
+    Regex::new("^(text/.+)|(application/javascript)$").unwrap();
 }
 
 pub struct Keypair {
