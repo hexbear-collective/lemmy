@@ -28,7 +28,7 @@ use lemmy_server::{
   websocket::chat_server::ChatServer,
   LemmyContext,
 };
-use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_REGEX};
+use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_IMAGE_REGEX, CACHE_CONTROL_APPLICATION_REGEX};
 use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -36,7 +36,8 @@ use tokio::sync::Mutex;
 lazy_static! {
   // static ref CACHE_CONTROL_VALUE: String = format!("public, max-age={}", 365 * 24 * 60 * 60);
   // Test out 1 hour here, this is breaking some things
-  static ref CACHE_CONTROL_VALUE: String = format!("public, max-age={}", 60 * 60);
+  static ref CACHE_CONTROL_IMAGE_VALUE: String = format!("public, max-age={}", 12 * 60 * 60);
+  static ref CACHE_CONTROL_APPLICATION_VALUE: String = format!("public, no-cache, max-age={}", 0);
 }
 
 embed_migrations!();
@@ -120,10 +121,14 @@ async fn main() -> Result<(), LemmyError> {
       .configure(nodeinfo::config)
       .configure(webfinger::config)
       // static files
-      .service(actix_files::Files::new(
-        "/static",
-        settings.front_end_dir.to_owned(),
-      ))
+      .service(
+        actix_files::Files::new(
+          "/static",
+          settings.front_end_dir.to_owned(),
+        )
+          .use_etag(true)
+          .use_last_modified(true)
+      )
       .service(actix_files::Files::new(
         "/docs",
         settings.front_end_dir + "/documentation",
@@ -147,8 +152,11 @@ where
   async move {
     let mut res = fut.await?;
     if let Some(content_type) = res.headers().get(CONTENT_TYPE) {
-      if CACHE_CONTROL_REGEX.is_match(content_type.to_str().unwrap()) {
-        let header_val = HeaderValue::from_static(&CACHE_CONTROL_VALUE);
+      if CACHE_CONTROL_IMAGE_REGEX.is_match(content_type.to_str().unwrap()) {
+        let header_val = HeaderValue::from_static(&CACHE_CONTROL_IMAGE_VALUE);
+        res.headers_mut().insert(CACHE_CONTROL, header_val);
+      } else if CACHE_CONTROL_APPLICATION_REGEX.is_match(content_type.to_str().unwrap()) {
+        let header_val = HeaderValue::from_static(&CACHE_CONTROL_APPLICATION_VALUE);
         res.headers_mut().insert(CACHE_CONTROL, header_val);
       }
     }
