@@ -655,7 +655,7 @@ impl ModAddCommunityView {
         community_id,
         removed,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
         community_name,
       ));
