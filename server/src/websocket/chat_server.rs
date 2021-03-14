@@ -504,7 +504,7 @@ impl ChatServer {
           do_user_operation::<ResolveCommentReport>(args).await
         }
 
-        // chapo specific
+        // hexbear specific
         UserOperation::FeaturePost => do_user_operation::<FeaturePost>(args).await,
         UserOperation::LeaveRooms => do_user_operation::<LeaveRooms>(args).await,
         UserOperation::PostJoin => do_user_operation::<PostJoin>(args).await,

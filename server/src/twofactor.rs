@@ -48,7 +48,7 @@ impl CodeCacheHandler {
       //code is valid for one hour
     }
 
-    let subject = &format!("ChapoChat: Attempted login for {}", &user.name);
+    let subject = &format!("Hexbear: Attempted login for {}", &user.name);
     let time = Utc::now().format("%Y-%m-%d %H:%M:%S");
     let html = &format!("<h1>Attempted login for {}</h1><br><p>At {} UTC a login was attempted on your account.
               Because your account is setup with two-factor authentication, you must enter a code to successfully login. This code will expire within one hour.</p>
