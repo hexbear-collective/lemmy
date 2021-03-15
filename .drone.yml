@@ -28,13 +28,6 @@
     volumes:
       - name: cache
         path: /cache
-    when:
-      branch:
-        - main
-      event:
-        - push
-        - tag
-        - pull_request
 
   - name: build_backend
     image: rust:1.47
@@ -48,13 +41,6 @@
       - name: cargo
         path: /var/cache/drone/cargo
     depends_on: [ fetch, prepare_cargo_cache ]
-    when:
-      branch:
-        - main
-      event:
-        - push
-        - tag
-        - pull_request
   
   - name: notify-matrix
     image: plugins/matrix
