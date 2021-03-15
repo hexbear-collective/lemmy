@@ -146,7 +146,7 @@
       - success
       - failure
 
-   volumes:
+    volumes:
     - name: cache
       host:
         path: /var/cache
