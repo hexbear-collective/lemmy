@@ -41,7 +41,7 @@
       - name: cargo
         path: /var/cache/drone/cargo
     depends_on: [ fetch, prepare_cargo_cache ]
-  
+
   - name: notify-matrix
     image: plugins/matrix
     settings:
@@ -72,10 +72,10 @@
 
   trigger:
     event:
-    - promote
+      - promote
     target:
-    - dev
-    - prod
+      - dev
+      - prod
 
   clone:
     skip_verify: true
@@ -145,7 +145,7 @@
       status:
       - success
       - failure
-  
+
    volumes:
     - name: cache
       host:
@@ -156,5 +156,3 @@
     - name: dockersock
       host:
         path: /var/run/docker.sock
-
-
