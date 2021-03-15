@@ -119,7 +119,7 @@ impl Comment {
     use crate::schema::comment::dsl::*;
     diesel::update(comment.filter(creator_id.eq(for_creator_id)))
       .set((
-        content.eq("*Permananently Deleted*"),
+        content.eq("*Permanently Deleted*"),
         deleted.eq(true),
         updated.eq(naive_now()),
       ))
