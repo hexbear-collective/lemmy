@@ -5,24 +5,11 @@
 
   trigger:
     branch:
-      - dev
-      - prod
       - main
     event:
       - push
       - pull_request
       - tag
-
-  globals:
-    - &docker_settings
-      username:
-        from_secret: CHAPO_REGISTRY_USER
-      password:
-        from_secret: CHAPO_REGISTRY_TOKEN
-      registry:
-        from_secret: CHAPO_REGISTRY_URL
-      repo:
-        from_secret: CHAPO_REGISTRY_URL_REPO
 
   clone:
     skip_verify: true
@@ -33,21 +20,6 @@
     commands:
       - git fetch --tags
       - git submodule update --init
-
-  - name: prepare_docker_cache
-    image: busybox
-    commands:
-      - mkdir -p /cache/${DRONE_REPO}/docker
-    volumes:
-      - name: cache
-        path: /cache
-    when:
-      branch:
-        - dev
-        - prod
-      event:
-        - push
-        - tag
 
   - name: prepare_cargo_cache
     image: busybox
@@ -63,37 +35,6 @@
         - push
         - tag
         - pull_request
-
-  - name: docker_build
-    image: plugins/docker
-    settings:
-      <<: *docker_settings
-      use_cache: true
-      dockerfile: docker/prod/Dockerfile
-      build_args:
-        - FRONTEND_TAG=${DRONE_BRANCH}
-      tags:
-        - ${DRONE_BRANCH}-latest
-        - ${DRONE_BRANCH}
-        - ${DRONE_COMMIT_SHA:0:8}
-        - ${DRONE_BRANCH}-${DRONE_COMMIT}
-      cache_from:
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
-        - registry.chapo.chat/hexbear:${DRONE_BRANCH}-latest
-      purge: false
-    volumes:
-      - name: docker
-        path: /var/lib/docker
-      - name: dockersock
-        path: /var/run/docker.sock
-    depends_on: [ fetch, prepare_docker_cache ]
-    when:
-      branch:
-        - dev
-        - prod
-      event:
-        - push
-        - tag
 
   - name: build_backend
     image: rust:1.47
@@ -114,35 +55,6 @@
         - push
         - tag
         - pull_request
-
-  - name: notify
-    image: appleboy/drone-discord
-    settings:
-      webhook_id:
-        from_secret: discord_webhook_id
-      webhook_token:
-        from_secret: discord_webhook_token
-      color: "0xffd930"
-      message: |
-        {{#success build.status}}
-        ✅  Build #{{build.number}} of `{{repo.name}}` succeeded.  
-        {{else}}
-        ❌  Build #{{build.number}} of `{{repo.name}}` failed.  
-        {{/success}}
-
-        📝 Commit by {{commit.author}} on `{{commit.branch}}`:
-        --------
-        
-        {{commit.message}}
-        
-
-        🌐 {{ build.link }}
-
-    depends_on: [build_backend, docker_build ]
-    when:
-      status:
-      - success
-      - failure
   
   - name: notify-matrix
     image: plugins/matrix
@@ -153,7 +65,7 @@
         from_secret: matrix_username
       password:
         from_secret: matrix_password
-    depends_on: [build_backend, docker_build ]
+    depends_on: [build_backend]
     when:
       status:
       - success
@@ -163,12 +75,100 @@
     - name: cache
       host:
         path: /var/cache
-    - name: docker
-      host:
-        path: /var/cache/${DRONE_REPO}/docker
     - name: cargo
       host:
         path: /var/cache/${DRONE_REPO}/cargo
+
+---
+  kind: pipeline
+  type: docker
+  name: deploy
+
+  trigger:
+    event:
+    - promote
+    target:
+    - dev
+    - prod
+
+  clone:
+    skip_verify: true
+
+  globals:
+    - &docker_settings
+      username:
+        from_secret: CHAPO_REGISTRY_USER
+      password:
+        from_secret: CHAPO_REGISTRY_TOKEN
+      registry:
+        from_secret: CHAPO_REGISTRY_URL
+      repo:
+        from_secret: CHAPO_REGISTRY_URL_REPO
+
+  steps:
+  - name: fetch
+    image: alpine/git
+    commands:
+      - git fetch --tags
+      - git submodule update --init
+
+  - name: prepare_docker_cache
+    image: busybox
+    commands:
+      - mkdir -p /cache/${DRONE_REPO}/docker
+    volumes:
+      - name: cache
+        path: /cache
+
+  - name: docker_build
+    image: plugins/docker
+    settings:
+      <<: *docker_settings
+      use_cache: true
+      dockerfile: docker/prod/Dockerfile
+      build_args:
+        - FRONTEND_TAG=${DRONE_DEPLOY_TO}-latest
+      tags:
+        - ${DRONE_DEPLOY_TO}-latest
+        - ${DRONE_BRANCH}
+        - ${DRONE_COMMIT_SHA:0:8}
+        - ${DRONE_BRANCH}-${DRONE_COMMIT}
+        - ${DRONE_DEPLOY_TO}-${DRONE_COMMIT}
+      cache_from:
+        - registry.chapo.chat/hexbear:${DRONE_BRANCH}
+        - registry.chapo.chat/hexbear:${DRONE_DEPLOY_TO}-latest
+      purge: false
+    volumes:
+      - name: docker
+        path: /var/lib/docker
+      - name: dockersock
+        path: /var/run/docker.sock
+    depends_on: [ fetch, prepare_docker_cache ]
+
+  - name: notify-matrix
+    image: plugins/matrix
+    settings:
+      homeserver: https://matrix.chapo.chat
+      roomid: "!TjshsDXBWkOhmZIrmL:chapo.chat"
+      username:
+        from_secret: matrix_username
+      password:
+        from_secret: matrix_password
+    depends_on: [ docker_build ]
+    when:
+      status:
+      - success
+      - failure
+  
+   volumes:
+    - name: cache
+      host:
+        path: /var/cache
+    - name: docker
+      host:
+        path: /var/cache/${DRONE_REPO}/docker
     - name: dockersock
       host:
         path: /var/run/docker.sock
+
+
