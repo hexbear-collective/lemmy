@@ -75,7 +75,7 @@ impl ModRemovePostView {
         reason,
         removed,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
         post_name,
         community_id,
@@ -161,7 +161,7 @@ impl ModLockPostView {
         post_id,
         locked,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
         post_name,
         community_id,
@@ -247,7 +247,7 @@ impl ModStickyPostView {
         post_id,
         stickied,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
         post_name,
         community_id,
@@ -339,7 +339,7 @@ impl ModRemoveCommentView {
         reason,
         removed,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         comment_user_id,
         comment_user_name,
         comment_content,
@@ -415,7 +415,7 @@ impl ModRemoveCommunityView {
         removed,
         expires,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         community_name,
       ));
     }
@@ -500,7 +500,7 @@ impl ModBanFromCommunityView {
         banned,
         expires,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
         community_name,
       ));
@@ -576,7 +576,7 @@ impl ModBanView {
         banned,
         expires,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
       ));
     }
@@ -725,7 +725,7 @@ impl ModAddView {
         other_user_id,
         removed,
         when_,
-        "ChapoModerator".into_sql::<Text>(),
+        "HexbearModerator".into_sql::<Text>(),
         other_user_name,
       ));
     }
