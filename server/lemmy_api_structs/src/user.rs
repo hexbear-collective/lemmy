@@ -94,7 +94,7 @@ pub struct GetUserDetails {
 }
 
 #[derive(Serialize, Deserialize)]
-//fe can still get userview type without unnecessary nesting
+//gives the fe the type of userview without creating unnecessary nesting
 #[serde(tag = "type")]
 pub enum UserViewEnum {
   UserDetail(UserView),
