@@ -4,7 +4,7 @@ use lemmy_db::{
   post_view::PostView,
   private_message_view::PrivateMessageView,
   user_mention_view::UserMentionView,
-  user_view::UserView,
+  user_view::{UserView, UserViewSafe},
 };
 use serde::{Deserialize, Serialize};
 
@@ -94,15 +94,23 @@ pub struct GetUserDetails {
 }
 
 #[derive(Serialize, Deserialize)]
+//gives the fe the type of userview without creating unnecessary nesting
+#[serde(tag = "type")]
+pub enum UserViewEnum {
+  UserDetail(UserView),
+  UserClean(UserViewSafe),
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct GetUserDetailsResponse {
-  pub user: UserView,
+  pub user: UserViewEnum,
   pub follows: Vec<CommunityFollowerView>,
   pub moderates: Vec<CommunityModeratorView>,
   pub comments: Vec<CommentView>,
   pub posts: Vec<PostView>,
   // TODO: These should be removed. GetSite does this already.
-  pub admins: Vec<UserView>,   // hexbear
-  pub sitemods: Vec<UserView>, // hexbear
+  pub admins: Vec<UserViewSafe>,   // hexbear
+  pub sitemods: Vec<UserViewSafe>, // hexbear
 }
 
 #[derive(Serialize, Deserialize)]
@@ -129,7 +137,7 @@ pub struct AddAdmin {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AddAdminResponse {
-  pub admins: Vec<UserView>,
+  pub admins: Vec<UserViewSafe>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -144,7 +152,7 @@ pub struct BanUser {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct BanUserResponse {
-  pub user: UserView,
+  pub user: UserViewSafe,
   pub banned: bool,
 }
 
@@ -280,7 +288,7 @@ pub struct AddSitemod {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AddSitemodResponse {
-  pub sitemods: Vec<UserView>,
+  pub sitemods: Vec<UserViewSafe>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

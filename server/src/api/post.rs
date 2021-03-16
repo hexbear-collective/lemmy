@@ -96,13 +96,13 @@ impl Perform for CreatePost {
     );
     moderators.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+        UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
       })
       .await??,
     );
     moderators.append(
       &mut blocking(context.pool(), move |conn| {
-        UserView::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
+        UserViewSafe::sitemods(conn).map(|v| v.into_iter().map(|s| s.id).collect())
       })
       .await??,
     );
@@ -275,7 +275,7 @@ impl Perform for GetPost {
       );
       moderators.append(
         &mut blocking(context.pool(), move |conn| {
-          UserView::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
+          UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())
         })
         .await??,
       );
@@ -339,12 +339,12 @@ impl Perform for GetPost {
     })
     .await??;
 
-    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
 
     if let Some(id) = websocket_id {
       context.chat_server().do_send(JoinPostRoom {

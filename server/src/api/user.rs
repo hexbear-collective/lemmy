@@ -275,7 +275,7 @@ impl Perform for Register {
 
     // Don't allow admin registration if there are any admins
     let any_admins = blocking(context.pool(), move |conn| {
-      UserView::admins(conn).map(|a| a.is_empty())
+      UserViewSafe::admins(conn).map(|a| a.is_empty())
     })
     .await??;
     if data.admin && !any_admins {
@@ -735,18 +735,6 @@ impl Perform for GetUserDetails {
     };
 
     let auth_user = user.clone();
-    let user_fun = move |conn: &'_ _| match auth_user {
-      Some(user) => {
-        if user_details_id == user.id {
-          UserView::read(conn, user.id)
-        } else {
-          UserView::get_user_secure(conn, user_details_id)
-        }
-      }
-      None => UserView::get_user_secure(conn, user_details_id),
-    };
-
-    let mut user_view = blocking(context.pool(), user_fun).await??;
 
     let page = data.page;
     let limit = data.limit;
@@ -798,26 +786,50 @@ impl Perform for GetUserDetails {
     })
     .await??;
 
-    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
     let creator_index = admins.iter().position(|r| r.id == site_creator_id).unwrap();
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
 
-    // temporarily disable avatars
-    user_view.avatar = None;
+    match auth_user {
+      Some(user) if user_details_id == user.id => {
+        // this is a request for details of the authenticated user
+        let mut user_view =
+          blocking(context.pool(), move |conn| UserView::read(conn, user.id)).await??;
+        user_view.avatar = None;
+        // Return the jwt
+        Ok(GetUserDetailsResponse {
+          user: UserViewEnum::UserDetail(user_view),
+          follows,
+          moderates,
+          comments,
+          posts,
+          admins,
+          sitemods,
+        })
+      }
+      _ => {
+        // not for the authenticated user, use the safe view
+        let mut user_view = blocking(context.pool(), move |conn| {
+          UserViewSafe::read(conn, user_details_id)
+        })
+        .await??;
+        user_view.avatar = None;
 
-    // Return the jwt
-    Ok(GetUserDetailsResponse {
-      user: user_view,
-      follows,
-      moderates,
-      comments,
-      posts,
-      admins,
-      sitemods,
-    })
+        // Return the jwt
+        Ok(GetUserDetailsResponse {
+          user: UserViewEnum::UserClean(user_view),
+          follows,
+          moderates,
+          comments,
+          posts,
+          admins,
+          sitemods,
+        })
+      }
+    }
   }
 }
 
@@ -857,7 +869,7 @@ impl Perform for AddAdmin {
     })
     .await??;
 
-    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
     let creator_index = admins
       .iter()
       .position(|r| r.id == site_creator_id)
@@ -908,7 +920,7 @@ impl Perform for AddSitemod {
 
     blocking(context.pool(), move |conn| ModAdd::create(conn, &form)).await??;
 
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
 
     let res = AddSitemodResponse { sitemods };
 
@@ -993,7 +1005,7 @@ impl Perform for BanUser {
 
     let user_id = data.user_id;
     let user_view = blocking(context.pool(), move |conn| {
-      UserView::get_user_secure(conn, user_id)
+      UserViewSafe::read(conn, user_id)
     })
     .await??;
 
@@ -1802,7 +1814,10 @@ impl Perform for RemoveUserContent {
     .await??;
 
     let user_id = data.user_id;
-    let user_view = blocking(context.pool(), move |conn| UserView::read(conn, user_id)).await??;
+    let user_view = blocking(context.pool(), move |conn| {
+      UserViewSafe::read(conn, user_id)
+    })
+    .await??;
 
     let banned = user_view.banned;
     let res = BanUserResponse {

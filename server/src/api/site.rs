@@ -437,8 +437,8 @@ impl Perform for GetSite {
       None
     };
 
-    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
 
     // Make sure the site creator is the top admin
     if let Some(site_view) = site_view.to_owned() {
@@ -451,7 +451,7 @@ impl Perform for GetSite {
       }
     }
 
-    let banned = blocking(context.pool(), move |conn| UserView::banned(conn)).await??;
+    let banned = blocking(context.pool(), move |conn| UserViewSafe::banned(conn)).await??;
 
     let online = context
       .chat_server()
@@ -633,10 +633,6 @@ impl Perform for Search {
       }
     };
 
-    for u in &mut users {
-      u.email = None;
-    }
-
     // Return the jwt
     Ok(SearchResponse {
       type_: data.type_.to_owned(),
@@ -691,8 +687,8 @@ impl Perform for TransferSite {
 
     let site_view = blocking(context.pool(), move |conn| SiteView::read(conn)).await??;
 
-    let mut admins = blocking(context.pool(), move |conn| UserView::admins(conn)).await??;
-    let sitemods = blocking(context.pool(), move |conn| UserView::sitemods(conn)).await??;
+    let mut admins = blocking(context.pool(), move |conn| UserViewSafe::admins(conn)).await??;
+    let sitemods = blocking(context.pool(), move |conn| UserViewSafe::sitemods(conn)).await??;
     let creator_index = admins
       .iter()
       .position(|r| r.id == site_view.creator_id)
@@ -700,7 +696,7 @@ impl Perform for TransferSite {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let banned = blocking(context.pool(), move |conn| UserView::banned(conn)).await??;
+    let banned = blocking(context.pool(), move |conn| UserViewSafe::banned(conn)).await??;
 
     Ok(GetSiteResponse {
       site: Some(site_view),

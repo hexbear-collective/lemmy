@@ -1,7 +1,6 @@
-use super::user_view::user_view::BoxedQuery;
 use crate::{fuzzy_search, limit_and_offset, MaybeOptional, SortType};
 
-use diesel::{dsl::*, pg::Pg, result::Error, *};
+use diesel::{dsl::*, pg::Pg, query_builder::BoxedSelectStatement, result::Error, *};
 use serde::{Deserialize, Serialize};
 
 table! {
@@ -62,9 +61,50 @@ pub struct UserView {
   pub inbox_disabled: bool,
 }
 
+#[derive(
+  Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize, QueryableByName, Clone,
+)]
+#[table_name = "user_view"]
+pub struct UserViewSafe {
+  pub id: i32,
+  pub actor_id: String,
+  pub name: String,
+  pub preferred_username: Option<String>,
+  pub avatar: Option<String>,
+  pub banner: Option<String>,
+  pub matrix_user_id: Option<String>,
+  pub bio: Option<String>,
+  pub local: bool,
+  pub admin: bool,
+  pub sitemod: bool,
+  pub moderator: bool,
+  pub banned: bool,
+  pub published: chrono::NaiveDateTime,
+}
+
 pub struct UserQueryBuilder<'a> {
   conn: &'a PgConnection,
-  query: BoxedQuery<'a, Pg>,
+  query: BoxedSelectStatement<
+    'a,
+    (
+      sql_types::Integer,
+      sql_types::Text,
+      sql_types::Text,
+      sql_types::Nullable<sql_types::Text>,
+      sql_types::Nullable<sql_types::Text>,
+      sql_types::Nullable<sql_types::Text>,
+      sql_types::Nullable<sql_types::Text>,
+      sql_types::Nullable<sql_types::Text>,
+      sql_types::Bool,
+      sql_types::Bool,
+      sql_types::Bool,
+      sql_types::Bool,
+      sql_types::Bool,
+      sql_types::Timestamp,
+    ),
+    user_view::table,
+    Pg,
+  >,
   sort: &'a SortType,
   page: Option<i64>,
   limit: Option<i64>,
@@ -74,7 +114,24 @@ impl<'a> UserQueryBuilder<'a> {
   pub fn create(conn: &'a PgConnection) -> Self {
     use super::user_view::user_view::dsl::*;
 
-    let query = user_view.into_boxed();
+    let query = user_view
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        published,
+      ))
+      .into_boxed();
 
     UserQueryBuilder {
       conn,
@@ -108,9 +165,8 @@ impl<'a> UserQueryBuilder<'a> {
     self
   }
 
-  pub fn list(self) -> Result<Vec<UserView>, Error> {
+  pub fn list(self) -> Result<Vec<UserViewSafe>, Error> {
     use super::user_view::user_view::dsl::*;
-    use diesel::sql_types::{Nullable, Text};
     let mut query = self.query;
 
     query = match self.sort {
@@ -139,33 +195,7 @@ impl<'a> UserQueryBuilder<'a> {
     let (limit, offset) = limit_and_offset(self.page, self.limit);
     query = query.limit(limit).offset(offset);
 
-    // The select is necessary here to not get back emails
-    query = query.select((
-      id,
-      actor_id,
-      name,
-      preferred_username,
-      avatar,
-      banner,
-      "".into_sql::<Nullable<Text>>(),
-      matrix_user_id,
-      bio,
-      local,
-      admin,
-      sitemod,
-      moderator,
-      banned,
-      show_avatars,
-      send_notifications_to_email,
-      published,
-      number_of_posts,
-      post_score,
-      number_of_comments,
-      comment_score,
-      has_2fa,
-      inbox_disabled,
-    ));
-    query.load::<UserView>(self.conn)
+    query.load::<UserViewSafe>(self.conn)
   }
 }
 
@@ -344,5 +374,101 @@ impl UserView {
       ))
       .find(user_id)
       .first::<Self>(conn)
+  }
+}
+
+impl UserViewSafe {
+  pub fn read(conn: &PgConnection, from_user_id: i32) -> Result<Self, Error> {
+    use super::user_view::user_view::dsl::*;
+    user_view
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        published,
+      ))
+      .find(from_user_id)
+      .first::<Self>(conn)
+  }
+
+  pub fn admins(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_view::dsl::*;
+    user_view
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        published,
+      ))
+      .filter(admin.eq(true))
+      .order_by(published)
+      .load::<Self>(conn)
+  }
+
+  pub fn sitemods(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_view::dsl::*;
+    user_view
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        published,
+      ))
+      .filter(sitemod.eq(true))
+      .order_by(published)
+      .load::<Self>(conn)
+  }
+
+  pub fn banned(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_view::dsl::*;
+    user_view
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        published,
+      ))
+      .filter(banned.eq(true))
+      .load::<Self>(conn)
   }
 }
