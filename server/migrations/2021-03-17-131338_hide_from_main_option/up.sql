@@ -176,7 +176,7 @@ UNION ALL
      LEFT JOIN community_user_tag cut ON p.creator_id = cut.user_id AND p.community_id = cut.community_id
      LEFT JOIN community_user_ban cb ON p.creator_id = cb.user_id AND p.community_id = cb.community_id
      LEFT JOIN community c ON p.community_id = c.id
-     LEFT JOIN community_settings cs ON p.community_id = c.id
+     LEFT JOIN community_settings cs ON p.community_id = cs.id
      LEFT JOIN hexbear.post_stat cps ON cps.post_id = p.id;
 
 CREATE OR REPLACE VIEW hexbear.comment_fast_view

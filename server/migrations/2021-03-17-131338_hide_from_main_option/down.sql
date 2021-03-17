@@ -1,6 +1,7 @@
 -- This file should undo anything in `up.sql`
-alter table community_settings
-drop column hide_from_all;
+drop view hexbear.post_fast_view;
+drop view hexbear.comment_fast_view;
+
 
 CREATE OR REPLACE VIEW hexbear.post_fast_view
 AS SELECT pav.id,
@@ -304,3 +305,6 @@ UNION ALL
      LEFT JOIN community_user_tag cut ON ct.creator_id = cut.user_id AND p.community_id = cut.community_id
      LEFT JOIN community_user_ban cb ON ct.creator_id = cb.user_id AND p.id = ct.post_id AND p.community_id = cb.community_id
      LEFT JOIN hexbear.comment_stat ccs ON ccs.comment_id = ct.id;
+
+ alter table community_settings
+ drop column hide_from_all;
