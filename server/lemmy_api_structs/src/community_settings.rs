@@ -15,6 +15,7 @@ pub struct GetCommunitySettingsResponse {
   pub comment_images: i32,
   pub published: NaiveDateTime,
   pub allow_as_default: bool,
+  pub hide_from_all: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,6 +26,7 @@ pub struct EditCommunitySettings {
   pub post_links: bool,
   pub comment_images: i32,
   pub allow_as_default: bool,
+  pub hide_from_all: bool,
   pub auth: String,
 }
 
@@ -36,4 +38,5 @@ pub struct EditCommunitySettingsResponse {
   pub comment_images: i32,
   pub published: NaiveDateTime,
   pub allow_as_default: bool,
+  pub hide_from_all: bool,
 }

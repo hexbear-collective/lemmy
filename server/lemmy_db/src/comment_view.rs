@@ -23,6 +23,7 @@ table! {
     community_local -> Bool,
     community_name -> Varchar,
     community_icon -> Nullable<Text>,
+    community_hide_from_all -> Bool,
     banned -> Bool,
     banned_from_community -> Bool,
     creator_actor_id -> Text,
@@ -68,6 +69,7 @@ pub struct CommentView {
   pub community_local: bool,
   pub community_name: String,
   pub community_icon: Option<String>,
+  pub community_hide_from_all: bool,
   pub banned: bool,
   pub banned_from_community: bool,
   pub creator_actor_id: String,
@@ -225,6 +227,7 @@ impl<'a> CommentQueryBuilder<'a> {
     query = match self.listing_type {
       ListingType::Subscribed => query.filter(subscribed.eq(true)),
       ListingType::Local => query.filter(community_local.eq(true)),
+      ListingType::All => query.filter(community_hide_from_all.eq(false).or(subscribed.eq(true))),
       _ => query,
     };
 

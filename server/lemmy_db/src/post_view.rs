@@ -44,6 +44,7 @@ table! {
     community_removed -> Bool,
     community_deleted -> Bool,
     community_nsfw -> Bool,
+    community_hide_from_all -> Bool,
     number_of_comments -> BigInt,
     score -> BigInt,
     upvotes -> BigInt,
@@ -101,6 +102,7 @@ pub struct PostView {
   pub community_removed: bool,
   pub community_deleted: bool,
   pub community_nsfw: bool,
+  pub community_hide_from_all: bool,
   pub number_of_comments: i64,
   pub score: i64,
   pub upvotes: i64,
@@ -245,6 +247,7 @@ impl<'a> PostQueryBuilder<'a> {
     query = match self.listing_type {
       ListingType::Subscribed => query.filter(subscribed.eq(true)),
       ListingType::Local => query.filter(community_local.eq(true)),
+      ListingType::All => query.filter(community_hide_from_all.eq(false).or(subscribed.eq(true))),
       _ => query,
     };
 

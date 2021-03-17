@@ -43,6 +43,7 @@ impl Perform for GetCommunitySettings {
       comment_images: community_settings.comment_images,
       published: naive_now(),
       allow_as_default: community_settings.allow_as_default,
+      hide_from_all: community_settings.hide_from_all,
     };
 
     // Return the jwt
@@ -70,6 +71,7 @@ impl Perform for EditCommunitySettings {
       post_links: data.post_links.to_owned(),
       comment_images: data.comment_images.to_owned(),
       allow_as_default: data.allow_as_default.to_owned(),
+      hide_from_all: data.hide_from_all.to_owned(),
     };
 
     let community_id = data.community_id;
@@ -89,6 +91,7 @@ impl Perform for EditCommunitySettings {
       comment_images: updated_community_settings.comment_images,
       published: updated_community_settings.published,
       allow_as_default: updated_community_settings.allow_as_default,
+        hide_from_all: updated_community_settings.hide_from_all,
     };
 
     context.chat_server().do_send(SendCommunityRoomMessage {
