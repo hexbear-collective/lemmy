@@ -1,4 +1,4 @@
 # Contributing
 
-See [here](https://chapo.chat/docs/contributing.html) for contributing Instructions.
+See [here](https://hexbear.net/docs/contributing.html) for contributing Instructions.
 
