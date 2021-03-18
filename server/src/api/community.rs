@@ -212,6 +212,7 @@ impl Perform for CreateCommunity {
       post_links: true,
       comment_images: 1,
       allow_as_default: true,
+      hide_from_all: false,
     };
 
     let _inserted_settings = blocking(context.pool(), move |conn| {

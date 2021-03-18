@@ -185,6 +185,7 @@ table! {
         comment_images -> Int4,
         published -> Timestamp,
         allow_as_default -> Bool,
+        hide_from_all -> Bool,
     }
 }
 

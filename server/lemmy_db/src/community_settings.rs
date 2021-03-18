@@ -12,6 +12,7 @@ pub struct CommunitySettings {
   pub comment_images: i32,
   pub published: chrono::NaiveDateTime,
   pub allow_as_default: bool,
+  pub hide_from_all: bool,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize, Debug)]
@@ -23,6 +24,7 @@ pub struct CommunitySettingsForm {
   pub post_links: bool,
   pub comment_images: i32,
   pub allow_as_default: bool,
+  pub hide_from_all: bool,
 }
 
 impl CommunitySettings {
