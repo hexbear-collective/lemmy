@@ -216,7 +216,7 @@ impl<'a> CommentQueryBuilder<'a> {
       query = query.filter(post_id.eq(for_post_id));
     };
 
-    if let Some(for_comment_ids) = self.for_comment_ids {
+    if let Some(ref for_comment_ids) = self.for_comment_ids {
       query = query.filter(id.eq_any(for_comment_ids));
     };
 
@@ -224,12 +224,15 @@ impl<'a> CommentQueryBuilder<'a> {
       query = query.filter(content.ilike(fuzzy_search(&search_term)));
     };
 
-    query = match self.listing_type {
-      ListingType::Subscribed => query.filter(subscribed.eq(true)),
-      ListingType::Local => query.filter(community_local.eq(true)),
-      ListingType::All => query.filter(community_hide_from_all.eq(false).or(subscribed.eq(true))),
-      _ => query,
-    };
+    //in these cases listingtype doesn't matter
+    if self.for_post_id.is_none() && self.for_comment_ids.is_none() && self.for_community_id.is_none() {
+      query = match self.listing_type {
+        ListingType::Subscribed => query.filter(subscribed.eq(true)),
+        ListingType::Local => query.filter(community_local.eq(true)),
+        ListingType::All => query.filter(community_hide_from_all.eq(false).or(subscribed.eq(true))),
+        _ => query,
+      };
+    }
 
     if self.saved_only {
       query = query.filter(saved.eq(true));
