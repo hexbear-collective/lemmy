@@ -40,7 +40,7 @@ captcha = "0.0.7"
 chrono = { version = "0.4.7", features = ["serde"] }
 comrak = "0.7"
 config = {version = "0.10.1", default-features = false, features = ["hjson"] }
-diesel = { version = "1.4.4", features = ["postgres","chrono","r2d2","64-column-tables","serde_json","uuid"] }
+diesel = { version = "1.4.6", features = ["postgres","chrono","r2d2","64-column-tables","serde_json","uuid"] }
 diesel_migrations = "1.4.0"
 dotenv = "0.15.0"
 enumflags2 = "0.6.4"

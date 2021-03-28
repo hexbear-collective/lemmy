@@ -9,6 +9,13 @@ table! {
     }
 }
 
+table!{
+    hexbear.ban_id (id) {
+        id -> Int4,
+        created -> Timestamp,
+    }
+}
+
 table! {
     category (id) {
         id -> Int4,
@@ -501,6 +508,13 @@ table! {
         id -> Int4,
         user_id -> Int4,
         published -> Timestamp,
+    }
+}
+
+table! {
+    hexbear.user_ban_id (bid, uid) {
+        bid -> Int4,
+        uid -> Int4,
     }
 }
 
