@@ -1,19 +1,13 @@
 use actix_web::web::Data;
 
 use lemmy_api_structs::APIError;
-use lemmy_db::{
-  community::Community,
-  community_view::CommunityUserBanView,
-  naive_now,
-  post::Post,
-  user::User_,
-  Crud,
-};
+use lemmy_db::{Crud, community::Community, community_view::CommunityUserBanView, naive_now, post::Post, user::User_};
 use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
 
 use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 use chrono::Duration;
 use lemmy_db::user_token::UserToken;
+use lemmy_db::user_ban_id::UserBanId;
 
 pub mod claims;
 pub mod comment;
@@ -77,7 +71,10 @@ pub(in crate::api) async fn get_user_from_jwt(
   jwt: &str,
   pool: &DbPool,
 ) -> Result<User_, LemmyError> {
-  let claims = match Claims::decode(&jwt) {
+  let (jwt_spliced, bid_str) = jwt.split_at(192);
+  let mut bid_string = bid_str.to_string();
+
+  let claims = match Claims::decode(&jwt_spliced) {
     Ok(claims) => claims.claims,
     Err(_e) => return Err(APIError::err("not_logged_in").into()),
   };
@@ -85,10 +82,30 @@ pub(in crate::api) async fn get_user_from_jwt(
   validate_token(claims.token_id, pool).await?;
 
   let user_id = claims.id;
-  let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
+  let user = blocking(pool, move |conn| User_::read(conn, user_id.clone())).await??;
+
+  if !bid_string.is_empty() {
+    //bid reported, try creating relationship
+    let bid = bid_string.parse().map_err(|_| APIError::err("invalid_bid"))?;
+    blocking(pool, move |conn| UserBanId::associate(conn, bid, user_id.clone())).await??;
+  } else {
+    //bid not reported, find existing
+    bid_string = match blocking(pool, move |conn| UserBanId::get_by_user(conn, user_id.clone())).await? {
+      Ok(Some(ubid)) => ubid.bid.to_string(),
+      Ok(None) => "".to_string(),
+      //another error
+      Err(_) => return Err(APIError::err("internal_error").into()),
+    }
+  }
+
   // Check for a site ban
   if user.banned {
-    return Err(APIError::err("site_ban").into());
+    //generate new bid
+    if bid_string.is_empty() {
+      bid_string = blocking(pool, move |conn| UserBanId::create_then_associate(conn, user_id.clone())).await??.bid.to_string();
+    }
+   
+    return Err(APIError::err(&*format!("site_ban_{}", bid_string)).into());
   }
   Ok(user)
 }

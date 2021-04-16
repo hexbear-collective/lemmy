@@ -13,6 +13,7 @@ table!{
     hexbear.ban_id (id) {
         id -> Int4,
         created -> Timestamp,
+        aliased_to -> Int4,
     }
 }
 

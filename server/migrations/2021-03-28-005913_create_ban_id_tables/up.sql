@@ -1,6 +1,7 @@
 create table hexbear.ban_id (
-    id          int        primary key,
-    created     timestamp  not null default now()
+    id          serial      primary key,
+    created     timestamp   not null default now(),
+    aliased_to  int         references hexbear.ban_id on update cascade on delete cascade
 );
 
 create table hexbear.user_ban_id (
