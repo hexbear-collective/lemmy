@@ -9,7 +9,7 @@ use crate::schema::{
 pub struct BanId {
     pub id: i32,
     pub created: chrono::NaiveDateTime,
-    pub aliased_to: i32,
+    pub aliased_to: Option<i32>,
 }
 
 #[derive(Queryable, Insertable)]
@@ -51,7 +51,7 @@ impl UserBanId {
             Ok(Some(old_bid)) if old_bid.bid != ban_id_val => {
                 let incoming_bid = BanId::read(conn, ban_id_val)?;
                 //the incoming bid isn't aliased to the new one.
-                if incoming_bid.aliased_to != old_bid.bid {
+                if incoming_bid.aliased_to.is_none() || incoming_bid.aliased_to.unwrap() != old_bid.bid {
                     return Self::overwriting_associate(conn, old_bid.bid, ban_id_val);
                 }
                 return Ok(old_bid);
