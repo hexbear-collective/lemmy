@@ -1,9 +1,12 @@
 use diesel::{dsl::*, result::Error, *};
 use crate::schema::{
     {ban_id, ban_id::dsl::*},
-    {user_ban_id, user_ban_id::dsl::*}
+    {user_ban_id, user_ban_id::dsl::*},
+    {user_, user_::dsl::*},
 };
 use uuid::Uuid;
+use crate::user_view::UserViewSafe;
+use crate::diesel::sql_types::Bool;
 
 #[derive(Queryable, Insertable)]
 #[table_name = "ban_id"]
@@ -20,6 +23,14 @@ pub struct UserBanId {
     pub uid: i32,
 }
 
+#[derive(Queryable)]
+pub struct UserRelationResp {
+    pub bid: Uuid,
+    pub uid: i32,
+    pub name: String,
+    pub banned: bool,
+}
+
 impl BanId {
     pub fn create(conn: &PgConnection) -> Result<Self, Error> {
         insert_into(ban_id).default_values().get_result::<Self>(conn)
@@ -34,7 +45,7 @@ impl BanId {
     }
 
     pub fn update_alias(conn: &PgConnection, old_bid_val: Uuid, new_bid_val: Uuid) -> Result<Vec<Self>, Error> {
-        update(ban_id.filter(id.eq(old_bid_val).or(aliased_to.eq(old_bid_val)))).set(aliased_to.eq(new_bid_val)).get_results(conn)
+        update(ban_id.filter(ban_id::id.eq(old_bid_val).or(aliased_to.eq(old_bid_val)))).set(aliased_to.eq(new_bid_val)).get_results(conn)
     }
 }
 
@@ -51,7 +62,7 @@ impl UserBanId {
     }
 
     pub fn associate(conn: &PgConnection, ban_id_val: Uuid, user_id_val: i32) -> Result<Self, Error> {
-        return match Self::get_by_user(conn, user_id_val) {
+        match Self::get_by_user(conn, &user_id_val) {
             //UserBanId found attached to user, which is not the same as the incoming one.
             Ok(Some(old_bid)) if old_bid.bid != ban_id_val => {
                 let incoming_bid = BanId::read(conn, ban_id_val)?;
@@ -67,8 +78,8 @@ impl UserBanId {
             Ok(None) => {
                 //Check for an alias
                 let bid_read = BanId::read_opt(conn, ban_id_val)?;
-                if bid_read.is_some() && bid_read.as_ref().unwrap().aliased_to.is_some() {
-                    Self::simple_associate(conn, bid_read.unwrap().aliased_to.unwrap(), user_id_val)
+                if let Some(BanId { aliased_to: Some(alias), .. }) = bid_read {
+                    Self::simple_associate(conn, alias, user_id_val)
                 } else {
                     Self::simple_associate(conn, ban_id_val, user_id_val)
                 }
@@ -82,7 +93,31 @@ impl UserBanId {
         Self::simple_associate(conn, BanId::create(conn)?.id, user_id_val)
     }
 
-    pub fn get_by_user(conn: &PgConnection, user_id_val: i32) -> Result<Option<Self>, Error> {
+    pub fn get_by_user(conn: &PgConnection, user_id_val: &i32) -> Result<Option<Self>, Error> {
         user_ban_id.filter(uid.eq(user_id_val)).first::<Self>(conn).optional()
+    }
+
+    pub fn get_users_by_bid(conn: &PgConnection, ban_id_val: Uuid) -> Result<Vec<UserViewSafe>, Error> {
+        user_ban_id.filter(bid.eq(ban_id_val))
+            .inner_join(user_)
+            .select((
+                uid,
+                user_::actor_id,
+                user_::name,
+                user_::preferred_username,
+                user_::avatar,
+                user_::banner,
+                user_::matrix_user_id,
+                user_::bio,
+                user_::local,
+                user_::admin,
+                user_::sitemod,
+                //I am *really* not keen on writing that join out in diesel right now. I doubt this will ever be used anyways.
+                //TODO: write out moderator join
+                false.into_sql::<Bool>(),
+                user_::banned,
+                user_::published,
+            ))
+            .load(conn)
     }
 }

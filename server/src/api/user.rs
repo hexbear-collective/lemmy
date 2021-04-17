@@ -220,8 +220,8 @@ impl Perform for Login {
     }
 
     //get bid (if any)
-    let uid = user.id.clone();
-    let bid = blocking(&context.pool, move |conn| UserBanId::get_by_user(conn, uid)).await??.map_or("".to_string(), |ubid| ubid.bid.to_string());
+    let uid = user.id;
+    let bid = blocking(&context.pool, move |conn| UserBanId::get_by_user(conn, &uid)).await??.map_or("".to_string(), |ubid| ubid.bid.to_string());
 
     // Return the jwt
     let jwt = generate_token(context, user.id).await?;
@@ -1832,6 +1832,32 @@ impl Perform for RemoveUserContent {
     });
 
     Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for GetRelatedUsers {
+  type Response = GetRelatedUsersResponse;
+
+  async fn perform(&self, context: &Data<LemmyContext>, _websocket_id: Option<usize>) -> Result<Self::Response, LemmyError> {
+    let data: &GetRelatedUsers = &self;
+
+    // Permissions checks
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+
+    // make sure they're an admin/sitemod
+    is_admin_or_sitemod(context.pool(), user.id).await?;
+
+    let userid = data.user_id;
+    let userbanid = blocking(context.pool(), move |conn| UserBanId::get_by_user(conn, &userid)).await??;
+
+    match userbanid {
+      Some(ubid) => {
+        let users = blocking(context.pool(), move |conn| UserBanId::get_users_by_bid(conn, ubid.bid)).await??;
+        Ok(GetRelatedUsersResponse { users })
+      },
+      None => Ok(GetRelatedUsersResponse { users: vec![] })
+    }
   }
 }
 

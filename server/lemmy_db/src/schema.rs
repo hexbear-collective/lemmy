@@ -620,6 +620,7 @@ joinable!(post_saved -> post (post_id));
 joinable!(post_saved -> user_ (user_id));
 joinable!(site -> user_ (creator_id));
 joinable!(user_ban -> user_ (user_id));
+joinable!(user_ban_id -> user_ (uid));
 joinable!(user_mention -> comment (comment_id));
 joinable!(user_mention -> user_ (recipient_id));
 joinable!(user_tag -> user_ (user_id));
@@ -660,6 +661,7 @@ allow_tables_to_appear_in_same_query!(
     site,
     user_,
     user_ban,
+    user_ban_id,
     user_fast,
     user_mention,
     user_tag,

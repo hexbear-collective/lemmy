@@ -82,15 +82,15 @@ pub(in crate::api) async fn get_user_from_jwt(
   validate_token(claims.token_id, pool).await?;
 
   let user_id = claims.id;
-  let user = blocking(pool, move |conn| User_::read(conn, user_id.clone())).await??;
+  let user = blocking(pool, move |conn| User_::read(conn, user_id)).await??;
 
   if !bid_string.is_empty() {
     //bid reported, try creating relationship
     let bid = bid_string.parse().map_err(|_| APIError::err("invalid_bid"))?;
-    blocking(pool, move |conn| UserBanId::associate(conn, bid, user_id.clone())).await??;
+    blocking(pool, move |conn| UserBanId::associate(conn, bid, user_id)).await??;
   } else {
     //bid not reported, find existing
-    bid_string = match blocking(pool, move |conn| UserBanId::get_by_user(conn, user_id.clone())).await? {
+    bid_string = match blocking(pool, move |conn| UserBanId::get_by_user(conn, &user_id)).await? {
       Ok(Some(ubid)) => ubid.bid.to_string(),
       Ok(None) => "".to_string(),
       //another error

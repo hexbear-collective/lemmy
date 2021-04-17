@@ -342,3 +342,14 @@ pub struct GetUnreadCount {
 pub struct GetUnreadCountResponse {
   pub unreads: i32,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct GetRelatedUsers {
+  pub user_id: i32,
+  pub auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetRelatedUsersResponse {
+  pub users: Vec<UserViewSafe>,
+}
