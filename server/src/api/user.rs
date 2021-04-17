@@ -81,6 +81,7 @@ use crate::{
   LemmyContext,
 };
 use lemmy_db::user_token::{UserToken, UserTokenForm};
+use lemmy_db::user_ban_id::UserBanId;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -199,14 +200,9 @@ impl Perform for Login {
       match &data.code_2fa {
         Some(code) => match context.code_cache_2fa().check_2fa(&user, code) {
           Ok(matches) => {
-            if matches {
-              let jwt = generate_token(context, user.id).await?;
-              return Ok(LoginResponse {
-                requires_2fa: false,
-                jwt: jwt.token_hash,
-              });
+            if !matches {
+              return Err(APIError::err("invalid_2fa_code").into());
             }
-            return Err(APIError::err("invalid_2fa_code").into());
           }
           Err(e) => return Err(e),
         },
@@ -223,11 +219,15 @@ impl Perform for Login {
       }
     }
 
+    //get bid (if any)
+    let uid = user.id.clone();
+    let bid = blocking(&context.pool, move |conn| UserBanId::get_by_user(conn, uid)).await??.map_or("".to_string(), |ubid| ubid.bid.to_string());
+
     // Return the jwt
     let jwt = generate_token(context, user.id).await?;
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: jwt.token_hash,
+      jwt: format!("{}{}", jwt.token_hash, bid),
     })
   }
 }

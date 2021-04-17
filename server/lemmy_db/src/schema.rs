@@ -11,9 +11,9 @@ table! {
 
 table!{
     hexbear.ban_id (id) {
-        id -> Int4,
+        id -> Uuid,
         created -> Timestamp,
-        aliased_to -> Nullable<Int4>,
+        aliased_to -> Nullable<Uuid>,
     }
 }
 
@@ -514,7 +514,7 @@ table! {
 
 table! {
     hexbear.user_ban_id (bid, uid) {
-        bid -> Int4,
+        bid -> Uuid,
         uid -> Int4,
     }
 }
