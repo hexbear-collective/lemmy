@@ -2,11 +2,9 @@ use diesel::{dsl::*, result::Error, *};
 use crate::schema::{
     {ban_id, ban_id::dsl::*},
     {user_ban_id, user_ban_id::dsl::*},
-    {user_, user_::dsl::*},
 };
 use uuid::Uuid;
 use crate::user_view::UserViewSafe;
-use crate::diesel::sql_types::Bool;
 
 #[derive(Queryable, Insertable)]
 #[table_name = "ban_id"]
@@ -98,26 +96,7 @@ impl UserBanId {
     }
 
     pub fn get_users_by_bid(conn: &PgConnection, ban_id_val: Uuid) -> Result<Vec<UserViewSafe>, Error> {
-        user_ban_id.filter(bid.eq(ban_id_val))
-            .inner_join(user_)
-            .select((
-                uid,
-                user_::actor_id,
-                user_::name,
-                user_::preferred_username,
-                user_::avatar,
-                user_::banner,
-                user_::matrix_user_id,
-                user_::bio,
-                user_::local,
-                user_::admin,
-                user_::sitemod,
-                //I am *really* not keen on writing that join out in diesel right now. I doubt this will ever be used anyways.
-                //TODO: write out moderator join
-                false.into_sql::<Bool>(),
-                user_::banned,
-                user_::published,
-            ))
-            .load(conn)
+        let uids = user_ban_id.filter(bid.eq(ban_id_val)).select(uid).load(conn)?;
+        UserViewSafe::read_mult(conn, uids)
     }
 }

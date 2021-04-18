@@ -211,6 +211,11 @@ impl UserView {
     user_view.find(from_user_id).first::<Self>(conn)
   }
 
+  pub fn read_mult(conn: &PgConnection, from_user_ids: Vec<i32>) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_view::dsl::*;
+    user_view.filter(id.eq(any(from_user_ids))).load(conn)
+  }
+
   pub fn admins(conn: &PgConnection) -> Result<Vec<Self>, Error> {
     use super::user_view::user_view::dsl::*;
     use diesel::sql_types::{Nullable, Text};
@@ -407,6 +412,31 @@ impl UserViewSafe {
       ))
       .find(from_user_id)
       .first::<Self>(conn)
+  }
+
+  pub fn read_mult(conn: &PgConnection, from_user_ids: Vec<i32>) -> Result<Vec<Self>, Error> {
+    use super::user_view::user_view::dsl::*;
+    user_view
+        .select((
+          id,
+          actor_id,
+          name,
+          preferred_username,
+          avatar,
+          banner,
+          matrix_user_id,
+          bio,
+          local,
+          admin,
+          sitemod,
+          moderator,
+          banned,
+          published,
+          number_of_posts,
+          number_of_comments,
+        ))
+        .filter(id.eq(any(from_user_ids)))
+        .load(conn)
   }
 
   pub fn admins(conn: &PgConnection) -> Result<Vec<Self>, Error> {
