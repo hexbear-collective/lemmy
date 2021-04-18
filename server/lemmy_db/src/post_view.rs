@@ -247,7 +247,12 @@ impl<'a> PostQueryBuilder<'a> {
     query = match self.listing_type {
       ListingType::Subscribed => query.filter(subscribed.eq(true)),
       ListingType::Local => query.filter(community_local.eq(true)),
-      ListingType::All => query.filter(community_hide_from_all.eq(false).or(subscribed.eq(true))),
+      ListingType::All => {
+        if self.for_creator_id.is_none() {
+          query = query.filter(community_hide_from_all.eq(false).or(subscribed.eq(true)));
+        }
+        query
+      },
       _ => query,
     };
 

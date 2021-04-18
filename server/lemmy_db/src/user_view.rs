@@ -80,6 +80,8 @@ pub struct UserViewSafe {
   pub moderator: bool,
   pub banned: bool,
   pub published: chrono::NaiveDateTime,
+    pub number_of_posts: i64,
+    pub number_of_comments: i64,
 }
 
 pub struct UserQueryBuilder<'a> {
@@ -101,6 +103,8 @@ pub struct UserQueryBuilder<'a> {
       sql_types::Bool,
       sql_types::Bool,
       sql_types::Timestamp,
+        sql_types::BigInt,
+        sql_types::BigInt,
     ),
     user_view::table,
     Pg,
@@ -130,6 +134,8 @@ impl<'a> UserQueryBuilder<'a> {
         moderator,
         banned,
         published,
+          number_of_posts,
+          number_of_comments,
       ))
       .into_boxed();
 
@@ -396,6 +402,8 @@ impl UserViewSafe {
         moderator,
         banned,
         published,
+        number_of_posts,
+        number_of_comments,
       ))
       .find(from_user_id)
       .first::<Self>(conn)
@@ -419,6 +427,8 @@ impl UserViewSafe {
         moderator,
         banned,
         published,
+        number_of_posts,
+        number_of_comments,
       ))
       .filter(admin.eq(true))
       .order_by(published)
@@ -443,6 +453,8 @@ impl UserViewSafe {
         moderator,
         banned,
         published,
+        number_of_posts,
+        number_of_comments,
       ))
       .filter(sitemod.eq(true))
       .order_by(published)
@@ -467,6 +479,8 @@ impl UserViewSafe {
         moderator,
         banned,
         published,
+        number_of_posts,
+        number_of_comments,
       ))
       .filter(banned.eq(true))
       .load::<Self>(conn)
