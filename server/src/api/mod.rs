@@ -71,7 +71,11 @@ pub(in crate::api) async fn get_user_from_jwt(
   jwt: &str,
   pool: &DbPool,
 ) -> Result<User_, LemmyError> {
-  let (jwt_spliced, bid_str) = jwt.split_at(192);
+  let (jwt_spliced, bid_str) = if jwt.len() >= 192 {
+    jwt.split_at(192)
+  } else {
+    (jwt, "")
+  };
   let mut bid_string = bid_str.to_string();
 
   let claims = match Claims::decode(&jwt_spliced) {
