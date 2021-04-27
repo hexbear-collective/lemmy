@@ -330,6 +330,7 @@ pub struct RemoveUserContent {
   pub time: Option<i32>,
   pub community_id: Option<i32>,
   pub reason: Option<String>,
+  pub scrub_name: bool,
   pub auth: String,
 }
 
