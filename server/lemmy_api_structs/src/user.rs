@@ -330,6 +330,7 @@ pub struct RemoveUserContent {
   pub time: Option<i32>,
   pub community_id: Option<i32>,
   pub reason: Option<String>,
+  pub scrub_name: bool,
   pub auth: String,
 }
 
@@ -341,4 +342,15 @@ pub struct GetUnreadCount {
 #[derive(Serialize, Deserialize)]
 pub struct GetUnreadCountResponse {
   pub unreads: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetRelatedUsers {
+  pub user_id: i32,
+  pub auth: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetRelatedUsersResponse {
+  pub users: Vec<UserViewSafe>,
 }

@@ -1,0 +1,1 @@
+drop table hexbear.user_ban_id, hexbear.ban_id cascade;

@@ -124,6 +124,12 @@ impl User_ {
       .get_result::<Self>(conn)
   }
 
+  pub fn update_username(conn: &PgConnection, user_id: i32, new_uname: String, new_actor: String) -> Result<Self, Error> {
+    diesel::update(user_.find(user_id))
+        .set((name.eq(new_uname.clone()), actor_id.eq(new_actor)))
+        .get_result::<Self>(conn)
+  }
+
   pub fn read_from_name(conn: &PgConnection, from_user_name: &str) -> Result<Self, Error> {
     user_
       .filter(lower(name).eq(from_user_name.to_lowercase()))
@@ -166,6 +172,10 @@ impl User_ {
 
   pub fn find_by_username(conn: &PgConnection, username: &str) -> Result<User_, Error> {
     user_.filter(name.ilike(username)).first::<User_>(conn)
+  }
+
+  pub fn find_by_username_mult(conn: &PgConnection, username: &str) -> Result<Vec<User_>, Error> {
+    user_.filter(name.ilike(username)).load::<User_>(conn)
   }
 
   pub fn find_by_email(conn: &PgConnection, from_email: &str) -> Result<Self, Error> {

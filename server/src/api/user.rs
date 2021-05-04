@@ -81,6 +81,7 @@ use crate::{
   LemmyContext,
 };
 use lemmy_db::user_token::{UserToken, UserTokenForm};
+use lemmy_db::user_ban_id::UserBanId;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -199,14 +200,9 @@ impl Perform for Login {
       match &data.code_2fa {
         Some(code) => match context.code_cache_2fa().check_2fa(&user, code) {
           Ok(matches) => {
-            if matches {
-              let jwt = generate_token(context, user.id).await?;
-              return Ok(LoginResponse {
-                requires_2fa: false,
-                jwt: jwt.token_hash,
-              });
+            if !matches {
+              return Err(APIError::err("invalid_2fa_code").into());
             }
-            return Err(APIError::err("invalid_2fa_code").into());
           }
           Err(e) => return Err(e),
         },
@@ -223,11 +219,15 @@ impl Perform for Login {
       }
     }
 
+    //get bid (if any)
+    let uid = user.id;
+    let bid = blocking(&context.pool, move |conn| UserBanId::get_by_user(conn, &uid)).await??.map_or("".to_string(), |ubid| ubid.bid.to_string());
+
     // Return the jwt
     let jwt = generate_token(context, user.id).await?;
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: jwt.token_hash,
+      jwt: format!("{}{}", jwt.token_hash, bid),
     })
   }
 }
@@ -1745,6 +1745,23 @@ impl Perform for RemoveUserContent {
       return Err(APIError::err("couldnt_update_user").into());
     }
 
+    if data.scrub_name {
+      let scrubbed_unames: Vec<String> = blocking(context.pool(), move |conn| {
+        User_::find_by_username_mult(conn, "UsernameScrubbed_%")
+      }).await??.into_iter().map(|user| user.name).collect();
+
+      let mut i = 1;
+      while scrubbed_unames.contains(&format!("UsernameScrubbed{}", i)){
+        i += 1;
+      }
+      let scrubbed_name = format!("UsernameScrubbed{}", i);
+
+      blocking(context.pool(), move |conn| {
+        User_::update_username(conn, target.id, scrubbed_name.clone(),
+                               make_apub_endpoint(EndpointType::User, &*scrubbed_name).to_string())
+      }).await??;
+    }
+
     // ban the user first, so when we query the db we won't miss anything
     let banned_user_id = data.user_id;
     let ban_user = move |conn: &'_ _| User_::ban_user(conn, banned_user_id, true);
@@ -1832,6 +1849,32 @@ impl Perform for RemoveUserContent {
     });
 
     Ok(res)
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Perform for GetRelatedUsers {
+  type Response = GetRelatedUsersResponse;
+
+  async fn perform(&self, context: &Data<LemmyContext>, _websocket_id: Option<usize>) -> Result<Self::Response, LemmyError> {
+    let data: &GetRelatedUsers = &self;
+
+    // Permissions checks
+    let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+
+    // make sure they're an admin/sitemod
+    is_admin_or_sitemod(context.pool(), user.id).await?;
+
+    let userid = data.user_id;
+    let userbanid = blocking(context.pool(), move |conn| UserBanId::get_by_user(conn, &userid)).await??;
+
+    match userbanid {
+      Some(ubid) => {
+        let users = blocking(context.pool(), move |conn| UserBanId::get_users_by_bid(conn, ubid.bid)).await??;
+        Ok(GetRelatedUsersResponse { users })
+      },
+      None => Ok(GetRelatedUsersResponse { users: vec![] })
+    }
   }
 }
 
