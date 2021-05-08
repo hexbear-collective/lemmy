@@ -113,7 +113,6 @@ pub struct GetSiteResponse {
   pub my_user: Option<User_>,
   pub admins: Vec<UserViewSafe>,
   pub sitemods: Vec<UserViewSafe>, // hexbear
-  pub banned: Vec<UserViewSafe>,
   pub federated_instances: Vec<String>,
 }
 
