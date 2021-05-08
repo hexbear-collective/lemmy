@@ -227,7 +227,7 @@ impl Perform for Login {
     let jwt = generate_token(context, user.id).await?;
     Ok(LoginResponse {
       requires_2fa: false,
-      jwt: format!("{}{}", jwt.token_hash, bid),
+      jwt: format!("{}:{}", jwt.token_hash, bid),
     })
   }
 }
