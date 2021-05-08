@@ -451,8 +451,6 @@ impl Perform for GetSite {
       }
     }
 
-    let banned = blocking(context.pool(), move |conn| UserViewSafe::banned(conn)).await??;
-
     let online = context
       .chat_server()
       .send(GetUsersOnline)
@@ -473,7 +471,6 @@ impl Perform for GetSite {
       site: site_view,
       admins,
       sitemods,
-      banned,
       online,
       version: version::SEMVER_LIGHTWEIGHT.to_string(),
       my_user,
@@ -696,13 +693,10 @@ impl Perform for TransferSite {
     let creator_user = admins.remove(creator_index);
     admins.insert(0, creator_user);
 
-    let banned = blocking(context.pool(), move |conn| UserViewSafe::banned(conn)).await??;
-
     Ok(GetSiteResponse {
       site: Some(site_view),
       admins,
       sitemods,
-      banned,
       online: 0,
       version: version::SEMVER_LIGHTWEIGHT.to_string(),
       my_user: Some(user),
