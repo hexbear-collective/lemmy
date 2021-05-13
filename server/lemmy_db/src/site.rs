@@ -17,6 +17,7 @@ pub struct Site {
   pub enable_create_communities: bool,
   pub icon: Option<String>,
   pub banner: Option<String>,
+  pub autosubscribe_comms: Vec<i32>,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize)]
@@ -33,6 +34,7 @@ pub struct SiteForm {
   // when you want to null out a column, you have to send Some(None)), since sending None means you just don't want to update that column.
   pub icon: Option<Option<String>>,
   pub banner: Option<Option<String>>,
+  pub autosubscribe_comms: Vec<i32>,
 }
 
 impl Crud<SiteForm> for Site {

@@ -468,6 +468,7 @@ table! {
         enable_create_communities -> Bool,
         icon -> Nullable<Text>,
         banner -> Nullable<Text>,
+        autosubscribe_comms -> Array<Int4>,
     }
 }
 

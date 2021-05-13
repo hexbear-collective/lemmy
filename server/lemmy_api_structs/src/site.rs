@@ -93,6 +93,7 @@ pub struct EditSite {
   pub enable_nsfw: bool,
   pub auth: String,
   pub enable_create_communities: Option<bool>,
+  pub autosubscribe_comms: Vec<i32>,
 }
 
 #[derive(Serialize, Deserialize)]
