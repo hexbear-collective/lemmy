@@ -5,44 +5,21 @@ use url::Url;
 
 use lemmy_api_structs::{post::*, APIError};
 use lemmy_db::{
-  comment_view::*,
-  community_settings::*,
-  community_view::*,
-  moderator::*,
-  naive_now,
-  post::*,
-  post_view::*,
-  site::*,
-  site_view::*,
-  user_view::*,
-  Crud,
-  Likeable,
-  ListingType,
-  Saveable,
+  comment_view::*, community_settings::*, community_view::*, moderator::*, naive_now, post::*,
+  post_view::*, site::*, site_view::*, user_view::*, Crud, Likeable, ListingType, Saveable,
   SortType,
 };
 use lemmy_utils::{
-  is_valid_post_title,
-  make_apub_endpoint,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
+  is_valid_post_title, make_apub_endpoint, ConnectionId, EndpointType, LemmyError,
 };
 
 use crate::{
   api::{
-    check_community_ban,
-    check_slurs,
-    check_slurs_opt,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_mod_or_admin,
-    Perform,
+    check_community_ban, check_slurs, check_slurs_opt, get_user_from_jwt, get_user_from_jwt_opt,
+    is_mod_or_admin, Perform,
   },
   apub::{ApubLikeableType, ApubObjectType},
-  blocking,
-  fetch_iframely_and_pictrs_data,
-  is_within_post_body_char_limit,
+  blocking, fetch_iframely_and_pictrs_data, is_within_post_body_char_limit,
   is_within_post_title_char_limit,
   websocket::{
     messages::{GetPostUsersOnline, JoinCommunityRoom, JoinPostRoom, SendPost},

@@ -1,11 +1,7 @@
 use crate::{
   naive_now,
   schema::{post, post_like, post_read, post_report, post_saved},
-  Crud,
-  Likeable,
-  Readable,
-  Reportable,
-  Saveable,
+  Crud, Likeable, Readable, Reportable, Saveable,
 };
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
@@ -209,24 +205,25 @@ impl Post {
       .get_result::<Self>(conn)
   }
 
-  pub fn permadelete_user_posts(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
+  pub fn permadelete_user_posts(
+    conn: &PgConnection,
+    for_creator_id: i32,
+  ) -> Result<Vec<i32>, Error> {
     use crate::schema::post::dsl::*;
 
     let perma_deleted = "*Permananently Deleted*";
     let perma_deleted_url = "https://deleted.com";
 
-    diesel::update(
-      post
-        .filter(creator_id.eq(for_creator_id)),
-    )
-    .set((
+    diesel::update(post.filter(creator_id.eq(for_creator_id)))
+      .set((
         deleted.eq(true),
         updated.eq(naive_now()),
-      name.eq(perma_deleted),
-      url.eq(perma_deleted_url),
-      body.eq(perma_deleted)))
-    .returning(id)
-    .get_results(conn)
+        name.eq(perma_deleted),
+        url.eq(perma_deleted_url),
+        body.eq(perma_deleted),
+      ))
+      .returning(id)
+      .get_results(conn)
   }
 
   pub fn update_featured(
@@ -447,12 +444,7 @@ impl Readable<PostReadForm> for PostRead {
 #[cfg(test)]
 mod tests {
   use crate::{
-    community::*,
-    post::*,
-    tests::establish_unpooled_connection,
-    user::*,
-    ListingType,
-    SortType,
+    community::*, post::*, tests::establish_unpooled_connection, user::*, ListingType, SortType,
   };
 
   #[test]

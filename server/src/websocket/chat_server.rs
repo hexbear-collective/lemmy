@@ -15,15 +15,8 @@ use diesel::{
   PgConnection,
 };
 use lemmy_api_structs::{
-  comment::*,
-  community::*,
-  community_settings::*,
-  post::*,
-  post_hexbear::FeaturePost,
-  report::*,
-  site::*,
-  user::*,
-  APIError,
+  comment::*, community::*, community_settings::*, post::*, post_hexbear::FeaturePost, report::*,
+  site::*, user::*, APIError,
 };
 use lemmy_rate_limit::RateLimit;
 use lemmy_utils::{location_info, CommunityId, ConnectionId, IPAddr, LemmyError, PostId, UserId};

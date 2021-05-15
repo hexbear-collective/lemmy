@@ -1,13 +1,16 @@
 use actix_web::web::Data;
 
 use lemmy_api_structs::APIError;
-use lemmy_db::{Crud, community::Community, community_view::CommunityUserBanView, naive_now, post::Post, user::User_};
+use lemmy_db::{
+  community::Community, community_view::CommunityUserBanView, naive_now, post::Post, user::User_,
+  Crud,
+};
 use lemmy_utils::{settings::Settings, slur_check, slurs_vec_to_str, ConnectionId, LemmyError};
 
 use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 use chrono::Duration;
-use lemmy_db::user_token::UserToken;
 use lemmy_db::user_ban_id::UserBanId;
+use lemmy_db::user_token::UserToken;
 
 pub mod claims;
 pub mod comment;
@@ -86,7 +89,9 @@ pub(in crate::api) async fn get_user_from_jwt(
 
   if !bid_string.is_empty() {
     //bid reported, try creating relationship
-    let bid = bid_string.parse().map_err(|_| APIError::err("invalid_bid"))?;
+    let bid = bid_string
+      .parse()
+      .map_err(|_| APIError::err("invalid_bid"))?;
     blocking(pool, move |conn| UserBanId::associate(conn, bid, user_id)).await??;
   } else {
     //bid not reported, find existing
@@ -102,9 +107,14 @@ pub(in crate::api) async fn get_user_from_jwt(
   if user.banned {
     //generate new bid
     if bid_string.is_empty() {
-      bid_string = blocking(pool, move |conn| UserBanId::create_then_associate(conn, user_id.clone())).await??.bid.to_string();
+      bid_string = blocking(pool, move |conn| {
+        UserBanId::create_then_associate(conn, user_id.clone())
+      })
+      .await??
+      .bid
+      .to_string();
     }
-   
+
     return Err(APIError::err(&*format!("site_ban_{}", bid_string)).into());
   }
   Ok(user)

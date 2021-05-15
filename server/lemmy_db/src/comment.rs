@@ -2,10 +2,7 @@ use super::post::Post;
 use crate::{
   naive_now,
   schema::{comment, comment_like, comment_report, comment_saved},
-  Crud,
-  Likeable,
-  Reportable,
-  Saveable,
+  Crud, Likeable, Reportable, Saveable,
 };
 use diesel::{dsl::*, result::Error, sql_types::Integer, *};
 use serde::{Deserialize, Serialize};
@@ -199,15 +196,19 @@ impl Comment {
       .get_result::<Self>(conn)
   }
 
-  pub fn permadelete_user_comments(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
+  pub fn permadelete_user_comments(
+    conn: &PgConnection,
+    for_creator_id: i32,
+  ) -> Result<Vec<i32>, Error> {
     use crate::schema::comment::dsl::*;
-    diesel::update(
-      comment
-        .filter(creator_id.eq(for_creator_id))
-    )
-    .set((deleted.eq(true), updated.eq(naive_now()), content.eq("*Permananently Deleted*")))
-    .returning(id)
-    .get_results(conn)
+    diesel::update(comment.filter(creator_id.eq(for_creator_id)))
+      .set((
+        deleted.eq(true),
+        updated.eq(naive_now()),
+        content.eq("*Permananently Deleted*"),
+      ))
+      .returning(id)
+      .get_results(conn)
   }
 
   pub fn remove_user_comments(conn: &PgConnection, for_creator_id: i32) -> Result<Vec<i32>, Error> {
@@ -370,14 +371,8 @@ impl Saveable<CommentSavedForm> for CommentSaved {
 #[cfg(test)]
 mod tests {
   use crate::{
-    comment::*,
-    community::*,
-    post::*,
-    tests::establish_unpooled_connection,
-    user::*,
-    Crud,
-    ListingType,
-    SortType,
+    comment::*, community::*, post::*, tests::establish_unpooled_connection, user::*, Crud,
+    ListingType, SortType,
   };
 
   #[test]

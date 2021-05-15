@@ -2,10 +2,7 @@ use crate::{
   community_settings::CommunitySettings,
   naive_now,
   schema::{community, community_follower, community_moderator, community_user_ban},
-  Bannable,
-  Crud,
-  Followable,
-  Joinable,
+  Bannable, Crud, Followable, Joinable,
 };
 use diesel::{dsl::*, result::Error, *};
 use serde::{Deserialize, Serialize};
@@ -155,7 +152,7 @@ impl Community {
       .append(&mut UserViewSafe::admins(conn).map(|v| v.into_iter().map(|a| a.id).collect())?);
 
     mods_and_admins
-        .append(&mut UserViewSafe::sitemods(conn).map(|v| v.into_iter().map(|a| a.id).collect())?);
+      .append(&mut UserViewSafe::sitemods(conn).map(|v| v.into_iter().map(|a| a.id).collect())?);
 
     Ok(mods_and_admins)
   }

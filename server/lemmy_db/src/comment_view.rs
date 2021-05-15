@@ -225,7 +225,11 @@ impl<'a> CommentQueryBuilder<'a> {
     };
 
     //in these cases listingtype doesn't matter
-    if self.for_post_id.is_none() && self.for_comment_ids.is_none() && self.for_community_id.is_none() && self.for_creator_id.is_none() {
+    if self.for_post_id.is_none()
+      && self.for_comment_ids.is_none()
+      && self.for_community_id.is_none()
+      && self.for_creator_id.is_none()
+    {
       query = match self.listing_type {
         ListingType::Subscribed => query.filter(subscribed.eq(true)),
         ListingType::Local => query.filter(community_local.eq(true)),
@@ -481,15 +485,8 @@ impl<'a> ReplyQueryBuilder<'a> {
 #[cfg(test)]
 mod tests {
   use crate::{
-    comment::*,
-    comment_view::*,
-    community::*,
-    post::*,
-    tests::establish_unpooled_connection,
-    user::*,
-    Crud,
-    Likeable,
-    *,
+    comment::*, comment_view::*, community::*, post::*, tests::establish_unpooled_connection,
+    user::*, Crud, Likeable, *,
   };
 
   #[test]

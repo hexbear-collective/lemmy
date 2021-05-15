@@ -45,8 +45,8 @@ pub mod user_tag;
 pub mod user_view;
 
 // hexbear
-pub mod user_token;
 pub mod user_ban_id;
+pub mod user_token;
 
 pub trait Crud<T> {
   fn create(conn: &PgConnection, form: &T) -> Result<Self, Error>
