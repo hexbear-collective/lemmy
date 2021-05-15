@@ -4,10 +4,7 @@ use actix_web::web::Data;
 use log::error;
 
 use lemmy_api_structs::{comment::*, APIError};
-use lemmy_db::{
-  comment::*, comment_view::*, community_settings::*, moderator::*, post::*, site_view::*, user::*,
-  user_mention::*, Crud, Likeable, ListingType, Saveable, SortType,
-};
+use lemmy_db::{comment::*, comment_view::*, community_settings::*, moderator::*, post::*, site_view::*, user::*, user_mention::*, Crud, Likeable, ListingType, Saveable, SortType, naive_now};
 use lemmy_utils::{
   make_apub_endpoint, num_md_images, remove_slurs, scrape_text_for_mentions, send_email,
   settings::Settings, ConnectionId, EndpointType, LemmyError, MentionData,
@@ -30,6 +27,7 @@ use lemmy_db::{
   community_view::{CommunityModeratorView, CommunityView},
   post_view::PostView,
 };
+use crate::chrono::Duration;
 
 #[async_trait::async_trait(?Send)]
 impl Perform for GetComment {
@@ -135,6 +133,10 @@ impl Perform for CreateComment {
   ) -> Result<CommentResponse, LemmyError> {
     let data: &CreateComment = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
+
+    if (naive_now() - user.published) < Duration::minutes(5) {
+      return Err(APIError::err("new_user_5min_waiting_period_not_met").into());
+    }
 
     let content_slurs_removed = remove_slurs(&data.content.to_owned());
     // let content_pii_removed = remove_pii(&content_slurs_removed);

@@ -40,6 +40,10 @@ impl Perform for CreatePost {
     let data: &CreatePost = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
+    if (naive_now() - user.published) < chrono::Duration::minutes(5) {
+      return Err(APIError::err("new_user_5min_waiting_period_not_met").into());
+    }
+
     check_slurs(&data.name)?;
     check_slurs_opt(&data.body)?;
     if !is_within_post_title_char_limit(&data.name) {
