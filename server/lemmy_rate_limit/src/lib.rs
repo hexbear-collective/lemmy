@@ -66,6 +66,10 @@ impl RateLimit {
     self.kind(RateLimitType::Report)
   }
 
+  pub fn direct_message(&self) -> RateLimited {
+    self.kind(RateLimitType::DirectMessage)
+  }
+
   fn kind(&self, type_: RateLimitType) -> RateLimited {
     RateLimited {
       rate_limiter: self.rate_limiter.clone(),
@@ -146,6 +150,15 @@ impl RateLimited {
             &ip_addr,
             rate_limit.report,
             rate_limit.report_per_second,
+            false,
+          )?;
+        }
+        RateLimitType::DirectMessage => {
+          limiter.check_rate_limit_full(
+            self.type_,
+            &ip_addr,
+            rate_limit.direct_message,
+            rate_limit.direct_message_per_second,
             false,
           )?;
         }

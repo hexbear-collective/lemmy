@@ -151,7 +151,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       .service(
         web::resource("/private_message")
           .guard(guard::Post())
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.direct_message())
           .route(web::post().to(route_post::<CreatePrivateMessage>)),
       )
       .service(

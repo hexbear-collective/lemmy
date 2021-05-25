@@ -54,6 +54,7 @@ where
     UserOperation::Register => rate_limiter.register().wrap(ip, fut).await,
     UserOperation::CreatePost => rate_limiter.post().wrap(ip, fut).await,
     UserOperation::CreateComment => rate_limiter.comment().wrap(ip, fut).await, 
+    UserOperation::CreatePrivateMessage => rate_limiter.direct_message().wrap(ip, fut).await,
     UserOperation::CreateCommunity => rate_limiter.register().wrap(ip, fut).await,
     UserOperation::CreateCommentReport | UserOperation::CreatePostReport => rate_limiter.report().wrap(ip, fut).await,
     _ => rate_limiter.message().wrap(ip, fut).await,

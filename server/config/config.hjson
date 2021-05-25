@@ -31,5 +31,7 @@
       comment_per_second: 120
       report: 4
       report_per_second: 600
+      direct_message: 4
+      direct_message_per_second: 120
     }
 }

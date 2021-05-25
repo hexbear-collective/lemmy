@@ -18,6 +18,7 @@ pub enum RateLimitType {
   Image,
   Comment,
   Report,
+  DirectMessage,
 }
 
 /// Rate limiting based on rate type and IP addr
