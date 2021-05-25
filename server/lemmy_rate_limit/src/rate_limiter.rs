@@ -16,6 +16,8 @@ pub enum RateLimitType {
   Register,
   Post,
   Image,
+  Comment,
+  Report,
 }
 
 /// Rate limiting based on rate type and IP addr
@@ -79,7 +81,7 @@ impl RateLimiter {
           rate_limit.allowance = rate as f64;
         }
 
-        if rate_limit.allowance < 1.0 && ip != "127.0.0.1" {
+        if rate_limit.allowance < 1.0 {
           debug!(
             "Rate limited type: {}, IP: {}, time_passed: {}, allowance: {}",
             type_.as_ref(),
@@ -90,17 +92,16 @@ impl RateLimiter {
           Err(
             APIError {
               message: format!(
-                "Too many requests. type: {}, IP: {}, {} per {} seconds",
-                type_.as_ref(),
-                ip,
+                "Too many requests. You are limited to {} {}s per {} seconds",
                 rate,
+                type_.as_ref(),
                 per
               ),
             }
             .into(),
           )
         } else {
-          if !check_only && ip != "127.0.0.1" {
+          if !check_only {
             rate_limit.allowance -= 1.0;
           }
           Ok(())

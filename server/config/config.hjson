@@ -10,4 +10,26 @@
     hcaptcha_site_key:   "10000000-ffff-ffff-ffff-000000000001"
     hcaptcha_verify_url: "https://hcaptcha.com/siteverify"
   }
+  rate_limit: {
+      # maximum number of messages created in interval
+      message: 180
+      # interval length for message limit
+      message_per_second: 60
+      # maximum number of posts created in interval
+      post: 6
+      # interval length for post limit
+      post_per_second: 600
+      # maximum number of registrations in interval
+      register: 2
+      # interval length for registration limit
+      register_per_second: 3600
+      # maximum number of image uploads in interval
+      image: 6
+      # interval length for image uploads
+      image_per_second: 3600
+      comment: 4
+      comment_per_second: 120
+      report: 4
+      report_per_second: 600
+    }
 }

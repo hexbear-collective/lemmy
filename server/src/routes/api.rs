@@ -92,7 +92,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       .service(
         // Handle POST to /post/report separately to add the post() rate limitter
         web::resource("/post/report")
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.report())
           .route(web::post().to(route_post::<CreatePostReport>)),
       )
       .service(
@@ -119,13 +119,13 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
         // Handle POST to /comment separately to add the post() rate limitter
         web::resource("/comment")
           .guard(guard::Post())
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.comment())
           .route(web::post().to(route_post::<CreateComment>)),
       )
       .service(
         // Handle POST to /comment/report separately to add the post() rate limitter
         web::resource("/comment/report")
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.report())
           .route(web::post().to(route_post::<CreateCommentReport>)),
       )
       .service(
