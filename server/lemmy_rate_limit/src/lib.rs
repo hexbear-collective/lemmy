@@ -58,6 +58,18 @@ impl RateLimit {
     self.kind(RateLimitType::Image)
   }
 
+  pub fn comment(&self) -> RateLimited {
+    self.kind(RateLimitType::Comment)
+  }
+
+  pub fn report(&self) -> RateLimited {
+    self.kind(RateLimitType::Report)
+  }
+
+  pub fn direct_message(&self) -> RateLimited {
+    self.kind(RateLimitType::DirectMessage)
+  }
+
   fn kind(&self, type_: RateLimitType) -> RateLimited {
     RateLimited {
       rate_limiter: self.rate_limiter.clone(),
@@ -120,6 +132,33 @@ impl RateLimited {
             &ip_addr,
             rate_limit.image,
             rate_limit.image_per_second,
+            false,
+          )?;
+        }
+        RateLimitType::Comment => {
+          limiter.check_rate_limit_full(
+            self.type_,
+            &ip_addr,
+            rate_limit.comment,
+            rate_limit.comment_per_second,
+            false,
+          )?;
+        }
+        RateLimitType::Report => {
+          limiter.check_rate_limit_full(
+            self.type_,
+            &ip_addr,
+            rate_limit.report,
+            rate_limit.report_per_second,
+            false,
+          )?;
+        }
+        RateLimitType::DirectMessage => {
+          limiter.check_rate_limit_full(
+            self.type_,
+            &ip_addr,
+            rate_limit.direct_message,
+            rate_limit.direct_message_per_second,
             false,
           )?;
         }

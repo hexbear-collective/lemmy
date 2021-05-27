@@ -92,7 +92,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       .service(
         // Handle POST to /post/report separately to add the post() rate limitter
         web::resource("/post/report")
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.report())
           .route(web::post().to(route_post::<CreatePostReport>)),
       )
       .service(
@@ -119,13 +119,13 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
         // Handle POST to /comment separately to add the post() rate limitter
         web::resource("/comment")
           .guard(guard::Post())
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.comment())
           .route(web::post().to(route_post::<CreateComment>)),
       )
       .service(
         // Handle POST to /comment/report separately to add the post() rate limitter
         web::resource("/comment/report")
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.report())
           .route(web::post().to(route_post::<CreateCommentReport>)),
       )
       .service(
@@ -151,7 +151,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
       .service(
         web::resource("/private_message")
           .guard(guard::Post())
-          .wrap(rate_limit.post())
+          .wrap(rate_limit.direct_message())
           .route(web::post().to(route_post::<CreatePrivateMessage>)),
       )
       .service(
@@ -197,7 +197,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
           // Admin action. I don't like that it's in /user
           .route("/ban", web::post().to(route_post::<BanUser>))
           .route("/purge", web::post().to(route_post::<RemoveUserContent>))
-            .route("/relations", web::get().to(route_get::<GetRelatedUsers>))
+          .route("/relations", web::get().to(route_get::<GetRelatedUsers>))
           // Account actions. I don't like that they're in /user maybe /accounts
           .route("/login", web::post().to(route_post::<Login>))
           .route("/logout", web::post().to(route_post::<Logout>))

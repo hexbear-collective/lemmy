@@ -1,7 +1,7 @@
+use crate::api::claims::Claims;
 use actix::clock::Duration;
 use actix_web::{body::BodyStream, http::StatusCode, *};
 use awc::Client;
-use crate::{api::claims::Claims};
 use lemmy_rate_limit::RateLimit;
 use lemmy_utils::settings::Settings;
 use serde::{Deserialize, Serialize};
@@ -48,8 +48,7 @@ async fn upload(
   client: web::Data<Client>,
 ) -> Result<HttpResponse, Error> {
   // TODO: check rate limit here
-  let jwt = req
-    .cookie("jwt");
+  let jwt = req.cookie("jwt");
 
   if jwt.is_none() || Claims::decode(jwt.unwrap().value()).is_err() {
     return Ok(HttpResponse::Unauthorized().finish());

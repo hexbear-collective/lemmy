@@ -1,6 +1,5 @@
 use crate::{
-  is_email_regex,
-  naive_now,
+  is_email_regex, naive_now,
   schema::{user_, user_::dsl::*},
   Crud,
 };
@@ -124,10 +123,15 @@ impl User_ {
       .get_result::<Self>(conn)
   }
 
-  pub fn update_username(conn: &PgConnection, user_id: i32, new_uname: String, new_actor: String) -> Result<Self, Error> {
+  pub fn update_username(
+    conn: &PgConnection,
+    user_id: i32,
+    new_uname: String,
+    new_actor: String,
+  ) -> Result<Self, Error> {
     diesel::update(user_.find(user_id))
-        .set((name.eq(new_uname.clone()), actor_id.eq(new_actor)))
-        .get_result::<Self>(conn)
+      .set((name.eq(new_uname.clone()), actor_id.eq(new_actor)))
+      .get_result::<Self>(conn)
   }
 
   pub fn read_from_name(conn: &PgConnection, from_user_name: &str) -> Result<Self, Error> {

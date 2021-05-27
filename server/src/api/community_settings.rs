@@ -3,8 +3,7 @@ use actix_web::web::Data;
 use lemmy_api_structs::{community_settings::*, APIError};
 use lemmy_db::{
   community_settings::{CommunitySettings, CommunitySettingsForm},
-  naive_now,
-  Crud,
+  naive_now, Crud,
 };
 use lemmy_utils::{ConnectionId, LemmyError};
 
@@ -91,7 +90,7 @@ impl Perform for EditCommunitySettings {
       comment_images: updated_community_settings.comment_images,
       published: updated_community_settings.published,
       allow_as_default: updated_community_settings.allow_as_default,
-        hide_from_all: updated_community_settings.hide_from_all,
+      hide_from_all: updated_community_settings.hide_from_all,
     };
 
     context.chat_server().do_send(SendCommunityRoomMessage {

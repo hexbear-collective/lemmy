@@ -1,12 +1,6 @@
 use lemmy_db::{
-  category::*,
-  comment_view::*,
-  community_view::*,
-  moderator_views::*,
-  post_view::*,
-  site_view::*,
-  user::*,
-  user_view::*,
+  category::*, comment_view::*, community_view::*, moderator_views::*, post_view::*, site_view::*,
+  user::*, user_view::*,
 };
 use serde::{Deserialize, Serialize};
 
@@ -45,18 +39,18 @@ pub struct GetModlog {
   pub community_id: Option<i32>,
   pub page: Option<i64>,
   pub limit: Option<i64>,
-  pub action_filter: Option<u16>,   //9 bits for each type of mod action
-  pub auth: Option<String>, // hexbear
+  pub action_filter: Option<u16>, //9 bits for each type of mod action
+  pub auth: Option<String>,       // hexbear
 }
 
 //exists in upstream, but is different from hexbear ----------
 #[derive(Serialize)]
 pub struct GetModlogResponse {
-  pub log: Vec<ModlogAction>
+  pub log: Vec<ModlogAction>,
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "type")]    //enum type is inline with the internal data
+#[serde(tag = "type")] //enum type is inline with the internal data
 pub enum ModlogAction {
   RemovePost(ModRemovePostView),
   LockPost(ModLockPostView),
@@ -93,6 +87,7 @@ pub struct EditSite {
   pub enable_nsfw: bool,
   pub auth: String,
   pub enable_create_communities: Option<bool>,
+  pub autosubscribe_comms: Vec<i32>,
 }
 
 #[derive(Serialize, Deserialize)]

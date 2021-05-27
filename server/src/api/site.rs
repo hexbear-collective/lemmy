@@ -319,6 +319,7 @@ impl Perform for CreateSite {
       open_registration: data.open_registration,
       enable_nsfw: data.enable_nsfw,
       enable_create_communities: true,
+      autosubscribe_comms: Vec::new(),
       updated: None,
     };
 
@@ -368,6 +369,7 @@ impl Perform for EditSite {
       enable_create_communities: data
         .enable_create_communities
         .unwrap_or(found_site.enable_create_communities),
+      autosubscribe_comms: data.autosubscribe_comms.clone(),
     };
 
     let update_site = move |conn: &'_ _| Site::update(conn, 1, &site_form);

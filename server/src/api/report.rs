@@ -8,10 +8,7 @@ use lemmy_db::{
   post::*,
   post_view::*,
   report_views::{
-    CommentReportQueryBuilder,
-    CommentReportView,
-    PostReportQueryBuilder,
-    PostReportView,
+    CommentReportQueryBuilder, CommentReportView, PostReportQueryBuilder, PostReportView,
   },
   user_view::UserViewSafe,
   Reportable,
@@ -20,8 +17,7 @@ use lemmy_utils::{ConnectionId, LemmyError};
 
 use crate::{
   api::{check_community_ban, get_user_from_jwt, Perform},
-  blocking,
-  LemmyContext,
+  blocking, LemmyContext,
 };
 
 const MAX_REPORT_LEN: usize = 1000;

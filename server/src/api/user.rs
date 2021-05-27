@@ -9,79 +9,37 @@ use log::{error, info};
 
 use lemmy_api_structs::{user::*, APIError};
 use lemmy_db::{
-  comment::*,
-  comment_view::*,
-  community::*,
-  community_settings::*,
-  community_view::*,
-  diesel_option_overwrite,
-  moderator::*,
-  naive_now,
-  password_reset_request::*,
-  post::*,
-  post_view::*,
-  private_message::*,
-  private_message_view::*,
-  site::*,
-  site_view::*,
-  user::*,
-  user_mention::*,
-  user_mention_view::*,
-  user_tag::*,
-  user_view::*,
-  Crud,
-  Followable,
-  Joinable,
-  ListingType,
-  SortType,
+  comment::*, comment_view::*, community::*, community_settings::*, community_view::*,
+  diesel_option_overwrite, moderator::*, naive_now, password_reset_request::*, post::*,
+  post_view::*, private_message::*, private_message_view::*, site::*, site_view::*, user::*,
+  user_mention::*, user_mention_view::*, user_tag::*, user_view::*, Crud, Followable, Joinable,
+  ListingType, SortType,
 };
 use lemmy_utils::{
-  generate_actor_keypair,
-  generate_random_string,
-  is_valid_preferred_username,
-  is_valid_username,
-  location_info,
-  make_apub_endpoint,
-  naive_from_unix,
-  remove_slurs,
-  send_email,
-  settings::Settings,
-  ConnectionId,
-  EndpointType,
-  LemmyError,
+  generate_actor_keypair, generate_random_string, is_valid_preferred_username, is_valid_username,
+  location_info, make_apub_endpoint, naive_from_unix, remove_slurs, send_email, settings::Settings,
+  ConnectionId, EndpointType, LemmyError,
 };
 
 use crate::{
   api::{
-    check_slurs,
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    is_admin_or_sitemod,
-    validate_token,
-    Perform,
+    check_slurs, claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin,
+    is_admin_or_sitemod, validate_token, Perform,
   },
   apub::ApubObjectType,
-  blocking,
-  captcha_espeak_wav_base64,
+  blocking, captcha_espeak_wav_base64,
   hcaptcha::hcaptcha_verify,
   is_within_message_char_limit,
   websocket::{
     messages::{
-      CaptchaItem,
-      CheckCaptcha,
-      JoinUserRoom,
-      LeaveAllRooms,
-      SendAllMessage,
-      SendUserRoomMessage,
+      CaptchaItem, CheckCaptcha, JoinUserRoom, LeaveAllRooms, SendAllMessage, SendUserRoomMessage,
     },
     UserOperation,
   },
   LemmyContext,
 };
-use lemmy_db::user_token::{UserToken, UserTokenForm};
 use lemmy_db::user_ban_id::UserBanId;
+use lemmy_db::user_token::{UserToken, UserTokenForm};
 
 #[async_trait::async_trait(?Send)]
 impl Perform for SetUserTag {
@@ -221,7 +179,11 @@ impl Perform for Login {
 
     //get bid (if any)
     let uid = user.id;
-    let bid = blocking(&context.pool, move |conn| UserBanId::get_by_user(conn, &uid)).await??.map_or("".to_string(), |ubid| ubid.bid.to_string());
+    let bid = blocking(&context.pool, move |conn| {
+      UserBanId::get_by_user(conn, &uid)
+    })
+    .await??
+    .map_or("".to_string(), |ubid| ubid.bid.to_string());
 
     // Return the jwt
     let jwt = generate_token(context, user.id).await?;
@@ -433,7 +395,7 @@ impl Perform for Register {
       };
 
     // Sign them up for main community no matter what
-    let community_follower_form = CommunityFollowerForm {
+    /*let community_follower_form = CommunityFollowerForm {
       community_id: main_community.id,
       user_id: inserted_user.id,
     };
@@ -441,18 +403,25 @@ impl Perform for Register {
     let follow = move |conn: &'_ _| CommunityFollower::follow(conn, &community_follower_form);
     if blocking(context.pool(), follow).await?.is_err() {
       return Err(APIError::err("community_follower_already_exists").into());
-    };
+    };*/
 
-    // subscribe the user to all communities that have allow_as_default enabled
-    let default_communities = blocking(context.pool(), move |conn| {
+    //get comms that are both admin-selected and enabled allow_as_default, then subscribe users to all of them
+    let default_communities = blocking(context.pool(), move |conn| SiteView::read(conn))
+      .await??
+      .autosubscribe_comms;
+    let optin_communities = blocking(context.pool(), move |conn| {
       CommunitySettings::list_allowed_as_default(conn)
     })
     .await??;
 
     // Sign up new users for a set of default communities
-    for comm in default_communities.into_iter() {
+    for comm in default_communities.into_iter().filter(|comm| {
+      optin_communities
+        .iter()
+        .any(|opt_comm| &opt_comm.id == comm)
+    }) {
       let community_follower_form = CommunityFollowerForm {
-        community_id: comm.id,
+        community_id: comm,
         user_id: inserted_user.id,
       };
 
@@ -1748,18 +1717,27 @@ impl Perform for RemoveUserContent {
     if data.scrub_name {
       let scrubbed_unames: Vec<String> = blocking(context.pool(), move |conn| {
         User_::find_by_username_mult(conn, "UsernameScrubbed_%")
-      }).await??.into_iter().map(|user| user.name).collect();
+      })
+      .await??
+      .into_iter()
+      .map(|user| user.name)
+      .collect();
 
       let mut i = 1;
-      while scrubbed_unames.contains(&format!("UsernameScrubbed{}", i)){
+      while scrubbed_unames.contains(&format!("UsernameScrubbed{}", i)) {
         i += 1;
       }
       let scrubbed_name = format!("UsernameScrubbed{}", i);
 
       blocking(context.pool(), move |conn| {
-        User_::update_username(conn, target.id, scrubbed_name.clone(),
-                               make_apub_endpoint(EndpointType::User, &*scrubbed_name).to_string())
-      }).await??;
+        User_::update_username(
+          conn,
+          target.id,
+          scrubbed_name.clone(),
+          make_apub_endpoint(EndpointType::User, &*scrubbed_name).to_string(),
+        )
+      })
+      .await??;
     }
 
     // ban the user first, so when we query the db we won't miss anything
@@ -1856,7 +1834,11 @@ impl Perform for RemoveUserContent {
 impl Perform for GetRelatedUsers {
   type Response = GetRelatedUsersResponse;
 
-  async fn perform(&self, context: &Data<LemmyContext>, _websocket_id: Option<usize>) -> Result<Self::Response, LemmyError> {
+  async fn perform(
+    &self,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<usize>,
+  ) -> Result<Self::Response, LemmyError> {
     let data: &GetRelatedUsers = &self;
 
     // Permissions checks
@@ -1866,14 +1848,20 @@ impl Perform for GetRelatedUsers {
     is_admin_or_sitemod(context.pool(), user.id).await?;
 
     let userid = data.user_id;
-    let userbanid = blocking(context.pool(), move |conn| UserBanId::get_by_user(conn, &userid)).await??;
+    let userbanid = blocking(context.pool(), move |conn| {
+      UserBanId::get_by_user(conn, &userid)
+    })
+    .await??;
 
     match userbanid {
       Some(ubid) => {
-        let users = blocking(context.pool(), move |conn| UserBanId::get_users_by_bid(conn, ubid.bid)).await??;
+        let users = blocking(context.pool(), move |conn| {
+          UserBanId::get_users_by_bid(conn, ubid.bid)
+        })
+        .await??;
         Ok(GetRelatedUsersResponse { users })
-      },
-      None => Ok(GetRelatedUsersResponse { users: vec![] })
+      }
+      None => Ok(GetRelatedUsersResponse { users: vec![] }),
     }
   }
 }

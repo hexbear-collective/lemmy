@@ -80,8 +80,8 @@ pub struct UserViewSafe {
   pub moderator: bool,
   pub banned: bool,
   pub published: chrono::NaiveDateTime,
-    pub number_of_posts: i64,
-    pub number_of_comments: i64,
+  pub number_of_posts: i64,
+  pub number_of_comments: i64,
 }
 
 pub struct UserQueryBuilder<'a> {
@@ -103,8 +103,8 @@ pub struct UserQueryBuilder<'a> {
       sql_types::Bool,
       sql_types::Bool,
       sql_types::Timestamp,
-        sql_types::BigInt,
-        sql_types::BigInt,
+      sql_types::BigInt,
+      sql_types::BigInt,
     ),
     user_view::table,
     Pg,
@@ -134,8 +134,8 @@ impl<'a> UserQueryBuilder<'a> {
         moderator,
         banned,
         published,
-          number_of_posts,
-          number_of_comments,
+        number_of_posts,
+        number_of_comments,
       ))
       .into_boxed();
 
@@ -417,26 +417,26 @@ impl UserViewSafe {
   pub fn read_mult(conn: &PgConnection, from_user_ids: Vec<i32>) -> Result<Vec<Self>, Error> {
     use super::user_view::user_view::dsl::*;
     user_view
-        .select((
-          id,
-          actor_id,
-          name,
-          preferred_username,
-          avatar,
-          banner,
-          matrix_user_id,
-          bio,
-          local,
-          admin,
-          sitemod,
-          moderator,
-          banned,
-          published,
-          number_of_posts,
-          number_of_comments,
-        ))
-        .filter(id.eq(any(from_user_ids)))
-        .load(conn)
+      .select((
+        id,
+        actor_id,
+        name,
+        preferred_username,
+        avatar,
+        banner,
+        matrix_user_id,
+        bio,
+        local,
+        admin,
+        sitemod,
+        moderator,
+        banned,
+        published,
+        number_of_posts,
+        number_of_comments,
+      ))
+      .filter(id.eq(any(from_user_ids)))
+      .load(conn)
   }
 
   pub fn admins(conn: &PgConnection) -> Result<Vec<Self>, Error> {

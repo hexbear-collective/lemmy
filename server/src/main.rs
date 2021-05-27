@@ -21,14 +21,12 @@ use diesel::{
 use lemmy_db::get_database_url_from_env;
 use lemmy_rate_limit::{rate_limiter::RateLimiter, RateLimit};
 use lemmy_server::{
-  apub::activity_queue::create_activity_queue,
-  blocking,
-  routes::*,
-  twofactor::CodeCacheHandler,
-  websocket::chat_server::ChatServer,
-  LemmyContext,
+  apub::activity_queue::create_activity_queue, blocking, routes::*, twofactor::CodeCacheHandler,
+  websocket::chat_server::ChatServer, LemmyContext,
 };
-use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_IMAGE_REGEX, CACHE_CONTROL_APPLICATION_REGEX};
+use lemmy_utils::{
+  settings::Settings, LemmyError, CACHE_CONTROL_APPLICATION_REGEX, CACHE_CONTROL_IMAGE_REGEX,
+};
 use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -122,12 +120,9 @@ async fn main() -> Result<(), LemmyError> {
       .configure(webfinger::config)
       // static files
       .service(
-        actix_files::Files::new(
-          "/static",
-          settings.front_end_dir.to_owned(),
-        )
+        actix_files::Files::new("/static", settings.front_end_dir.to_owned())
           .use_etag(true)
-          .use_last_modified(true)
+          .use_last_modified(true),
       )
       .service(actix_files::Files::new(
         "/docs",

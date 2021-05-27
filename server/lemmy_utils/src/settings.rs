@@ -41,6 +41,12 @@ pub struct RateLimitConfig {
   pub register_per_second: i32,
   pub image: i32,
   pub image_per_second: i32,
+  pub comment: i32,
+  pub comment_per_second: i32,
+  pub report: i32,
+  pub report_per_second: i32,
+  pub direct_message: i32,
+  pub direct_message_per_second: i32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
