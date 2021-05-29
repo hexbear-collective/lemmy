@@ -68,7 +68,8 @@ services:
     ports:
       - "127.0.0.1:8061:80"
     volumes:
-      - ./volumes/iframely:/iframely:ro
+      - ./volumes/iframely/iframely.config.local.js:/iframely/config.local.js:ro
+      - ./volumes/iframely/plugins:/iframely/plugins:ro
     restart: always
 
   purgebot:
