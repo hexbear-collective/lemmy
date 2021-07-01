@@ -390,10 +390,28 @@ impl Perform for Register {
             icon: None,
             banner: None,
           };
-          blocking(context.pool(), move |conn| {
+          let community = blocking(context.pool(), move |conn| {
             Community::create(conn, &community_form)
           })
-          .await??
+          .await??;
+
+          // Initialize community settings
+          let community_settings_form = CommunitySettingsForm {
+            id: community.id,
+            read_only: false,
+            private: false,
+            post_links: true,
+            comment_images: 1,
+            allow_as_default: true,
+            hide_from_all: false,
+          };
+
+          let _inserted_settings = blocking(context.pool(), move |conn| {
+            CommunitySettings::create(conn, &community_settings_form)
+          })
+          .await??;
+
+          community
         }
       };
 

@@ -109,7 +109,7 @@ pub struct IframelyResponse {
 }
 
 pub async fn fetch_iframely(client: &Client, url: &str) -> Result<IframelyResponse, LemmyError> {
-  let fetch_url = format!("http://iframely/oembed?url={}", url);
+  let fetch_url = format!("http://iframely/iframely?url={}", url);
 
   let response = retry(|| client.get(&fetch_url).send()).await?;
 
