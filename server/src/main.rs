@@ -103,7 +103,6 @@ async fn main() -> Result<(), LemmyError> {
       .allow_any_header()
       .max_age(3600);
 
-    let settings = Settings::get();
     let rate_limiter = rate_limiter.clone();
     App::new()
       .wrap_fn(add_cache_headers)
@@ -115,19 +114,8 @@ async fn main() -> Result<(), LemmyError> {
       .configure(federation::config)
       .configure(feeds::config)
       .configure(|cfg| images::config(cfg, &rate_limiter))
-      .configure(index::config)
       .configure(nodeinfo::config)
       .configure(webfinger::config)
-      // static files
-      .service(
-        actix_files::Files::new("/static", settings.front_end_dir.to_owned())
-          .use_etag(true)
-          .use_last_modified(true),
-      )
-      .service(actix_files::Files::new(
-        "/docs",
-        settings.front_end_dir + "/documentation",
-      ))
   })
   .bind((settings.bind, settings.port))?
   .run()
