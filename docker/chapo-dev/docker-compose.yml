@@ -3,8 +3,11 @@ version: '3.3'
 services:
   hexbear-frontend:
     image: registry.chapo.chat/hexbear-frontend:dev
+    container_name: lemmy-dev-fe
+    ports:
+      - "127.0.0.1:4444:4444"
     volumes:
-      - frontend:/app/dist
+      - frontend:/app/dist  #is this necessary anymore?
 
   lemmy:
     image: registry.chapo.chat/hexbear:dev-latest

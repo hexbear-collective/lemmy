@@ -6,7 +6,6 @@
 
 
 **Production:** [![Build Status](https://drone.chapo.chat/api/badges/chapo-collective/lemmy-hexbear/status.svg?ref=refs/heads/prod)](https://drone.chapo.chat/chapo-collective/lemmy-hexbear)  
-**Dev-Server:** [![Build Status](https://drone.chapo.chat/api/badges/chapo-collective/lemmy-hexbear/status.svg?ref=refs/heads/dev)](https://drone.chapo.chat/chapo-collective/lemmy-hexbear)  
 
 [Original Lemmy README](README-lemmy.md)
 </div>
