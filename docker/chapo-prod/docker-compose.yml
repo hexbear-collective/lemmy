@@ -3,8 +3,13 @@ version: '3.3'
 services:
   hexbear-frontend:
     image: registry.chapo.chat/hexbear-frontend:prod
-    volumes:
-      - frontend:/app/dist
+    container_name: lemmy-dev-fe
+    ports:
+      - "127.0.0.1:4444:4444"
+    environment:
+      - PG_CONN_URL=postgres://lemmy:${LEMMYPROD_POSTGRES_PW}@postgres-prod:5433/lemmy
+    depends_on:
+      - postgres
 
   lemmy:
     image: registry.chapo.chat/hexbear:prod-latest

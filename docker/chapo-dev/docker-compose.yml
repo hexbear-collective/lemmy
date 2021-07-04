@@ -6,8 +6,10 @@ services:
     container_name: lemmy-dev-fe
     ports:
       - "127.0.0.1:4444:4444"
-    volumes:
-      - frontend:/app/dist  #is this necessary anymore?
+    environment:
+      - PG_CONN_URL=postgres://lemmy:${LEMMYDEV_POSTGRES_PW}@postgres-dev:5433/lemmy
+    depends_on:
+      - postgres
 
   lemmy:
     image: registry.chapo.chat/hexbear:dev-latest
