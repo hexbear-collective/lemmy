@@ -344,6 +344,7 @@ impl FromApub for CommunityForm {
     let description = group
       .inner
       .content()
+      .as_ref()
       .map(|s| s.as_single_xsd_string())
       .flatten()
       .map(|s| s.to_string());

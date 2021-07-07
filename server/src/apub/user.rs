@@ -233,6 +233,7 @@ impl FromApub for UserForm {
     let bio = person
       .inner
       .summary()
+      .as_ref()
       .map(|s| s.as_single_xsd_string())
       .flatten()
       .map(|s| s.to_string());
