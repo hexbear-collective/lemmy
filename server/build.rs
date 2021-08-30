@@ -1,13 +1,10 @@
-// build.rs
-extern crate vergen;
-
-use vergen::{generate_cargo_keys, ConstantsFlags};
+use vergen::{Config, vergen};
 
 fn main() {
   // Setup the flags, toggling off the 'SEMVER_FROM_CARGO_PKG' flag
-  let mut flags = ConstantsFlags::all();
-  flags.toggle(ConstantsFlags::SEMVER_FROM_CARGO_PKG);
+  let mut config = Config::default();
+  *config.build_mut().semver_mut() = false;
 
   // Generate the 'cargo:' key output
-  generate_cargo_keys(flags).expect("Unable to generate the cargo keys!");
+  vergen(config).expect("Unable to generate the cargo keys!");
 }

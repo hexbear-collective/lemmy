@@ -79,10 +79,11 @@ fn get_feed_all_data(conn: &PgConnection, sort_type: &SortType) -> Result<String
 }
 
 async fn get_feed(
-  web::Path((r_type, name)): web::Path<(String, String)>,
+  path: web::Path<(String, String)>,
   info: web::Query<Params>,
   context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error> {
+  let (r_type, name) = path.into_inner();
   let sort_type = get_sort_type(info).map_err(ErrorBadRequest)?;
 
   let request_type = match r_type.as_str() {

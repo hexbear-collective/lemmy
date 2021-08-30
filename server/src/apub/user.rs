@@ -233,9 +233,9 @@ impl FromApub for UserForm {
     let bio = person
       .inner
       .summary()
-      .map(|s| s.as_single_xsd_string())
-      .flatten()
-      .map(|s| s.to_string());
+      .map(|s| s.as_single_xsd_string()
+      .map(|str| str.to_string()))
+      .flatten();
     check_slurs(&name)?;
     check_slurs_opt(&preferred_username)?;
     check_slurs_opt(&bio)?;
