@@ -18,11 +18,11 @@ lettre_email = "0.9.4"
 log = "0.4.14"
 itertools = "0.10.1"
 rand = "0.8.4"
-serde = { version = "1.0.126", features = ["derive"] }
-serde_json = { version = "1.0.64", features = ["preserve_order"] }
-comrak = "0.10.1"
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = { version = "1.0.67", features = ["preserve_order"] }
+comrak = "0.11.0"
 lazy_static = "1.4.0"
-openssl = "0.10.35"
+openssl = "0.10.36"
 url = { version = "2.2.2", features = ["serde"] }
 actix-web = "4.0.0-beta.8"
-anyhow = "1.0.41"
+anyhow = "1.0.43"

@@ -1,7 +1,8 @@
 use crate::apub::ActorType;
 use activitystreams::unparsed::UnparsedMutExt;
 use activitystreams_ext::UnparsedExtension;
-use actix_web::{client::ClientRequest, HttpRequest};
+use actix_web::HttpRequest;
+use awc::ClientRequest;
 use anyhow::{anyhow, Context};
 use http_signature_normalization_actix::{
   digest::{DigestClient, SignExt},

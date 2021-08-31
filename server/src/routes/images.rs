@@ -1,6 +1,6 @@
 use crate::api::claims::Claims;
-use actix::clock::Duration;
-use actix_web::{body::BodyStream, http::StatusCode, *};
+use std::time::Duration;
+use actix_web::{*, body::BodyStream, http::StatusCode, web::Data};
 use awc::Client;
 use lemmy_rate_limit::RateLimit;
 use lemmy_utils::settings::Settings;
@@ -13,7 +13,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimit) {
     .finish();
 
   cfg
-    .data(client)
+    .app_data(Data::new(client))
     .service(
       web::resource("/pictrs/image")
         .wrap(rate_limit.image())
@@ -61,9 +61,9 @@ async fn upload(
     client_req = client_req.append_header(("X-Forwarded-For", addr.to_string()))
   };
 
-  let mut res = client_req.send_stream(body).await?;
+  let mut res = client_req.send_stream(body).await.map_err(|e| error::ErrorBadRequest(e))?;
 
-  let images = res.json::<Images>().await?;
+  let images = res.json::<Images>().await.map_err(|e| error::ErrorBadRequest(e))?;
 
   Ok(HttpResponse::build(res.status()).json(images))
 }
@@ -110,7 +110,7 @@ async fn image(
     client_req = client_req.append_header(("X-Forwarded-For", addr.to_string()))
   };
 
-  let res = client_req.no_decompress().send().await.map_err::<Error, _>(|e| e.into())?;
+  let res = client_req.no_decompress().send().await.map_err(|e| error::ErrorBadRequest(e))?;
 
   if res.status() == StatusCode::NOT_FOUND {
     return Ok(HttpResponse::NotFound().finish());
@@ -145,7 +145,7 @@ async fn delete(
     client_req = client_req.append_header(("X-Forwarded-For", addr.to_string()))
   };
 
-  let res = client_req.no_decompress().send().await?;
+  let res = client_req.no_decompress().send().await.map_err(|e| error::ErrorBadRequest(e))?;
 
   Ok(HttpResponse::build(res.status()).body(BodyStream::new(res)))
 }
