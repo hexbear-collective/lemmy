@@ -102,10 +102,30 @@ impl LemmyContext {
 
 #[derive(Deserialize, Debug)]
 pub struct IframelyResponse {
-  title: Option<String>,
-  description: Option<String>,
-  thumbnail_url: Option<String>,
   html: Option<String>,
+  links: Option<IframelyLinks>,
+  meta: Option<IframelyMeta>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct IframelyMeta {
+  description: Option<String>,
+  title: Option<String>,
+  site: Option<String>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct IframelyLink {
+  href: Option<String>,
+  html: Option<String>,
+  #[serde(rename = "type")]
+  content_type: Option<String>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct IframelyLinks {
+  icon: Option<Vec<IframelyLink>>,
+  thumbnail: Option<Vec<IframelyLink>>,
 }
 
 pub async fn fetch_iframely(client: &Client, url: &str) -> Result<IframelyResponse, LemmyError> {
@@ -168,7 +188,11 @@ async fn fetch_iframely_and_pictrs_data(
       // Fetch iframely data
       let (iframely_title, iframely_description, iframely_thumbnail_url, iframely_html) =
         match fetch_iframely(client, url).await {
-          Ok(res) => (res.title, res.description, res.thumbnail_url, res.html),
+          Ok(res) => {
+            let meta = res.meta.map(|m| (m.title, m.description)).unwrap_or((None, None));
+            let thumbnail = res.links.map(|l| l.thumbnail.map(|t| t[0].href.clone()).flatten()).flatten();
+            (meta.0, meta.1, thumbnail, res.html)
+          },
           Err(e) => {
             error!("iframely err: {}", e);
             (None, None, None, None)

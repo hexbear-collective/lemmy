@@ -3,7 +3,7 @@ version: '3.3'
 services:
 
   lemmy:
-    image: lemmy-dev:latest
+    image: hexbear-dev:latest
     ports:
       - 8536:8536
     restart: always
@@ -39,7 +39,7 @@ services:
     restart: always
 
   iframely:
-    image: jolt/iframely:v1.4.3
+    image: jolt/iframely:v1.6.1
     ports:
       - 8061:80
     volumes:
