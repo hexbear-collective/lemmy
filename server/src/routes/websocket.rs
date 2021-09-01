@@ -8,6 +8,7 @@ use crate::{
 use actix::prelude::*;
 use actix_web::*;
 use actix_web_actors::ws;
+use core::ops::Deref;
 use lemmy_utils::get_ip;
 use log::{debug, error, info};
 use std::time::{Duration, Instant};
@@ -28,7 +29,7 @@ pub async fn chat_route(
       cs_addr: context.chat_server().to_owned(),
       id: 0,
       hb: Instant::now(),
-      ip: get_ip(&req.connection_info()),
+      ip: get_ip(req.connection_info().deref()),
     },
     &req,
     stream,

@@ -140,8 +140,8 @@ pub fn pii_vec_to_str(pii: Vec<&str>) -> String {
   [start, combined].concat()
 }
 
-pub fn generate_random_string() -> String {
-  thread_rng().sample_iter(&Alphanumeric).take(30).collect()
+pub fn generate_random_string() -> Result<String, anyhow::Error> {
+  Ok(String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(30).collect())?)
 }
 
 pub fn send_email(

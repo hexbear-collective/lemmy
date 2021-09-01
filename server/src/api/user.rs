@@ -1221,7 +1221,7 @@ impl Perform for PasswordReset {
     };
 
     // Generate a random token
-    let token = generate_random_string();
+    let token = generate_random_string()?;
 
     // Insert the row
     let token2 = token.clone();

@@ -6,12 +6,12 @@ use activitystreams::{
   base::{Extends, ExtendsExt},
   object::AsObject,
 };
+use core::fmt::Debug;
 use lemmy_db::{community::Community, user::User_};
 use lemmy_utils::{get_apub_protocol_string, settings::Settings, LemmyError};
 use serde::{Serialize};
 use url::{ParseError, Url};
 use uuid::Uuid;
-use std::fmt::Debug;
 
 pub async fn send_activity_to_community<T, Kind>(
   creator: &User_,
