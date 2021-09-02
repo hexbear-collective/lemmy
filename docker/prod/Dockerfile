@@ -1,4 +1,4 @@
-ARG RUST_BUILDER_IMAGE=ekidd/rust-musl-builder:1.47.0
+ARG RUST_BUILDER_IMAGE=ekidd/rust-musl-builder:latest
 ARG FRONTEND_TAG=prod
 ARG FRONTEND_REPO=registry.chapo.chat/hexbear-frontend
 

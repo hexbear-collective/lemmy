@@ -48,7 +48,7 @@ RUN sudo chown -R rust:rust .
 RUN mdbook build docs/
 
 
-FROM alpine:3.12
+FROM alpine:3.12 as runner
 
 # Install libpq for postgres
 RUN apk add libpq
