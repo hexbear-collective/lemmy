@@ -244,48 +244,51 @@ impl Perform for Register {
       return Err(APIError::err("admin_already_created").into());
     }
 
-    // Make sure site has open registration
-    if let Ok(site) = blocking(context.pool(), move |conn| SiteView::read(conn)).await? {
-      let site: SiteView = site;
-      if !site.open_registration {
-        return Err(APIError::err("registration_closed").into());
-      }
-    }
-
-    // Make sure passwords match
-    if data.password != data.password_verify {
-      return Err(APIError::err("passwords_dont_match").into());
-    }
-
-    // If its not the admin, check the captcha
-    if !data.admin && Settings::get().captcha.enabled {
-      match Settings::get().captcha.provider.as_str() {
-        "hcaptcha" => {
-          if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
-            if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
-              error!("hCaptcha failed: {:?}", hcaptcha_error);
-              return Err(APIError::err("captcha_failed").into());
-            }
-          } else {
-            return Err(APIError::err("missing_hcaptcha_id").into());
-          }
+    // If its not the admin, check other information about registration
+    if !data.admin {
+      // Make sure site has open registration
+      if let Ok(site) = blocking(context.pool(), move |conn| SiteView::read(conn)).await? {
+        let site: SiteView = site;
+        if !site.open_registration {
+          return Err(APIError::err("registration_closed").into());
         }
-        _ => {
-          let check = context
-            .chat_server()
-            .send(CheckCaptcha {
-              uuid: data
-                .captcha_uuid
-                .to_owned()
-                .unwrap_or_else(|| "".to_string()),
-              answer: data
-                .captcha_answer
-                .to_owned()
-                .unwrap_or_else(|| "".to_string()),
-            })
-            .await?;
-          if !check {
-            return Err(APIError::err("captcha_incorrect").into());
+      }
+
+      // Make sure passwords match
+      if data.password != data.password_verify {
+        return Err(APIError::err("passwords_dont_match").into());
+      }
+
+      //Check the captcha if it's enabled
+      if Settings::get().captcha.enabled {
+        match Settings::get().captcha.provider.as_str() {
+          "hcaptcha" => {
+            if let Some(hcaptcha_id) = data.hcaptcha_id.clone() {
+              if let Err(hcaptcha_error) = hcaptcha_verify(hcaptcha_id).await {
+                error!("hCaptcha failed: {:?}", hcaptcha_error);
+                return Err(APIError::err("captcha_failed").into());
+              }
+            } else {
+              return Err(APIError::err("missing_hcaptcha_id").into());
+            }
+          }
+          _ => {
+            let check = context
+              .chat_server()
+              .send(CheckCaptcha {
+                uuid: data
+                  .captcha_uuid
+                  .to_owned()
+                  .unwrap_or_else(|| "".to_string()),
+                answer: data
+                  .captcha_answer
+                  .to_owned()
+                  .unwrap_or_else(|| "".to_string()),
+              })
+              .await?;
+            if !check {
+              return Err(APIError::err("captcha_incorrect").into());
+            }
           }
         }
       }
@@ -313,7 +316,7 @@ impl Perform for Register {
     let user_form = UserForm {
       name: data.username.to_owned(),
       email: Some(email.to_owned()),
-      admin: false,
+      admin: data.admin,    //only executes up to this point if there are no other admins.
       matrix_user_id: None,
       avatar: None,
       banner: None,
@@ -387,10 +390,28 @@ impl Perform for Register {
             icon: None,
             banner: None,
           };
-          blocking(context.pool(), move |conn| {
+          let community = blocking(context.pool(), move |conn| {
             Community::create(conn, &community_form)
           })
-          .await??
+          .await??;
+
+          // Initialize community settings
+          let community_settings_form = CommunitySettingsForm {
+            id: community.id,
+            read_only: false,
+            private: false,
+            post_links: true,
+            comment_images: 1,
+            allow_as_default: true,
+            hide_from_all: false,
+          };
+
+          let _inserted_settings = blocking(context.pool(), move |conn| {
+            CommunitySettings::create(conn, &community_settings_form)
+          })
+          .await??;
+
+          community
         }
       };
 
@@ -406,9 +427,9 @@ impl Perform for Register {
     };*/
 
     //get comms that are both admin-selected and enabled allow_as_default, then subscribe users to all of them
+    //if the read site throws an error, we may be registering before the site is created. just pass over no defaults
     let default_communities = blocking(context.pool(), move |conn| SiteView::read(conn))
-      .await??
-      .autosubscribe_comms;
+      .await?.map(|s| s.autosubscribe_comms).unwrap_or(Vec::new());
     let optin_communities = blocking(context.pool(), move |conn| {
       CommunitySettings::list_allowed_as_default(conn)
     })

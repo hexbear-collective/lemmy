@@ -63,12 +63,11 @@ services:
     restart: always
 
   iframely:
-    image: dogbin/iframely:latest
-    container_name: iframely-dev
+    image: jolt/iframely:v1.6.1
     ports:
       - "127.0.0.1:8061:80"
     volumes:
-      - ./iframely.config.local.js:/iframely/config.local.js:ro
+      - ./volumes/iframely/iframely.config.local.js:/iframely/config.local.js:ro
     restart: always
 
   purgebot:
