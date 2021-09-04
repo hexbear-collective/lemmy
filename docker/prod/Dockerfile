@@ -10,6 +10,7 @@ ARG RUSTRELEASEDIR="release"
 
 # Cache deps
 WORKDIR /app
+COPY ./.git/ ./.git/
 RUN sudo chown -R rust:rust .
 RUN USER=root cargo new server
 WORKDIR /app/server
@@ -25,8 +26,6 @@ RUN cargo build --release
 RUN find target/$CARGO_BUILD_TARGET/$RUSTRELEASEDIR -type f -name "$(echo "lemmy_server" | tr '-' '_')*" -exec touch -t 200001010000 {} +
 COPY server/src ./src/
 COPY server/migrations ./migrations/
-
-COPY .git/ ./.git/
 
 # build for release
 # workaround for https://github.com/rust-lang/rust/issues/62896
