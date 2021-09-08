@@ -25,6 +25,8 @@
         // request with `redirect loop` error.
         MAX_REDIRECTS: 4,
 
+        DISABLE_HTTP2: true,
+
         SKIP_OEMBED_RE_LIST: [
             // /^https?:\/\/yourdomain\.com\//,
         ],

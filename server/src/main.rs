@@ -5,19 +5,15 @@ pub extern crate lazy_static;
 
 use actix::prelude::*;
 use actix_cors::Cors;
-use actix_web::{
-  body::Body,
-  dev::{Service, ServiceRequest, ServiceResponse},
-  http::{
+use actix_web::{*, body::Body, dev::{Service, ServiceRequest, ServiceResponse}, http::{
     header::{CACHE_CONTROL, CONTENT_TYPE},
     HeaderValue,
-  },
-  *,
-};
+  }, web::Data};
 use diesel::{
   r2d2::{ConnectionManager, Pool},
   PgConnection,
 };
+use futures::Future;
 use lemmy_db::get_database_url_from_env;
 use lemmy_rate_limit::{rate_limiter::RateLimiter, RateLimit};
 use lemmy_server::{
@@ -28,8 +24,7 @@ use lemmy_utils::{
   settings::Settings, LemmyError, CACHE_CONTROL_APPLICATION_REGEX, CACHE_CONTROL_IMAGE_REGEX,
 };
 use reqwest::Client;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
   // static ref CACHE_CONTROL_VALUE: String = format!("public, max-age={}", 365 * 24 * 60 * 60);
@@ -108,7 +103,7 @@ async fn main() -> Result<(), LemmyError> {
       .wrap_fn(add_cache_headers)
       .wrap(cors)
       .wrap(middleware::Logger::default())
-      .data(context)
+      .app_data(Data::new(context))
       // The routes
       .configure(|cfg| api::config(cfg, &rate_limiter))
       .configure(federation::config)
@@ -126,10 +121,10 @@ async fn main() -> Result<(), LemmyError> {
 
 fn add_cache_headers<S>(
   req: ServiceRequest,
-  srv: &mut S,
+  srv: &S,
 ) -> impl Future<Output = Result<ServiceResponse, Error>>
 where
-  S: Service<Request = ServiceRequest, Response = ServiceResponse<Body>, Error = Error>,
+  S: Service<ServiceRequest, Response = ServiceResponse<Body>, Error = Error>
 {
   let fut = srv.call(req);
   async move {

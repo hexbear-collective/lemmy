@@ -7,6 +7,7 @@ pub extern crate tokio;
 
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use futures::future::{ok, Ready};
+use lemmy_api_structs::APIError;
 use lemmy_utils::{
   get_ip,
   settings::{RateLimitConfig, Settings},
@@ -16,17 +17,14 @@ use rate_limiter::{RateLimitType, RateLimiter};
 use std::{
   future::Future,
   pin::Pin,
-  sync::Arc,
+  sync::{Arc, Mutex},
   task::{Context, Poll},
 };
-use tokio::sync::Mutex;
 
 pub mod rate_limiter;
 
 #[derive(Debug, Clone)]
 pub struct RateLimit {
-  // it might be reasonable to use a std::sync::Mutex here, since we don't need to lock this
-  // across await points
   pub rate_limiter: Arc<Mutex<RateLimiter>>,
 }
 
@@ -93,7 +91,7 @@ impl RateLimited {
 
     // before
     {
-      let mut limiter = self.rate_limiter.lock().await;
+      let mut limiter = self.rate_limiter.lock().map_err(|e| APIError::err(format!("Rate limiter mutex poisoned: {:?}", e).as_str()).into())?;
 
       match self.type_ {
         RateLimitType::Message => {
@@ -169,7 +167,7 @@ impl RateLimited {
 
     // after
     {
-      let mut limiter = self.rate_limiter.lock().await;
+      let mut limiter = self.rate_limiter.lock().map_err(|e| APIError::err(format!("Rate limiter mutex poisoned: {:?}", e).as_str()).into())?;
       if res.is_ok() {
         match self.type_ {
           RateLimitType::Post => {
@@ -199,12 +197,11 @@ impl RateLimited {
   }
 }
 
-impl<S> Transform<S> for RateLimited
+impl<S> Transform<S, ServiceRequest> for RateLimited
 where
-  S: Service<Request = ServiceRequest, Response = ServiceResponse, Error = actix_web::Error>,
+  S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error>,
   S::Future: 'static,
 {
-  type Request = S::Request;
   type Response = S::Response;
   type Error = actix_web::Error;
   type InitError = ();
@@ -221,21 +218,20 @@ where
 
 type FutResult<T, E> = dyn Future<Output = Result<T, E>>;
 
-impl<S> Service for RateLimitedMiddleware<S>
+impl<S> Service<ServiceRequest> for RateLimitedMiddleware<S>
 where
-  S: Service<Request = ServiceRequest, Response = ServiceResponse, Error = actix_web::Error>,
+  S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error>,
   S::Future: 'static,
 {
-  type Request = S::Request;
   type Response = S::Response;
   type Error = actix_web::Error;
   type Future = Pin<Box<FutResult<Self::Response, Self::Error>>>;
 
-  fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+  fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
     self.service.poll_ready(cx)
   }
 
-  fn call(&mut self, req: S::Request) -> Self::Future {
+  fn call(&self, req: ServiceRequest) -> Self::Future {
     let ip_addr = get_ip(&req.connection_info());
 
     let fut = self

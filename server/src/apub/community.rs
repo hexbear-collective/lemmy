@@ -10,18 +10,10 @@ use crate::{
   },
   blocking, DbPool, LemmyContext,
 };
-use activitystreams::{
-  activity::{
+use activitystreams::{activity::{
     kind::{AcceptType, AnnounceType, DeleteType, LikeType, RemoveType, UndoType},
     Accept, Announce, Delete, Follow, Remove, Undo,
-  },
-  actor::{kind::GroupType, ApActor, Endpoints, Group},
-  base::{AnyBase, BaseExt},
-  collection::{OrderedCollection, UnorderedCollection},
-  object::{Image, Tombstone},
-  prelude::*,
-  public,
-};
+  }, actor::{kind::GroupType, ApActor, Endpoints, Group}, base::{AnyBase, BaseExt}, collection::{OrderedCollection, UnorderedCollection}, object::{Image, Tombstone}, prelude::*, public};
 use activitystreams_ext::Ext2;
 use actix_web::{body::Body, web, HttpResponse};
 use anyhow::Context;
@@ -344,9 +336,9 @@ impl FromApub for CommunityForm {
     let description = group
       .inner
       .content()
-      .map(|s| s.as_single_xsd_string())
-      .flatten()
-      .map(|s| s.to_string());
+      .map(|s| s.as_single_xsd_string()
+      .map(|str| str.to_string()))
+      .flatten();
     check_slurs(&name)?;
     check_slurs(&title)?;
     check_slurs_opt(&description)?;

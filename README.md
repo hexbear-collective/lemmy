@@ -1,19 +1,16 @@
-<div align="center">
-
-<h3>DOES NOT RUN IN RUST 1.48+ DUE TO AN ISSUE IN A DEPENDENCY. USE RUST 1.47</h3>
-
-**Main Branch:** [![Build Status](https://drone.chapo.chat/api/badges/chapo-collective/lemmy-hexbear/status.svg?ref=refs/heads/main)](https://drone.chapo.chat/chapo-collective/lemmy-hexbear)  
-
-
-**Production:** [![Build Status](https://drone.chapo.chat/api/badges/chapo-collective/lemmy-hexbear/status.svg?ref=refs/heads/prod)](https://drone.chapo.chat/chapo-collective/lemmy-hexbear)  
-
-[Original Lemmy README](README-lemmy.md)
-</div>
+<div align="center"> 
 
 <p align="center">
-    <a href="https://www.chapo.chat" rel="noopener">
-    <img width=300px height=300px src="ui/public/android-chrome-512x512.png"></a>
+    <a href="https://www.hexbear.net" rel="noopener">
+    <img width=300px height=300px src="https://www.hexbear.net/static/android-chrome-512x512.png"></a>
 </p>
+
+**Main Branch:** [![Build Status](https://drone.chapo.chat/api/badges/hexbear-collective/lemmy-hexbear/status.svg?ref=refs/heads/main)](https://drone.chapo.chat/hexbear-collective/lemmy-hexbear)
+**Production:** [![Build Status](https://drone.chapo.chat/api/badges/hexbear-collective/lemmy-hexbear/status.svg?ref=refs/heads/prod)](https://drone.chapo.chat/hexbear-collective/lemmy-hexbear) 
+
+[Original Lemmy README](README-lemmy.md)
+
+</div>
 
 # Hexbear
 

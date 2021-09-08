@@ -4,7 +4,7 @@
 # build folders and similar which are not needed for the docker build
 ui/node_modules
 server/target
-# docker/dev/volumes
+docker/dev/volumes
 # docker/federation/volumes
 # docker/federation-test/volumes
 #.git # needed to get git sha
