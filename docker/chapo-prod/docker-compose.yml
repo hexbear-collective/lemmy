@@ -3,7 +3,7 @@ version: '3.3'
 services:
   hexbear-frontend:
     image: registry.chapo.chat/hexbear-frontend:prod-latest
-    container_name: lemmy-dev-fe
+    container_name: lemmy-prod-fe
     ports:
       - "127.0.0.1:4444:4444"
     environment:
