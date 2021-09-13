@@ -30,7 +30,7 @@
         path: /cache
 
   - name: build_backend
-    image: rust:1.47
+    image: rust:1.54
     env:
       - CARGO_TARGET_DIR=/var/cache/drone/cargo
       - CARGO_HOME=/var/cache/drone/cargo

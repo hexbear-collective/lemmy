@@ -71,7 +71,7 @@ impl ActixJob for SendActivityTask {
         let request = state
           .client
           .post(to_url.as_str())
-          .header("Content-Type", "application/json");
+          .insert_header(("Content-Type", "application/json"));
 
         // TODO: i believe we have to do the signing in here because it is only valid for a few seconds
         let signed = sign(

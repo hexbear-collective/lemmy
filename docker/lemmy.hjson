@@ -4,15 +4,15 @@
 
   setup: {
     # username for the admin user
-    admin_username: "lemmy"
+    admin_username: "hexdev"
     # password for the admin user
-    admin_password: "lemmy"
+    admin_password: "hexbear"
     # name of the site (can be changed later)
-    site_name: "lemmy-test"
+    site_name: "hexbear docker dev"
   }
 
   # the domain name of your instance (eg "dev.lemmy.ml")
-  hostname: "my_domain"
+  hostname: "localhost:4444"
   # address where lemmy should listen for incoming requests
   bind: "0.0.0.0"
   # port where lemmy should listen for incoming requests

@@ -102,14 +102,34 @@ impl LemmyContext {
 
 #[derive(Deserialize, Debug)]
 pub struct IframelyResponse {
-  title: Option<String>,
-  description: Option<String>,
-  thumbnail_url: Option<String>,
   html: Option<String>,
+  links: Option<IframelyLinks>,
+  meta: Option<IframelyMeta>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct IframelyMeta {
+  description: Option<String>,
+  title: Option<String>,
+  site: Option<String>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct IframelyLink {
+  href: Option<String>,
+  html: Option<String>,
+  #[serde(rename = "type")]
+  content_type: Option<String>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct IframelyLinks {
+  icon: Option<Vec<IframelyLink>>,
+  thumbnail: Option<Vec<IframelyLink>>,
 }
 
 pub async fn fetch_iframely(client: &Client, url: &str) -> Result<IframelyResponse, LemmyError> {
-  let fetch_url = format!("http://iframely/oembed?url={}", url);
+  let fetch_url = format!("http://iframely/iframely?url={}", url);
 
   let response = retry(|| client.get(&fetch_url).send()).await?;
 
@@ -168,7 +188,11 @@ async fn fetch_iframely_and_pictrs_data(
       // Fetch iframely data
       let (iframely_title, iframely_description, iframely_thumbnail_url, iframely_html) =
         match fetch_iframely(client, url).await {
-          Ok(res) => (res.title, res.description, res.thumbnail_url, res.html),
+          Ok(res) => {
+            let meta = res.meta.map(|m| (m.title, m.description)).unwrap_or((None, None));
+            let thumbnail = res.links.map(|l| l.thumbnail.map(|t| t[0].href.clone()).flatten()).flatten();
+            (meta.0, meta.1, thumbnail, res.html)
+          },
           Err(e) => {
             error!("iframely err: {}", e);
             (None, None, None, None)
@@ -244,7 +268,7 @@ where
     let res = (f)(&conn);
     Ok(res) as Result<_, LemmyError>
   })
-  .await?;
+  .await??;
 
   Ok(res)
 }
@@ -319,7 +343,7 @@ mod tests {
 
   #[test]
   fn test_image() {
-    actix_rt::System::new("tset_image").block_on(async move {
+    actix_rt::System::new().block_on(async move {
       let client = reqwest::Client::default();
       assert!(is_image_content_type(&client, "https://1734811051.rsc.cdn77.org/data/images/full/365645/as-virus-kills-navajos-in-their-homes-tribal-women-provide-lifeline.jpg?w=600?w=650").await.is_ok());
       assert!(is_image_content_type(&client,

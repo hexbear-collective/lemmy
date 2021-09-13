@@ -4,7 +4,7 @@ use actix_web::web::Data;
 use anyhow::Context;
 use log::{debug, info};
 
-use enumflags2::BitFlags;
+use enumflags2::{BitFlags, bitflags};
 use lemmy_api_structs::{site::*, user::Register, APIError};
 use lemmy_db::{
   category::*, comment_view::*, community_view::*, diesel_option_overwrite, moderator::*,
@@ -45,7 +45,8 @@ impl Perform for ListCategories {
   }
 }
 
-#[derive(BitFlags, Copy, Clone, Debug, PartialEq)]
+#[bitflags]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u16)]
 pub enum ModlogActionFlag {
   RemovePost = 0b000000001,

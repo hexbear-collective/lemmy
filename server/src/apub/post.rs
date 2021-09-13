@@ -152,16 +152,14 @@ fn extract_embed_from_apub(
         .map(|s| s.to_string());
       let description = preview_page
         .summary()
-        .as_ref()
-        .map(|s| s.as_single_xsd_string())
-        .flatten()
-        .map(|s| s.to_string());
+        .map(|s| s.as_single_xsd_string()
+        .map(|str| str.to_string()))
+        .flatten();
       let html = preview_page
         .content()
-        .as_ref()
-        .map(|c| c.as_single_xsd_string())
-        .flatten()
-        .map(|s| s.to_string());
+        .map(|c| c.as_single_xsd_string()
+        .map(|str| str.to_string()))
+        .flatten();
       Ok(EmbedType {
         title,
         description,
