@@ -8,7 +8,6 @@
 **Main Branch:** [![Build Status](https://drone.chapo.chat/api/badges/hexbear-collective/lemmy-hexbear/status.svg?ref=refs/heads/main)](https://drone.chapo.chat/hexbear-collective/lemmy-hexbear)
 **Production:** [![Build Status](https://drone.chapo.chat/api/badges/hexbear-collective/lemmy-hexbear/status.svg?ref=refs/heads/prod)](https://drone.chapo.chat/hexbear-collective/lemmy-hexbear) 
 
-
 [Original Lemmy README](README-lemmy.md)
 
 </div>

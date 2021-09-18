@@ -36,17 +36,6 @@ RUN strip ./target/$CARGO_BUILD_TARGET/$RUSTRELEASEDIR/lemmy_server
 
 RUN cp ./target/$CARGO_BUILD_TARGET/$RUSTRELEASEDIR/lemmy_server /app/server/
 
-FROM $RUST_BUILDER_IMAGE as docs
-WORKDIR /app
-COPY --chown=rust:rust docs ./docs
-RUN mdbook build docs/
-
-
-ARG FRONTEND_TAG
-ARG FRONTEND_REPO
-RUN echo ${FRONTEND_REPO}:${FRONTEND_TAG}
-FROM ${FRONTEND_REPO}:${FRONTEND_TAG} as frontend
-
 FROM alpine:3.12 as lemmy
 
 # Install libpq for postgres
@@ -61,9 +50,6 @@ RUN adduser -D -s /bin/sh -u 1000 -G lemmy lemmy
 # Copy resources
 COPY --chown=lemmy:lemmy server/config/defaults.hjson /config/defaults.hjson
 COPY --chown=lemmy:lemmy --from=rust /app/server/lemmy_server /app/lemmy
-COPY --chown=lemmy:lemmy --from=docs /app/docs/book/ /app/dist/documentation/
-
-COPY --chown=lemmy:lemmy --from=frontend /app/dist /app/dist
 
 RUN chown lemmy:lemmy /app/lemmy
 USER lemmy

@@ -41,13 +41,6 @@ RUN sudo chown -R rust:rust .
 RUN cargo build
 
 
-FROM ${RUST_BUILDER} as docs
-WORKDIR /app
-COPY docs ./docs
-RUN sudo chown -R rust:rust .
-RUN mdbook build docs/
-
-
 FROM alpine:3.12 as runner
 
 # Install libpq for postgres
@@ -59,7 +52,6 @@ RUN apk add espeak
 # Copy resources
 COPY server/config/defaults.hjson /config/defaults.hjson
 COPY --from=builder /app/server/target/x86_64-unknown-linux-musl/debug/lemmy_server /app/lemmy
-COPY --from=docs /app/docs/book/ /app/dist/documentation/
 
 RUN addgroup -g 1000 lemmy
 RUN adduser -D -s /bin/sh -u 1000 -G lemmy lemmy
