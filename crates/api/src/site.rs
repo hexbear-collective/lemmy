@@ -487,7 +487,6 @@ impl Perform for TransferSite {
     let creator_person = admins.remove(creator_index);
     admins.insert(0, creator_person);
 
-    let banned = blocking(context.pool(), PersonViewSafe::banned).await??;
     let federated_instances = build_federated_instances(
       context.pool(),
       &context.settings().federation,
@@ -498,7 +497,6 @@ impl Perform for TransferSite {
     Ok(GetSiteResponse {
       site_view: Some(site_view),
       admins,
-      banned,
       online: 0,
       version: version::VERSION.to_string(),
       my_user: None,

@@ -39,6 +39,9 @@ pub async fn match_websocket_operation(
     UserOperation::GetReplies => do_websocket_operation::<GetReplies>(context, id, op, data).await,
     UserOperation::AddAdmin => do_websocket_operation::<AddAdmin>(context, id, op, data).await,
     UserOperation::BanPerson => do_websocket_operation::<BanPerson>(context, id, op, data).await,
+    UserOperation::GetBannedPersons => {
+      do_websocket_operation::<GetBannedPersons>(context, id, op, data).await
+    }
     UserOperation::BlockPerson => {
       do_websocket_operation::<BlockPerson>(context, id, op, data).await
     }

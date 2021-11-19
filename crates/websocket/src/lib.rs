@@ -126,6 +126,7 @@ pub enum UserOperation {
   AddModToCommunity,
   AddAdmin,
   BanPerson,
+  GetBannedPersons,
   Search,
   ResolveObject,
   MarkAllAsRead,

@@ -83,8 +83,6 @@ impl PerformCrud for GetSite {
       }
     }
 
-    let banned = blocking(context.pool(), PersonViewSafe::banned).await??;
-
     let online = context
       .chat_server()
       .send(GetUsersOnline)
@@ -151,7 +149,6 @@ impl PerformCrud for GetSite {
     Ok(GetSiteResponse {
       site_view,
       admins,
-      banned,
       online,
       version: version::VERSION.to_string(),
       my_user,
