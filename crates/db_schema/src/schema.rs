@@ -136,6 +136,7 @@ table! {
         community_id -> Int4,
         person_id -> Int4,
         published -> Timestamp,
+        expires -> Nullable<Timestamp>,
     }
 }
 
@@ -302,6 +303,7 @@ table! {
         matrix_user_id -> Nullable<Text>,
         admin -> Bool,
         bot_account -> Bool,
+        ban_expires -> Nullable<Timestamp>,
     }
 }
 
@@ -523,6 +525,7 @@ table! {
         matrix_user_id -> Nullable<Text>,
         admin -> Bool,
         bot_account -> Bool,
+        ban_expires -> Nullable<Timestamp>,
     }
 }
 
@@ -548,6 +551,7 @@ table! {
         matrix_user_id -> Nullable<Text>,
         admin -> Bool,
         bot_account -> Bool,
+        ban_expires -> Nullable<Timestamp>,
     }
 }
 

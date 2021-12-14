@@ -224,6 +224,9 @@ impl Bannable for CommunityPersonBan {
     use crate::schema::community_person_ban::dsl::*;
     insert_into(community_person_ban)
       .values(community_person_ban_form)
+      .on_conflict((community_id, person_id))
+      .do_update()
+      .set(community_person_ban_form)
       .get_result::<Self>(conn)
   }
 
@@ -382,6 +385,7 @@ mod tests {
     let community_person_ban_form = CommunityPersonBanForm {
       community_id: inserted_community.id,
       person_id: inserted_person.id,
+      expires: None,
     };
 
     let inserted_community_person_ban =
@@ -392,6 +396,7 @@ mod tests {
       community_id: inserted_community.id,
       person_id: inserted_person.id,
       published: inserted_community_person_ban.published,
+      expires: None,
     };
 
     let read_community = Community::read(&conn, inserted_community.id).unwrap();
