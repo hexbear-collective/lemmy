@@ -29,6 +29,7 @@ pub struct Community {
   pub shared_inbox_url: Option<DbUrl>,
   pub hidden: bool,
   pub posting_restricted_to_mods: bool,
+  pub is_default_community: bool,
 }
 
 /// A safe representation of community, without the sensitive info
@@ -51,6 +52,7 @@ pub struct CommunitySafe {
   pub banner: Option<DbUrl>,
   pub hidden: bool,
   pub posting_restricted_to_mods: bool,
+  pub is_default_community: bool,
 }
 
 #[derive(Debug, Default)]
@@ -77,6 +79,7 @@ pub struct CommunityForm {
   pub shared_inbox_url: Option<Option<DbUrl>>,
   pub hidden: Option<bool>,
   pub posting_restricted_to_mods: Option<bool>,
+  pub is_default_community: bool,
 }
 
 #[derive(PartialEq, Debug)]

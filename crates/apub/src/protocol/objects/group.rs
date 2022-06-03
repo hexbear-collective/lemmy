@@ -51,6 +51,7 @@ pub struct Group {
   pub(crate) moderators: Option<ObjectId<ApubCommunityModerators>>,
   // lemmy extension
   pub(crate) posting_restricted_to_mods: Option<bool>,
+  pub(crate) is_default_community: bool,
   pub(crate) outbox: ObjectId<ApubCommunityOutbox>,
   pub(crate) endpoints: Option<Endpoints>,
   pub(crate) published: Option<DateTime<FixedOffset>>,
@@ -96,6 +97,7 @@ impl Group {
       inbox_url: Some(self.inbox.into()),
       shared_inbox_url: Some(self.endpoints.map(|e| e.shared_inbox.into())),
       posting_restricted_to_mods: self.posting_restricted_to_mods,
+      is_default_community: self.is_default_community
     }
   }
 }

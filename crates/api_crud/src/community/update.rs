@@ -61,6 +61,11 @@ impl PerformCrud for EditCommunity {
       nsfw: data.nsfw,
       posting_restricted_to_mods: data.posting_restricted_to_mods,
       updated: Some(naive_now()),
+      is_default_community: if local_user_view.person.admin {
+        data.is_default_community
+      } else {
+        read_community.is_default_community
+      },
       ..CommunityForm::default()
     };
 

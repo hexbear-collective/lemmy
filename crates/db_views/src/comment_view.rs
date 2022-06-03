@@ -694,6 +694,7 @@ mod tests {
         hidden: false,
         posting_restricted_to_mods: false,
         published: inserted_community.published,
+        is_default_community: false,
       },
       counts: CommentAggregates {
         id: agg.id,
