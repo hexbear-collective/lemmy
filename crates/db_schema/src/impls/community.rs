@@ -43,6 +43,7 @@ mod safe_type {
     banner,
     hidden,
     posting_restricted_to_mods,
+    is_default_community
   );
 
   impl ToSafe for Community {
@@ -64,6 +65,7 @@ mod safe_type {
         banner,
         hidden,
         posting_restricted_to_mods,
+        is_default_community
       )
     }
   }
@@ -127,6 +129,11 @@ impl Community {
   pub fn distinct_federated_communities(conn: &PgConnection) -> Result<Vec<DbUrl>, Error> {
     use crate::schema::community::dsl::*;
     community.select(actor_id).distinct().load::<DbUrl>(conn)
+  }
+
+  pub fn default_communities(conn: &PgConnection) -> Result<Vec<Community>, Error> {
+    use crate::schema::community::dsl::*;
+    community.filter(is_default_community.eq(true)).load(conn)
   }
 
   pub fn upsert(conn: &PgConnection, community_form: &CommunityForm) -> Result<Community, Error> {
@@ -375,6 +382,7 @@ mod tests {
       shared_inbox_url: None,
       hidden: false,
       posting_restricted_to_mods: false,
+      is_default_community: false
     };
 
     let community_follower_form = CommunityFollowerForm {
