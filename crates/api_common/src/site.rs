@@ -4,6 +4,7 @@ use lemmy_db_schema::{
   ListingType,
   SearchType,
   SortType,
+  ModlogActionType,
 };
 use lemmy_db_views::structs::{
   CommentView,
@@ -83,6 +84,8 @@ pub struct GetModlog {
   pub page: Option<i64>,
   pub limit: Option<i64>,
   pub auth: Option<Sensitive<String>>,
+  pub filter_by_action: Option<ModlogActionType>,
+  pub other_person_id: Option<PersonId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -122,6 +125,7 @@ pub struct CreateSite {
   pub default_theme: Option<String>,
   pub default_post_listing_type: Option<String>,
   pub auth: Sensitive<String>,
+  pub hide_modlog_mod_names: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -143,6 +147,7 @@ pub struct EditSite {
   pub default_post_listing_type: Option<String>,
   pub legal_information: Option<String>,
   pub auth: Sensitive<String>,
+  pub hide_modlog_mod_names: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

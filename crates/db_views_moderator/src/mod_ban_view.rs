@@ -17,8 +17,10 @@ impl ModBanView {
   pub fn list(
     conn: &PgConnection,
     mod_person_id: Option<PersonId>,
+    other_person_id: Option<PersonId>,
     page: Option<i64>,
     limit: Option<i64>,
+    hide_mod_names: bool,
   ) -> Result<Vec<Self>, Error> {
     let mut query = mod_ban::table
       .inner_join(person::table.on(mod_ban::mod_person_id.eq(person::id)))
@@ -34,14 +36,23 @@ impl ModBanView {
       query = query.filter(mod_ban::mod_person_id.eq(mod_person_id));
     };
 
+    if let Some(other_person_id) = other_person_id {
+      query = query.filter(person_alias_1::id.eq(other_person_id));
+    };
+
     let (limit, offset) = limit_and_offset(page, limit);
 
-    let res = query
+    let mut res = query
       .limit(limit)
       .offset(offset)
       .order_by(mod_ban::when_.desc())
       .load::<ModBanViewTuple>(conn)?;
 
+    if hide_mod_names {
+      res.iter_mut().for_each(|item| {
+        item.1.name.clear();
+      });
+    }
     Ok(Self::from_tuple_to_vec(res))
   }
 }

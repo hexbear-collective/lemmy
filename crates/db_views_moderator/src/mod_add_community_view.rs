@@ -19,8 +19,10 @@ impl ModAddCommunityView {
     conn: &PgConnection,
     community_id: Option<CommunityId>,
     mod_person_id: Option<PersonId>,
+    other_person_id: Option<PersonId>,
     page: Option<i64>,
     limit: Option<i64>,
+    hide_mod_names: bool,
   ) -> Result<Vec<Self>, Error> {
     let mut query = mod_add_community::table
       .inner_join(person::table.on(mod_add_community::mod_person_id.eq(person::id)))
@@ -44,14 +46,23 @@ impl ModAddCommunityView {
       query = query.filter(mod_add_community::community_id.eq(community_id));
     };
 
+    if let Some(other_person_id) = other_person_id {
+      query = query.filter(person_alias_1::id.eq(other_person_id));
+    };
+
     let (limit, offset) = limit_and_offset(page, limit);
 
-    let res = query
+    let mut res = query
       .limit(limit)
       .offset(offset)
       .order_by(mod_add_community::when_.desc())
       .load::<ModAddCommunityViewTuple>(conn)?;
 
+    if hide_mod_names {
+      res.iter_mut().for_each(|item| {
+        item.1.name.clear();
+      });
+    }
     Ok(Self::from_tuple_to_vec(res))
   }
 }

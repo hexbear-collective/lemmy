@@ -85,6 +85,7 @@ impl PerformCrud for EditSite {
       default_theme: data.default_theme.clone(),
       default_post_listing_type: data.default_post_listing_type.clone(),
       legal_information: data.legal_information.clone(),
+      hide_modlog_mod_names: data.hide_modlog_mod_names,
       ..SiteForm::default()
     };
 

@@ -22,6 +22,7 @@ impl ModHideCommunityView {
     admin_id: Option<PersonId>,
     page: Option<i64>,
     limit: Option<i64>,
+    hide_mod_names: bool,
   ) -> Result<Vec<Self>, Error> {
     let mut query = mod_hide_community::table
       .inner_join(person::table)
@@ -43,12 +44,17 @@ impl ModHideCommunityView {
 
     let (limit, offset) = limit_and_offset(page, limit);
 
-    let res = query
+    let mut res = query
       .limit(limit)
       .offset(offset)
       .order_by(mod_hide_community::when_.desc())
       .load::<ModHideCommunityViewTuple>(conn)?;
 
+    if hide_mod_names {
+      res.iter_mut().for_each(|item| {
+        item.1.name.clear();
+      });
+    }
     Ok(Self::from_tuple_to_vec(res))
   }
 }
