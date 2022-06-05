@@ -6,17 +6,21 @@ use lemmy_api_common::{
   utils::{blocking, honeypot_check, password_length_check, send_verification_email},
 };
 use lemmy_apub::{
-  generate_followers_url, 
-  generate_inbox_url, 
+  generate_followers_url,
+  generate_inbox_url,
   generate_local_apub_endpoint,
-  generate_shared_inbox_url, 
+  generate_shared_inbox_url,
   EndpointType,
 };
 use lemmy_db_schema::{
   aggregates::structs::PersonAggregates,
   source::{
     community::{
-      Community, CommunityFollower, CommunityFollowerForm, CommunityForm, CommunityModerator,
+      Community,
+      CommunityFollower,
+      CommunityFollowerForm,
+      CommunityForm,
+      CommunityModerator,
       CommunityModeratorForm,
     },
     local_user::{LocalUser, LocalUserForm},
