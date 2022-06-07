@@ -97,7 +97,7 @@ impl Group {
       inbox_url: Some(self.inbox.into()),
       shared_inbox_url: Some(self.endpoints.map(|e| e.shared_inbox.into())),
       posting_restricted_to_mods: self.posting_restricted_to_mods,
-      is_default_community: self.is_default_community
+      is_default_community: self.is_default_community,
     }
   }
 }

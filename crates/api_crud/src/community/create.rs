@@ -100,7 +100,7 @@ impl PerformCrud for CreateCommunity {
       inbox_url: Some(generate_inbox_url(&community_actor_id)?),
       shared_inbox_url: Some(Some(generate_shared_inbox_url(&community_actor_id)?)),
       posting_restricted_to_mods: data.posting_restricted_to_mods,
-      is_default_community: if local_user_view.person.admin { 
+      is_default_community: if local_user_view.person.admin {
         data.is_default_community
       } else {
         false

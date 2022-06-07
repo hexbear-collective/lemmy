@@ -96,7 +96,7 @@ pub struct EditCommunity {
   pub nsfw: Option<bool>,
   pub posting_restricted_to_mods: Option<bool>,
   pub auth: Sensitive<String>,
-  pub is_default_community: bool
+  pub is_default_community: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

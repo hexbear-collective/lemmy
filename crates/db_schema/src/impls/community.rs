@@ -43,7 +43,7 @@ mod safe_type {
     banner,
     hidden,
     posting_restricted_to_mods,
-    is_default_community
+    is_default_community,
   );
 
   impl ToSafe for Community {
@@ -65,7 +65,7 @@ mod safe_type {
         banner,
         hidden,
         posting_restricted_to_mods,
-        is_default_community
+        is_default_community,
       )
     }
   }
@@ -382,7 +382,7 @@ mod tests {
       shared_inbox_url: None,
       hidden: false,
       posting_restricted_to_mods: false,
-      is_default_community: false
+      is_default_community: false,
     };
 
     let community_follower_form = CommunityFollowerForm {
