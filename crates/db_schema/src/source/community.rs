@@ -79,7 +79,7 @@ pub struct CommunityForm {
   pub shared_inbox_url: Option<Option<DbUrl>>,
   pub hidden: Option<bool>,
   pub posting_restricted_to_mods: Option<bool>,
-  pub is_default_community: bool,
+  pub is_default_community: Option<bool>,
 }
 
 #[derive(PartialEq, Debug)]

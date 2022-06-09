@@ -2,7 +2,7 @@ use crate::PerformCrud;
 use actix_web::web::Data;
 use lemmy_api_common::{
   community::{CommunityResponse, EditCommunity},
-  utils::{blocking, get_local_user_view_from_jwt},
+  utils::{blocking, get_local_user_view_from_jwt, is_admin},
 };
 use lemmy_apub::protocol::activities::community::update::UpdateCommunity;
 use lemmy_db_schema::{
@@ -51,6 +51,10 @@ impl PerformCrud for EditCommunity {
       Community::read(conn, community_id)
     })
     .await??;
+    let mut is_default_community = false;
+    if is_admin(&local_user_view).is_ok() {
+      is_default_community = data.is_default_community.unwrap_or(false);
+    }
 
     let community_form = CommunityForm {
       name: read_community.name,
@@ -61,11 +65,7 @@ impl PerformCrud for EditCommunity {
       nsfw: data.nsfw,
       posting_restricted_to_mods: data.posting_restricted_to_mods,
       updated: Some(naive_now()),
-      is_default_community: if local_user_view.person.admin {
-        data.is_default_community
-      } else {
-        read_community.is_default_community
-      },
+      is_default_community: Some(is_default_community),
       ..CommunityForm::default()
     };
 

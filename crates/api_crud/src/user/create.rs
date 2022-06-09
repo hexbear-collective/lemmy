@@ -218,7 +218,7 @@ impl PerformCrud for Register {
           followers_url: Some(generate_followers_url(&actor_id)?),
           inbox_url: Some(generate_inbox_url(&actor_id)?),
           shared_inbox_url: Some(Some(generate_shared_inbox_url(&actor_id)?)),
-          is_default_community: true,
+          is_default_community: Some(true),
           ..CommunityForm::default()
         };
         let community = blocking(context.pool(), move |conn| {

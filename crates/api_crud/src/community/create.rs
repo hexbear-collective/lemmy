@@ -85,6 +85,10 @@ impl PerformCrud for CreateCommunity {
 
     // When you create a community, make sure the user becomes a moderator and a follower
     let keypair = generate_actor_keypair()?;
+    let mut is_default_community = false;
+    if is_admin(&local_user_view).is_ok() {
+      is_default_community = data.is_default_community.unwrap_or(false);
+    }
 
     let community_form = CommunityForm {
       name: data.name.to_owned(),
@@ -100,11 +104,7 @@ impl PerformCrud for CreateCommunity {
       inbox_url: Some(generate_inbox_url(&community_actor_id)?),
       shared_inbox_url: Some(Some(generate_shared_inbox_url(&community_actor_id)?)),
       posting_restricted_to_mods: data.posting_restricted_to_mods,
-      is_default_community: if local_user_view.person.admin {
-        data.is_default_community
-      } else {
-        false
-      },
+      is_default_community: Some(is_default_community),
       ..CommunityForm::default()
     };
 

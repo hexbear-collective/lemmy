@@ -106,7 +106,7 @@ impl ApubObject for ApubCommunity {
       published: Some(convert_datetime(self.published)),
       updated: self.updated.map(convert_datetime),
       posting_restricted_to_mods: Some(self.posting_restricted_to_mods),
-      is_default_community: self.is_default_community,
+      is_default_community: Some(self.is_default_community),
     };
     Ok(group)
   }

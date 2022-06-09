@@ -51,7 +51,7 @@ pub struct Group {
   pub(crate) moderators: Option<ObjectId<ApubCommunityModerators>>,
   // lemmy extension
   pub(crate) posting_restricted_to_mods: Option<bool>,
-  pub(crate) is_default_community: bool,
+  pub(crate) is_default_community: Option<bool>,
   pub(crate) outbox: ObjectId<ApubCommunityOutbox>,
   pub(crate) endpoints: Option<Endpoints>,
   pub(crate) published: Option<DateTime<FixedOffset>>,
