@@ -71,4 +71,8 @@ pub enum ModlogActionType {
   ModAdd,
   ModBan,
   ModHideCommunity,
+  AdminPurgePerson,
+  AdminPurgeCommunity,
+  AdminPurgePost,
+  AdminPurgeComment,
 }

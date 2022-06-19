@@ -49,9 +49,9 @@ impl Perform for GetModlog {
     let site = blocking(context.pool(), Site::read_local_site).await??;
     let hide_modlog_names = site.hide_modlog_mod_names
       && (local_user_view.is_none() || is_admin(&local_user_view.expect("")).is_err());
-      
+
     let mut mod_person_id = data.mod_person_id;
-    if hide_modlog_names{
+    if hide_modlog_names {
       mod_person_id = None;
     }
     let other_person_id = data.other_person_id;
@@ -255,10 +255,34 @@ impl Perform for GetModlog {
               hide_modlog_names,
             )?
           },
-          AdminPurgePersonView::list(conn, mod_person_id, page, limit)?,
-          AdminPurgeCommunityView::list(conn, mod_person_id, page, limit)?,
-          AdminPurgePostView::list(conn, mod_person_id, page, limit)?,
-          AdminPurgeCommentView::list(conn, mod_person_id, page, limit)?,
+          if filter_by_action != ModlogActionType::AdminPurgePerson
+            && filter_by_action != ModlogActionType::All
+          {
+            Vec::<AdminPurgePersonView>::new()
+          } else {
+            AdminPurgePersonView::list(conn, mod_person_id, page, limit, hide_modlog_names)?
+          },
+          if filter_by_action != ModlogActionType::AdminPurgeCommunity
+            && filter_by_action != ModlogActionType::All
+          {
+            Vec::<AdminPurgeCommunityView>::new()
+          } else {
+            AdminPurgeCommunityView::list(conn, mod_person_id, page, limit, hide_modlog_names)?
+          },
+          if filter_by_action != ModlogActionType::AdminPurgePost
+            && filter_by_action != ModlogActionType::All
+          {
+            Vec::<AdminPurgePostView>::new()
+          } else {
+            AdminPurgePostView::list(conn, mod_person_id, page, limit, hide_modlog_names)?
+          },
+          if filter_by_action != ModlogActionType::AdminPurgeComment
+            && filter_by_action != ModlogActionType::All
+          {
+            Vec::<AdminPurgeCommentView>::new()
+          } else {
+            AdminPurgeCommentView::list(conn, mod_person_id, page, limit, hide_modlog_names)?
+          },
         )) as Result<_, LemmyError>
       })
       .await??

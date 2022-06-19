@@ -112,25 +112,25 @@ pub struct ModTransferCommunityView {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AdminPurgeCommentView {
   pub admin_purge_comment: AdminPurgeComment,
-  pub admin: PersonSafe,
+  pub admin: Option<PersonSafe>,
   pub post: Post,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AdminPurgeCommunityView {
   pub admin_purge_community: AdminPurgeCommunity,
-  pub admin: PersonSafe,
+  pub admin: Option<PersonSafe>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AdminPurgePersonView {
   pub admin_purge_person: AdminPurgePerson,
-  pub admin: PersonSafe,
+  pub admin: Option<PersonSafe>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AdminPurgePostView {
   pub admin_purge_post: AdminPurgePost,
-  pub admin: PersonSafe,
+  pub admin: Option<PersonSafe>,
   pub community: CommunitySafe,
 }

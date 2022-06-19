@@ -19,6 +19,7 @@ impl AdminPurgePersonView {
     admin_person_id: Option<PersonId>,
     page: Option<i64>,
     limit: Option<i64>,
+    hide_mod_names: bool,
   ) -> Result<Vec<Self>, Error> {
     let mut query = admin_purge_person::table
       .inner_join(person::table.on(admin_purge_person::admin_person_id.eq(person::id)))
@@ -40,7 +41,13 @@ impl AdminPurgePersonView {
       .order_by(admin_purge_person::when_.desc())
       .load::<AdminPurgePersonViewTuple>(conn)?;
 
-    Ok(Self::from_tuple_to_vec(res))
+    let mut results = Self::from_tuple_to_vec(res);
+    if hide_mod_names {
+      results.iter_mut().for_each(|item| {
+        item.admin = None;
+      })
+    }
+    Ok(results)
   }
 }
 
@@ -51,7 +58,7 @@ impl ViewToVec for AdminPurgePersonView {
       .iter()
       .map(|a| Self {
         admin_purge_person: a.0.to_owned(),
-        admin: a.1.to_owned(),
+        admin: Some(a.1.to_owned()),
       })
       .collect::<Vec<Self>>()
   }
