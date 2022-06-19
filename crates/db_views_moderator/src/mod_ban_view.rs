@@ -42,18 +42,19 @@ impl ModBanView {
 
     let (limit, offset) = limit_and_offset(page, limit);
 
-    let mut res = query
+    let res = query
       .limit(limit)
       .offset(offset)
       .order_by(mod_ban::when_.desc())
       .load::<ModBanViewTuple>(conn)?;
 
+    let mut results = Self::from_tuple_to_vec(res);
     if hide_mod_names {
-      res.iter_mut().for_each(|item| {
-        item.1.name.clear();
-      });
+      results.iter_mut().for_each(|item| {
+        item.moderator = None;
+      })
     }
-    Ok(Self::from_tuple_to_vec(res))
+    Ok(results)
   }
 }
 
@@ -64,7 +65,7 @@ impl ViewToVec for ModBanView {
       .iter()
       .map(|a| Self {
         mod_ban: a.0.to_owned(),
-        moderator: a.1.to_owned(),
+        moderator: Some(a.1.to_owned()),
         banned_person: a.2.to_owned(),
       })
       .collect::<Vec<Self>>()

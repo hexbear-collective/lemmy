@@ -44,18 +44,19 @@ impl ModHideCommunityView {
 
     let (limit, offset) = limit_and_offset(page, limit);
 
-    let mut res = query
+    let res = query
       .limit(limit)
       .offset(offset)
       .order_by(mod_hide_community::when_.desc())
       .load::<ModHideCommunityViewTuple>(conn)?;
 
+    let mut results = Self::from_tuple_to_vec(res);
     if hide_mod_names {
-      res.iter_mut().for_each(|item| {
-        item.1.name.clear();
-      });
+      results.iter_mut().for_each(|item| {
+        item.admin = None;
+      })
     }
-    Ok(Self::from_tuple_to_vec(res))
+    Ok(results)
   }
 }
 
@@ -66,7 +67,7 @@ impl ViewToVec for ModHideCommunityView {
       .iter()
       .map(|a| Self {
         mod_hide_community: a.0.to_owned(),
-        admin: a.1.to_owned(),
+        admin: Some(a.1.to_owned()),
         community: a.2.to_owned(),
       })
       .collect::<Vec<Self>>()

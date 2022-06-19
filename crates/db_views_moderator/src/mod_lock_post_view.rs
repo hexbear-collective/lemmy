@@ -52,18 +52,19 @@ impl ModLockPostView {
 
     let (limit, offset) = limit_and_offset(page, limit);
 
-    let mut res = query
+    let res = query
       .limit(limit)
       .offset(offset)
       .order_by(mod_lock_post::when_.desc())
       .load::<ModLockPostViewTuple>(conn)?;
 
+    let mut results = Self::from_tuple_to_vec(res);
     if hide_mod_names {
-      res.iter_mut().for_each(|item| {
-        item.1.name.clear();
-      });
+      results.iter_mut().for_each(|item| {
+        item.moderator = None;
+      })
     }
-    Ok(Self::from_tuple_to_vec(res))
+    Ok(results)
   }
 }
 
@@ -74,7 +75,7 @@ impl ViewToVec for ModLockPostView {
       .iter()
       .map(|a| Self {
         mod_lock_post: a.0.to_owned(),
-        moderator: a.1.to_owned(),
+        moderator: Some(a.1.to_owned()),
         post: a.2.to_owned(),
         community: a.3.to_owned(),
       })

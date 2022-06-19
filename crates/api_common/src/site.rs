@@ -2,9 +2,9 @@ use crate::sensitive::Sensitive;
 use lemmy_db_schema::{
   newtypes::{CommentId, CommunityId, PersonId, PostId},
   ListingType,
+  ModlogActionType,
   SearchType,
   SortType,
-  ModlogActionType,
 };
 use lemmy_db_views::structs::{
   CommentView,

@@ -4,8 +4,7 @@ use lemmy_api_common::{
   site::{GetModlog, GetModlogResponse},
   utils::{blocking, check_private_instance, get_local_user_view_from_jwt_opt, is_admin},
 };
-use lemmy_db_schema::{source::site::Site,
-  ModlogActionType,};
+use lemmy_db_schema::{source::site::Site, ModlogActionType};
 use lemmy_db_views_moderator::structs::{
   AdminPurgeCommentView,
   AdminPurgeCommunityView,
@@ -47,13 +46,20 @@ impl Perform for GetModlog {
     let filter_by_action = data.filter_by_action.unwrap_or(ModlogActionType::All);
     let community_id = data.community_id;
 
-    let mod_person_id = data.mod_person_id;
-    let other_person_id = data.other_person_id;
     let site = blocking(context.pool(), Site::read_local_site).await??;
-    let hide_modlog_names = site.hide_modlog_mod_names && (local_user_view.is_none() || is_admin(&local_user_view.expect("")).is_err());
+    let hide_modlog_names = site.hide_modlog_mod_names
+      && (local_user_view.is_none() || is_admin(&local_user_view.expect("")).is_err());
+      
+    let mut mod_person_id = data.mod_person_id;
+    if hide_modlog_names{
+      mod_person_id = None;
+    }
+    let other_person_id = data.other_person_id;
     let page = data.page;
     let limit = data.limit;
-    let removed_posts = if filter_by_action != ModlogActionType::ModRemovePost && filter_by_action != ModlogActionType::All{
+    let removed_posts = if filter_by_action != ModlogActionType::ModRemovePost
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModRemovePostView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -70,7 +76,9 @@ impl Perform for GetModlog {
       .await??
     };
 
-    let locked_posts = if filter_by_action != ModlogActionType::ModLockPost && filter_by_action != ModlogActionType::All{
+    let locked_posts = if filter_by_action != ModlogActionType::ModLockPost
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModLockPostView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -87,7 +95,9 @@ impl Perform for GetModlog {
       .await??
     };
 
-    let stickied_posts = if filter_by_action != ModlogActionType::ModStickyPost && filter_by_action != ModlogActionType::All{
+    let stickied_posts = if filter_by_action != ModlogActionType::ModStickyPost
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModStickyPostView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -104,7 +114,9 @@ impl Perform for GetModlog {
       .await??
     };
 
-    let removed_comments = if filter_by_action != ModlogActionType::ModRemoveComment && filter_by_action != ModlogActionType::All{
+    let removed_comments = if filter_by_action != ModlogActionType::ModRemoveComment
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModRemoveCommentView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -121,7 +133,9 @@ impl Perform for GetModlog {
       .await??
     };
 
-    let banned_from_community = if filter_by_action != ModlogActionType::ModBanFromCommunity && filter_by_action != ModlogActionType::All{
+    let banned_from_community = if filter_by_action != ModlogActionType::ModBanFromCommunity
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModBanFromCommunityView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -138,7 +152,9 @@ impl Perform for GetModlog {
       .await??
     };
 
-    let added_to_community = if filter_by_action != ModlogActionType::ModAddCommunity && filter_by_action != ModlogActionType::All{
+    let added_to_community = if filter_by_action != ModlogActionType::ModAddCommunity
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModAddCommunityView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -155,25 +171,28 @@ impl Perform for GetModlog {
       .await??
     };
 
-    let transferred_to_community =
-    if filter_by_action != ModlogActionType::ModTransferCommunity && filter_by_action != ModlogActionType::All{
-        Vec::<ModTransferCommunityView>::new()
-      } else {
-        blocking(context.pool(), move |conn| {
-          ModTransferCommunityView::list(
-            conn,
-            community_id,
-            mod_person_id,
-            other_person_id,
-            page,
-            limit,
-            hide_modlog_names,
-          )
-        })
-        .await??
-      };
+    let transferred_to_community = if filter_by_action != ModlogActionType::ModTransferCommunity
+      && filter_by_action != ModlogActionType::All
+    {
+      Vec::<ModTransferCommunityView>::new()
+    } else {
+      blocking(context.pool(), move |conn| {
+        ModTransferCommunityView::list(
+          conn,
+          community_id,
+          mod_person_id,
+          other_person_id,
+          page,
+          limit,
+          hide_modlog_names,
+        )
+      })
+      .await??
+    };
 
-    let hidden_communities = if filter_by_action != ModlogActionType::ModHideCommunity && filter_by_action != ModlogActionType::All{
+    let hidden_communities = if filter_by_action != ModlogActionType::ModHideCommunity
+      && filter_by_action != ModlogActionType::All
+    {
       Vec::<ModHideCommunityView>::new()
     } else {
       blocking(context.pool(), move |conn| {
@@ -201,18 +220,16 @@ impl Perform for GetModlog {
     ) = if data.community_id.is_none() {
       blocking(context.pool(), move |conn| {
         Ok((
-          if filter_by_action != ModlogActionType::ModRemoveCommunity && filter_by_action != ModlogActionType::All{
+          if filter_by_action != ModlogActionType::ModRemoveCommunity
+            && filter_by_action != ModlogActionType::All
+          {
             Vec::<ModRemoveCommunityView>::new()
           } else {
-            ModRemoveCommunityView::list(
-              conn,
-              mod_person_id,
-              page,
-              limit,
-              hide_modlog_names,
-            )?
+            ModRemoveCommunityView::list(conn, mod_person_id, page, limit, hide_modlog_names)?
           },
-          if filter_by_action != ModlogActionType::ModBan && filter_by_action != ModlogActionType::All{
+          if filter_by_action != ModlogActionType::ModBan
+            && filter_by_action != ModlogActionType::All
+          {
             Vec::<ModBanView>::new()
           } else {
             ModBanView::list(
@@ -224,7 +241,9 @@ impl Perform for GetModlog {
               hide_modlog_names,
             )?
           },
-          if filter_by_action != ModlogActionType::ModAdd && filter_by_action != ModlogActionType::All{
+          if filter_by_action != ModlogActionType::ModAdd
+            && filter_by_action != ModlogActionType::All
+          {
             Vec::<ModAddView>::new()
           } else {
             ModAddView::list(
