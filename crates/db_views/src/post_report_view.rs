@@ -452,10 +452,11 @@ mod tests {
         score: 0,
         upvotes: 0,
         downvotes: 0,
-        stickied: false,
+        stickied_community: false,
         published: agg.published,
         newest_comment_time_necro: inserted_post.published,
         newest_comment_time: inserted_post.published,
+        stickied_local: false,
       },
       resolver: None,
     };

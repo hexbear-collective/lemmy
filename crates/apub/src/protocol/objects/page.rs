@@ -59,9 +59,10 @@ pub struct Page {
   pub(crate) image: Option<ImageObject>,
   pub(crate) comments_enabled: Option<bool>,
   pub(crate) sensitive: Option<bool>,
-  pub(crate) stickied: Option<bool>,
+  pub(crate) stickied_community: Option<bool>,
   pub(crate) published: Option<DateTime<FixedOffset>>,
   pub(crate) updated: Option<DateTime<FixedOffset>>,
+  pub(crate) stickied_local: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -96,7 +97,7 @@ impl Page {
       .dereference_local(context)
       .await;
 
-    let stickied_changed = Page::is_stickied_changed(&old_post, &self.stickied);
+    let stickied_changed = Page::is_stickied_changed(&old_post, &self.stickied_community);
     let locked_changed = Page::is_locked_changed(&old_post, &self.comments_enabled);
     Ok(stickied_changed || locked_changed)
   }
@@ -107,7 +108,7 @@ impl Page {
   ) -> bool {
     if let Some(new_stickied) = new_stickied {
       if let Ok(old_post) = old_post {
-        return new_stickied != &old_post.stickied;
+        return new_stickied != &old_post.stickied_community;
       }
     }
 

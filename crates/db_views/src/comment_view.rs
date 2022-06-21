@@ -669,7 +669,7 @@ mod tests {
         removed: false,
         deleted: false,
         locked: false,
-        stickied: false,
+        stickied_community: false,
         nsfw: false,
         embed_title: None,
         embed_description: None,
@@ -677,6 +677,7 @@ mod tests {
         thumbnail_url: None,
         ap_id: inserted_post.ap_id.to_owned(),
         local: true,
+        stickied_local: false,
       },
       community: CommunitySafe {
         id: inserted_community.id,

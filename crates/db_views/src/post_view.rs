@@ -361,7 +361,7 @@ impl<'a> PostQueryBuilder<'a> {
           if let Some(community_id) = self.community_id {
             query = query
               .filter(post::community_id.eq(community_id))
-              .then_order_by(post_aggregates::stickied.desc());
+              .then_order_by(post_aggregates::stickied_community.desc());
           }
         }
       }
@@ -370,7 +370,7 @@ impl<'a> PostQueryBuilder<'a> {
     if let Some(community_actor_id) = self.community_actor_id {
       query = query
         .filter(community::actor_id.eq(community_actor_id))
-        .then_order_by(post_aggregates::stickied.desc());
+        .then_order_by(post_aggregates::stickied_community.desc());
     }
 
     if let Some(url_search) = self.url_search {
@@ -642,7 +642,7 @@ mod tests {
         removed: false,
         deleted: false,
         locked: false,
-        stickied: false,
+        stickied_community: false,
         nsfw: false,
         embed_title: None,
         embed_description: None,
@@ -650,6 +650,7 @@ mod tests {
         thumbnail_url: None,
         ap_id: inserted_post.ap_id.to_owned(),
         local: true,
+        stickied_local: false,
       },
       my_vote: None,
       creator: PersonSafe {
@@ -697,10 +698,11 @@ mod tests {
         score: 1,
         upvotes: 1,
         downvotes: 0,
-        stickied: false,
+        stickied_community: false,
         published: agg.published,
         newest_comment_time_necro: inserted_post.published,
         newest_comment_time: inserted_post.published,
+        stickied_local: false,
       },
       subscribed: false,
       read: false,

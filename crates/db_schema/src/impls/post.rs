@@ -53,7 +53,7 @@ impl Post {
       .filter(deleted.eq(false))
       .filter(removed.eq(false))
       .then_order_by(published.desc())
-      .then_order_by(stickied.desc())
+      .then_order_by(stickied_community.desc())
       .limit(20)
       .load::<Self>(conn)
   }
@@ -146,7 +146,7 @@ impl Post {
   ) -> Result<Self, Error> {
     use crate::schema::post::dsl::*;
     diesel::update(post.find(post_id))
-      .set(stickied.eq(new_stickied))
+      .set(stickied_community.eq(new_stickied))
       .get_result::<Self>(conn)
   }
 
@@ -375,7 +375,7 @@ mod tests {
       published: inserted_post.published,
       removed: false,
       locked: false,
-      stickied: false,
+      stickied_community: false,
       nsfw: false,
       deleted: false,
       updated: None,
@@ -385,6 +385,7 @@ mod tests {
       thumbnail_url: None,
       ap_id: inserted_post.ap_id.to_owned(),
       local: true,
+      stickied_local: false,
     };
 
     // Post Like

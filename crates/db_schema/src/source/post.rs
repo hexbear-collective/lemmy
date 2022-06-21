@@ -20,13 +20,14 @@ pub struct Post {
   pub updated: Option<chrono::NaiveDateTime>,
   pub deleted: bool,
   pub nsfw: bool,
-  pub stickied: bool,
+  pub stickied_community: bool,
   pub embed_title: Option<String>,
   pub embed_description: Option<String>,
   pub embed_video_url: Option<DbUrl>,
   pub thumbnail_url: Option<DbUrl>,
   pub ap_id: DbUrl,
   pub local: bool,
+  pub stickied_local: bool,
 }
 
 #[derive(Default)]
@@ -44,13 +45,14 @@ pub struct PostForm {
   pub published: Option<chrono::NaiveDateTime>,
   pub updated: Option<chrono::NaiveDateTime>,
   pub deleted: Option<bool>,
-  pub stickied: Option<bool>,
+  pub stickied_community: Option<bool>,
   pub embed_title: Option<String>,
   pub embed_description: Option<String>,
   pub embed_video_url: Option<DbUrl>,
   pub thumbnail_url: Option<DbUrl>,
   pub ap_id: Option<DbUrl>,
   pub local: Option<bool>,
+  pub stickied_local: Option<bool>,
 }
 
 #[derive(PartialEq, Debug)]

@@ -354,13 +354,14 @@ table! {
         updated -> Nullable<Timestamp>,
         deleted -> Bool,
         nsfw -> Bool,
-        stickied -> Bool,
+        stickied_community -> Bool,
         embed_title -> Nullable<Text>,
         embed_description -> Nullable<Text>,
         embed_video_url -> Nullable<Text>,
         thumbnail_url -> Nullable<Text>,
         ap_id -> Varchar,
         local -> Bool,
+        stickied_local -> Bool,
     }
 }
 
@@ -372,10 +373,11 @@ table! {
         score -> Int8,
         upvotes -> Int8,
         downvotes -> Int8,
-        stickied -> Bool,
+        stickied_community -> Bool,
         published -> Timestamp,
         newest_comment_time_necro -> Timestamp,
         newest_comment_time -> Timestamp,
+        stickied_local -> Bool,
     }
 }
 

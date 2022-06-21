@@ -114,9 +114,10 @@ impl ApubObject for ApubPost {
       image: self.thumbnail_url.clone().map(ImageObject::new),
       comments_enabled: Some(!self.locked),
       sensitive: Some(self.nsfw),
-      stickied: Some(self.stickied),
+      stickied_community: Some(self.stickied_community),
       published: Some(convert_datetime(self.published)),
       updated: self.updated.map(convert_datetime),
+      stickied_local: Some(self.stickied_local),
     };
     Ok(page)
   }
@@ -191,13 +192,14 @@ impl ApubObject for ApubPost {
         updated: page.updated.map(|u| u.naive_local()),
         deleted: None,
         nsfw: page.sensitive,
-        stickied: page.stickied,
+        stickied_community: page.stickied_community,
         embed_title,
         embed_description,
         embed_video_url,
         thumbnail_url,
         ap_id: Some(page.id.clone().into()),
         local: Some(false),
+        stickied_local: page.stickied_local,
       }
     } else {
       // if is mod action, only update locked/stickied fields, nothing else
@@ -206,9 +208,10 @@ impl ApubObject for ApubPost {
         creator_id: creator.id,
         community_id: community.id,
         locked: page.comments_enabled.map(|e| !e),
-        stickied: page.stickied,
+        stickied_community: page.stickied_community,
         updated: page.updated.map(|u| u.naive_local()),
         ap_id: Some(page.id.clone().into()),
+        stickied_local: page.stickied_local,
         ..Default::default()
       }
     };
@@ -221,11 +224,11 @@ impl ApubObject for ApubPost {
     let post = blocking(context.pool(), move |conn| Post::upsert(conn, &form)).await??;
 
     // write mod log entries for sticky/lock
-    if Page::is_stickied_changed(&old_post, &page.stickied) {
+    if Page::is_stickied_changed(&old_post, &page.stickied_community) {
       let form = ModStickyPostForm {
         mod_person_id: creator.id,
         post_id: post.id,
-        stickied: Some(post.stickied),
+        stickied: Some(post.stickied_community),
       };
       blocking(context.pool(), move |conn| {
         ModStickyPost::create(conn, &form)
@@ -282,7 +285,7 @@ mod tests {
     assert!(post.body.is_some());
     assert_eq!(post.body.as_ref().unwrap().len(), 45);
     assert!(!post.locked);
-    assert!(post.stickied);
+    assert!(post.stickied_community);
     assert_eq!(request_counter, 0);
 
     Post::delete(&*context.pool().get().unwrap(), post.id).unwrap();
