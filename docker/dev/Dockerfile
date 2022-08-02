@@ -33,6 +33,7 @@ FROM ${RUST_BUILDER} as builder
 WORKDIR /app/server
 
 COPY server/ .
+COPY .git/ ./.git/
 
 COPY --from=cacher /app/server/target ./target
 COPY --from=cacher /home/rust/.cargo /home/rust/.cargo
