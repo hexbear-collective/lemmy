@@ -2,6 +2,7 @@
 extern crate diesel_migrations;
 
 use actix::prelude::*;
+use actix_cors::Cors;
 use actix_web::{web::Data, *};
 use diesel::{
   r2d2::{ConnectionManager, Pool},
@@ -149,10 +150,12 @@ async fn main() -> Result<(), LemmyError> {
       settings.to_owned(),
       secret.to_owned(),
     );
+    let cors = Cors::permissive();
     let rate_limiter = rate_limiter.clone();
     App::new()
       .wrap(actix_web::middleware::Logger::default())
       .wrap(TracingLogger::<QuieterRootSpanBuilder>::new())
+      .wrap(cors)
       .app_data(Data::new(context))
       .app_data(Data::new(rate_limiter.clone()))
       // The routes

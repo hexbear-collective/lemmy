@@ -12,7 +12,7 @@ rust-version = "1.57"
 doctest = false
 
 [profile.dev]
-debug = 0
+debug = 2
 
 [features]
 console = ["console-subscriber", "opentelemetry", "opentelemetry-otlp", "tracing-opentelemetry",
@@ -49,6 +49,7 @@ diesel_migrations = "1.4.0"
 serde = { version = "1.0.136", features = ["derive"] }
 actix = "0.13.0"
 actix-web = { version = "4.0.1", default-features = false, features = ["macros", "rustls"] }
+actix-cors = "0.6.1"
 tracing = "0.1.32"
 tracing-actix-web = { version = "0.5.1", default-features = false }
 tracing-error = "0.2.0"
