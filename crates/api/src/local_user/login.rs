@@ -10,6 +10,14 @@ use lemmy_api_common::{
   person::{Login, LoginResponse},
   utils::{check_email_verified, check_registration_application, check_user_valid},
 };
+use lemmy_db_schema::{
+  source::{
+    local_site::LocalSite, registration_application::RegistrationApplication,
+    user_ban_id::UserBanId,
+  },
+  utils::{get_conn, DbPool},
+  RegistrationMode,
+};
 use lemmy_db_views::structs::{LocalUserView, SiteView};
 use lemmy_utils::error::{LemmyErrorType, LemmyResult};
 

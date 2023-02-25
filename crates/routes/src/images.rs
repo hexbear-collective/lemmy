@@ -2,12 +2,10 @@ use actix_web::{
   body::BodyStream,
   http::{
     header::{HeaderName, ACCEPT_ENCODING, HOST},
-    Method,
-    StatusCode,
+    Method, StatusCode,
   },
   web::{self, Query},
-  HttpRequest,
-  HttpResponse,
+  HttpRequest, HttpResponse,
 };
 use futures::stream::{Stream, StreamExt};
 use http::HeaderValue;

@@ -1,8 +1,5 @@
 use crate::objects::{
-  comment::ApubComment,
-  community::ApubCommunity,
-  person::ApubPerson,
-  post::ApubPost,
+  comment::ApubComment, community::ApubCommunity, person::ApubPerson, post::ApubPost,
 };
 use activitypub_federation::{config::Data, fetch::object_id::ObjectId, traits::Object};
 use actix_web::web::Json;
@@ -103,7 +100,7 @@ pub async fn import_settings(
   context: Data<LemmyContext>,
 ) -> LemmyResult<Json<SuccessResponse>> {
   let person_form = PersonUpdateForm {
-    display_name: data.display_name.clone().map(Some),
+    //display_name: data.display_name.clone().map(Some), //hexbear, don't allow users to import display name
     bio: data.bio.clone().map(Some),
     matrix_user_id: data.bio.clone().map(Some),
     bot_account: data.bot_account,
@@ -319,10 +316,7 @@ pub(crate) mod tests {
   use lemmy_db_schema::{
     source::{
       community::{
-        Community,
-        CommunityFollower,
-        CommunityFollowerForm,
-        CommunityFollowerState,
+        Community, CommunityFollower, CommunityFollowerForm, CommunityFollowerState,
         CommunityInsertForm,
       },
       local_user::LocalUser,

@@ -1,18 +1,12 @@
 use lemmy_db_schema::{
   newtypes::{CommentReplyId, CommunityId, LanguageId, PersonId, PersonMentionId},
   sensitive::SensitiveString,
-  source::{login_token::LoginToken, site::Site},
-  CommentSortType,
-  ListingType,
-  PostListingMode,
-  PostSortType,
+  source::{login_token::LoginToken, person::Person, site::Site},
+  CommentSortType, ListingType, PostListingMode, PostSortType,
 };
 use lemmy_db_views::structs::{CommentView, LocalImageView, PostView};
 use lemmy_db_views_actor::structs::{
-  CommentReplyView,
-  CommunityModeratorView,
-  PersonMentionView,
-  PersonView,
+  CommentReplyView, CommunityModeratorView, PersonMentionView, PersonView,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;

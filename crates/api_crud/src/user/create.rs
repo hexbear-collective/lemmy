@@ -6,17 +6,9 @@ use lemmy_api_common::{
   oauth_provider::AuthenticateWithOauth,
   person::{LoginResponse, Register},
   utils::{
-    check_email_verified,
-    check_registration_application,
-    check_user_valid,
-    generate_inbox_url,
-    generate_local_apub_endpoint,
-    honeypot_check,
-    local_site_to_slur_regex,
-    password_length_check,
-    send_new_applicant_email_to_admins,
-    send_verification_email,
-    EndpointType,
+    check_email_verified, check_registration_application, check_user_valid, generate_inbox_url,
+    generate_local_apub_endpoint, honeypot_check, local_site_to_slur_regex, password_length_check,
+    send_new_applicant_email_to_admins, send_verification_email, EndpointType,
   },
 };
 use lemmy_db_schema::{
@@ -419,6 +411,7 @@ async fn create_person(
     actor_id: Some(actor_id.clone()),
     inbox_url: Some(generate_inbox_url()?),
     private_key: Some(actor_keypair.private_key),
+    display_name: Some(username.clone() + &" [none/use name]".to_string()),
     ..PersonInsertForm::new(username.clone(), actor_keypair.public_key, instance_id)
   };
 

@@ -13,7 +13,7 @@ ALTER TABLE post_aggregates
     ALTER COLUMN hot_rank_active TYPE float,
     ALTER COLUMN hot_rank_active SET DEFAULT 0.1728;
 
-DROP FUNCTION hot_rank (numeric, published timestamp with time zone);
+DROP FUNCTION hot_rank (numeric, published timestamp with time zone) CASCADE;
 
 CREATE OR REPLACE FUNCTION hot_rank (score numeric, published timestamp with time zone)
     RETURNS float

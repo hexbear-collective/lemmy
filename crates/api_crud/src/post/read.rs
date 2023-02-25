@@ -56,7 +56,7 @@ pub async fn get_post(
     &mut context.pool(),
     post_id,
     local_user.as_ref(),
-    is_mod_or_admin,
+    true, //is_mod_or_admin, // hexbear always shows post with a link
   )
   .await?;
 

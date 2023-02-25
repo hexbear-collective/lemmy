@@ -7,8 +7,7 @@ use diesel::{
   query_builder::{Query, QueryFragment},
   query_dsl::methods::LimitDsl,
   result::{
-    ConnectionError,
-    ConnectionResult,
+    ConnectionError, ConnectionResult,
     Error::{self as DieselError, QueryBuilderError},
   },
   sql_types::{self, Timestamptz},
@@ -18,8 +17,7 @@ use diesel_async::{
   pg::AsyncPgConnection,
   pooled_connection::{
     deadpool::{Hook, HookError, Object as PooledConnection, Pool},
-    AsyncDieselConnectionManager,
-    ManagerConfig,
+    AsyncDieselConnectionManager, ManagerConfig,
   },
   AsyncConnection,
 };
@@ -33,16 +31,11 @@ use lemmy_utils::{
 use regex::Regex;
 use rustls::{
   client::danger::{
-    DangerousClientConfigBuilder,
-    HandshakeSignatureValid,
-    ServerCertVerified,
-    ServerCertVerifier,
+    DangerousClientConfigBuilder, HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
   },
   crypto::{self, verify_tls12_signature, verify_tls13_signature},
   pki_types::{CertificateDer, ServerName, UnixTime},
-  ClientConfig,
-  DigitallySignedStruct,
-  SignatureScheme,
+  ClientConfig, DigitallySignedStruct, SignatureScheme,
 };
 use std::{
   ops::{Deref, DerefMut},
@@ -523,6 +516,11 @@ pub mod functions {
   sql_function! {
     #[sql_name = "r.controversy_rank"]
     fn controversy_rank(upvotes: BigInt, downvotes: BigInt, score: BigInt) -> Double;
+  }
+
+  sql_function! {
+    //Might need a sql_name here?
+    fn hot_rank_active(score: BigInt, time: Timestamptz, comment_time: Timestamptz) -> Double;
   }
 
   sql_function!(fn reverse_timestamp_sort(time: Timestamptz) -> BigInt);
