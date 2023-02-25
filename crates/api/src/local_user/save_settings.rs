@@ -1,9 +1,14 @@
 use crate::Perform;
-use actix_web::web::Data;
+use actix_web::{dev::Url, web::Data};
 use lemmy_api_common::{
   context::LemmyContext,
   person::{LoginResponse, SaveUserSettings},
-  utils::{local_user_view_from_jwt, sanitize_html_opt, send_verification_email},
+  utils::{
+    hexbear_find_pronouns,
+    local_user_view_from_jwt,
+    sanitize_html_opt,
+    send_verification_email,
+  },
 };
 use lemmy_db_schema::{
   source::{
@@ -40,13 +45,29 @@ impl Perform for SaveUserSettings {
     let bio = sanitize_html_opt(&data.bio);
     let display_name = sanitize_html_opt(&data.display_name);
 
-    let avatar = diesel_option_overwrite_to_url(&data.avatar)?;
-    let banner = diesel_option_overwrite_to_url(&data.banner)?;
+    let mut avatar = diesel_option_overwrite_to_url(&data.avatar)?;
+    let mut banner = diesel_option_overwrite_to_url(&data.banner)?;
     let bio = diesel_option_overwrite(bio);
-    let display_name = diesel_option_overwrite(display_name);
+    let mut display_name = diesel_option_overwrite(display_name);
     let matrix_user_id = diesel_option_overwrite(data.matrix_user_id.clone());
     let email_deref = data.email.as_deref().map(str::to_lowercase);
     let email = diesel_option_overwrite(email_deref.clone());
+
+    if let Some(Some(a)) = &avatar {
+      //validate avatar is in host domain
+      let avatar_host = a.host_str().unwrap_or("");
+      if (avatar_host != context.settings().get_hostname_without_port()?) {
+        avatar = Some(None);
+      }
+    }
+
+    if let Some(Some(a)) = &banner {
+      //validate banner is in host domain
+      let banner_host = a.host_str().unwrap_or("");
+      if (banner_host != context.settings().get_hostname_without_port()?) {
+        banner = Some(None);
+      }
+    }
 
     if let Some(Some(email)) = &email {
       let previous_email = local_user_view.local_user.email.clone().unwrap_or_default();
@@ -79,6 +100,8 @@ impl Perform for SaveUserSettings {
         site_view.local_site.actor_name_max_length as usize,
       )?;
     }
+
+    display_name = hexbear_validate_pronouns(display_name, local_user_view.person.name.to_string());
 
     if let Some(Some(matrix_user_id)) = &matrix_user_id {
       is_valid_matrix_id(matrix_user_id)?;
@@ -173,4 +196,15 @@ impl Perform for SaveUserSettings {
       registration_created: false,
     })
   }
+}
+fn hexbear_validate_pronouns(
+  display_name: Option<Option<String>>,
+  user_name: String,
+) -> Option<Option<String>> {
+  let mut name_with_pronouns = Some(Some(user_name.to_string()));
+  if let Some(Some(display_name)) = &display_name {
+    let pronouns = hexbear_find_pronouns(display_name.to_string()).join(", ");
+    name_with_pronouns = Some(Some(format!("{} [{pronouns}]", user_name.to_string())))
+  }
+  return name_with_pronouns;
 }

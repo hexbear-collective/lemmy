@@ -4,6 +4,7 @@ use lemmy_utils::{error::LemmyError, settings::SETTINGS};
 #[tokio::main]
 pub async fn main() -> Result<(), LemmyError> {
   init_logging(&SETTINGS.opentelemetry_url)?;
+  openssl_probe::init_ssl_cert_env_vars();
   #[cfg(not(feature = "embed-pictrs"))]
   start_lemmy_server().await?;
   #[cfg(feature = "embed-pictrs")]

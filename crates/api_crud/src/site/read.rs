@@ -102,6 +102,7 @@ async fn local_user_settings_view_from_jwt_opt(
 ) -> Option<LocalUserView> {
   match jwt {
     Some(jwt) => {
+      let jwt_split = jwt.split(":").collect::<Vec<&str>>();
       let claims = Claims::decode(jwt.as_ref(), &context.secret().jwt_secret)
         .ok()?
         .claims;
@@ -109,10 +110,16 @@ async fn local_user_settings_view_from_jwt_opt(
       let local_user_view = LocalUserView::read(&mut context.pool(), local_user_id)
         .await
         .ok()?;
+      let bid_string = if jwt_split.len() == 2 {
+        jwt_split.get(1).unwrap().to_string()
+      } else {
+        "".to_string()
+      };
       check_user_valid(
         local_user_view.person.banned,
         local_user_view.person.ban_expires,
         local_user_view.person.deleted,
+        bid_string,
       )
       .ok()?;
 

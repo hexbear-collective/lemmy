@@ -71,7 +71,7 @@ fn adapt_request(
 
   let client_request = client
     .request(request.method().clone(), url)
-    .timeout(REQWEST_TIMEOUT);
+    .timeout(REQWEST_TIMEOUT * 2);
 
   request
     .headers()
@@ -95,8 +95,9 @@ async fn upload(
   let jwt = req
     .cookie("jwt")
     .expect("No auth header for picture upload");
-
-  if Claims::decode(jwt.value(), &context.secret().jwt_secret).is_err() {
+  let jwt_split = jwt.value().split(":").collect::<Vec<&str>>();
+  let jwt_token = &jwt_split.get(0).unwrap().to_string();
+  if Claims::decode(jwt_token, &context.secret().jwt_secret).is_err() {
     return Ok(HttpResponse::Unauthorized().finish());
   };
 

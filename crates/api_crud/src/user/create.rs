@@ -114,6 +114,7 @@ impl PerformCrud for Register {
     // Register the new person
     let person_form = PersonInsertForm::builder()
       .name(username)
+      .display_name(Some(username.clone() + &" [none/use name]".to_string()))
       .actor_id(Some(actor_id.clone()))
       .private_key(Some(actor_keypair.private_key))
       .public_key(actor_keypair.public_key)

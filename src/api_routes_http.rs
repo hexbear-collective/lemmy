@@ -33,6 +33,7 @@ use lemmy_api_common::{
     GetReplies,
     GetReportCount,
     GetUnreadCount,
+    HexbearGetRelatedUsers,
     Login,
     MarkAllAsRead,
     MarkPersonMentionAsRead,
@@ -308,7 +309,11 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimitCell) {
           .route("/report_count", web::get().to(route_get::<GetReportCount>))
           .route("/unread_count", web::get().to(route_get::<GetUnreadCount>))
           .route("/verify_email", web::post().to(route_post::<VerifyEmail>))
-          .route("/leave_admin", web::post().to(route_post::<LeaveAdmin>)),
+          .route("/leave_admin", web::post().to(route_post::<LeaveAdmin>))
+          .route(
+            "/related",
+            web::get().to(route_get::<HexbearGetRelatedUsers>),
+          ),
       )
       // Admin Actions
       .service(

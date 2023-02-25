@@ -243,15 +243,10 @@ async fn build_db_pool_settings_opt(
 ) -> Result<ActualDbPool, LemmyError> {
   let db_url = get_database_url(settings);
   let pool_size = settings.map(|s| s.database.pool_size).unwrap_or(5);
-  // We only support TLS with sslmode=require currently
-  let tls_enabled = db_url.contains("sslmode=require");
-  let manager = if tls_enabled {
-    // diesel-async does not support any TLS connections out of the box, so we need to manually
-    // provide a setup function which handles creating the connection
-    AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_setup(&db_url, establish_connection)
-  } else {
-    AsyncDieselConnectionManager::<AsyncPgConnection>::new(&db_url)
-  };
+  let manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_setup(
+    &db_url,
+    establish_connection,
+  );
   let pool = Pool::builder(manager)
     .max_size(pool_size)
     .wait_timeout(POOL_TIMEOUT)
@@ -270,11 +265,14 @@ async fn build_db_pool_settings_opt(
 
 fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
   let fut = async {
-    let rustls_config = rustls::ClientConfig::builder()
+    // We first set up the way we want rustls to work.
+    let mut rustls_config = rustls::ClientConfig::builder()
       .with_safe_defaults()
-      .with_custom_certificate_verifier(Arc::new(NoCertVerifier {}))
+      .with_root_certificates(root_certs())
       .with_no_client_auth();
-
+    rustls_config
+      .dangerous()
+      .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
     let tls = tokio_postgres_rustls::MakeRustlsConnect::new(rustls_config);
     let (client, conn) = tokio_postgres::connect(config, tls)
       .await
@@ -289,21 +287,12 @@ fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConne
   fut.boxed()
 }
 
-struct NoCertVerifier {}
-
-impl ServerCertVerifier for NoCertVerifier {
-  fn verify_server_cert(
-    &self,
-    _end_entity: &rustls::Certificate,
-    _intermediates: &[rustls::Certificate],
-    _server_name: &ServerName,
-    _scts: &mut dyn Iterator<Item = &[u8]>,
-    _ocsp_response: &[u8],
-    _now: SystemTime,
-  ) -> Result<ServerCertVerified, rustls::Error> {
-    // Will verify all (even invalid) certs without any checks (sslmode=require)
-    Ok(ServerCertVerified::assertion())
-  }
+fn root_certs() -> rustls::RootCertStore {
+  let mut roots = rustls::RootCertStore::empty();
+  let certs = rustls_native_certs::load_native_certs().expect("Certs not loadable!");
+  let certs: Vec<_> = certs.into_iter().map(|cert| cert.0).collect();
+  roots.add_parsable_certificates(&certs);
+  roots
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
@@ -506,6 +495,24 @@ impl<RF, LF> Queries<RF, LF> {
     let conn = get_conn(pool).await?;
     let res = (self.list_fn)(conn, args).await?;
     Ok(res.into_iter().map(T::from_tuple).collect())
+  }
+}
+
+mod danger {
+  pub struct NoCertificateVerification {}
+
+  impl rustls::client::ServerCertVerifier for NoCertificateVerification {
+    fn verify_server_cert(
+      &self,
+      _end_entity: &rustls::Certificate,
+      _intermediates: &[rustls::Certificate],
+      _server_name: &rustls::ServerName,
+      _scts: &mut dyn Iterator<Item = &[u8]>,
+      _ocsp: &[u8],
+      _now: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+      Ok(rustls::client::ServerCertVerified::assertion())
+    }
   }
 }
 

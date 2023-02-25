@@ -7,6 +7,7 @@ pub mod get_captcha;
 pub mod list_banned;
 pub mod login;
 pub mod notifications;
+pub mod related_users;
 pub mod report_count;
 pub mod reset_password;
 pub mod save_settings;
