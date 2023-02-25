@@ -1,6 +1,7 @@
 use crate::sensitive::Sensitive;
 use lemmy_db_schema::{
   newtypes::{CommentReplyId, CommunityId, LanguageId, PersonId, PersonMentionId},
+  source::person::Person,
   CommentSortType,
   ListingType,
   SortType,
@@ -445,3 +446,14 @@ pub struct VerifyEmail {
 #[cfg_attr(feature = "full", ts(export))]
 /// A response to verifying your email.
 pub struct VerifyEmailResponse {}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct HexbearGetRelatedUsers {
+  pub user_id: i32,
+  pub auth: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HexbearGetRelatedUsersResponse {
+  pub users: Vec<Person>,
+}

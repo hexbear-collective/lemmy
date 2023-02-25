@@ -49,6 +49,8 @@ use lemmy_api_common::{
     GetReportCountResponse,
     GetUnreadCount,
     GetUnreadCountResponse,
+    HexbearGetRelatedUsers,
+    HexbearGetRelatedUsersResponse,
     Login,
     LoginResponse,
     MarkAllAsRead,
@@ -378,4 +380,8 @@ impl SendActivity for DeleteCustomEmoji {
 
 impl SendActivity for GetFederatedInstances {
   type Response = GetFederatedInstancesResponse;
+}
+
+impl SendActivity for HexbearGetRelatedUsers {
+  type Response = HexbearGetRelatedUsersResponse;
 }

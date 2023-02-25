@@ -17,6 +17,7 @@ use lemmy_db_schema::{
     post::{Post, PostRead, PostReadForm},
     registration_application::RegistrationApplication,
     secret::Secret,
+    user_ban_id::UserBanId,
   },
   traits::{Crud, Readable},
   utils::DbPool,
@@ -41,6 +42,7 @@ use lemmy_utils::{
 use regex::Regex;
 use reqwest_middleware::ClientWithMiddleware;
 use rosetta_i18n::{Language, LanguageId};
+use std::collections::HashSet;
 use tracing::warn;
 use url::{ParseError, Url};
 
@@ -76,14 +78,20 @@ pub async fn is_mod_or_admin_opt(
 
 pub async fn is_top_admin(pool: &DbPool, person_id: PersonId) -> Result<(), LemmyError> {
   let admins = PersonView::admins(pool).await?;
-  let top_admin = admins
-    .first()
-    .ok_or_else(|| LemmyError::from_message("no admins"))?;
+  //hexbear mark all admins as top admins
+  // let top_admin = admins
+  //   .first()
+  //   .ok_or_else(|| LemmyError::from_message("no admins"))?;
 
-  if top_admin.person.id != person_id {
-    return Err(LemmyError::from_message("not_top_admin"));
+  // if top_admin.person.id != person_id {
+  //   return Err(LemmyError::from_message("not_top_admin"));
+  // }
+  for admin in admins {
+    if admin.person.id == person_id {
+      return Ok(());
+    }
   }
-  Ok(())
+  return Err(LemmyError::from_message("not_top_admin"));
 }
 
 pub fn is_admin(local_user_view: &LocalUserView) -> Result<(), LemmyError> {
@@ -148,7 +156,15 @@ pub async fn get_local_user_view_from_jwt(
   pool: &DbPool,
   secret: &Secret,
 ) -> Result<LocalUserView, LemmyError> {
-  let claims = Claims::decode(jwt, &secret.jwt_secret)
+  let jwt_split = jwt.split(":").collect::<Vec<&str>>();
+  let jwt_spliced = jwt_split.get(0).unwrap();
+  let bid_string = if jwt_split.len() == 2 {
+    jwt_split.get(1).unwrap().to_string()
+  } else {
+    "".to_string()
+  };
+
+  let claims = Claims::decode(jwt_spliced, &secret.jwt_secret)
     .map_err(|e| e.with_message("not_logged_in"))?
     .claims;
   let local_user_id = LocalUserId(claims.sub);
@@ -157,9 +173,19 @@ pub async fn get_local_user_view_from_jwt(
     local_user_view.person.banned,
     local_user_view.person.ban_expires,
     local_user_view.person.deleted,
+    bid_string.to_string(),
   )?;
 
   check_validator_time(&local_user_view.local_user.validator_time, &claims)?;
+
+  let person_id = local_user_view.person.id.0;
+  if !bid_string.is_empty() {
+    //bid reported, try creating relationship
+    let bid = bid_string
+      .parse::<uuid::Uuid>()
+      .map_err(|e| LemmyError::from_error_message(e, "invalid_bid"))?;
+    UserBanId::associate(pool, bid, person_id).await?;
+  }
 
   Ok(local_user_view)
 }
@@ -206,6 +232,7 @@ pub async fn get_local_user_settings_view_from_jwt_opt(
         local_user_view.person.banned,
         local_user_view.person.ban_expires,
         local_user_view.person.deleted,
+        "".to_string(),
       )?;
 
       check_validator_time(&local_user_view.local_user.validator_time, &claims)?;
@@ -219,10 +246,11 @@ pub fn check_user_valid(
   banned: bool,
   ban_expires: Option<NaiveDateTime>,
   deleted: bool,
+  bid: String,
 ) -> Result<(), LemmyError> {
   // Check for a site ban
   if is_banned(banned, ban_expires) {
-    return Err(LemmyError::from_message("site_ban"));
+    return Err(LemmyError::from_message(&*format!("site_ban_{}", bid)));
   }
 
   // check for account deletion
@@ -865,4 +893,51 @@ pub fn generate_featured_url(actor_id: &DbUrl) -> Result<DbUrl, ParseError> {
 
 pub fn generate_moderators_url(community_id: &DbUrl) -> Result<DbUrl, LemmyError> {
   Ok(Url::parse(&format!("{community_id}/moderators"))?.into())
+}
+
+pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
+  let valid_pronouns = HashSet::from([
+    "none/use name".to_string(),
+    "any".to_string(),
+    "comrade/them".to_string(),
+    "des/pair".to_string(),
+    "doe/deer".to_string(),
+    "e/em/eir".to_string(),
+    "ey/em".to_string(),
+    "fae/faer".to_string(),
+    "he/him".to_string(),
+    "hy/hym".to_string(),
+    "it/its".to_string(),
+    "love/loves".to_string(),
+    "she/her".to_string(),
+    "they/them".to_string(),
+    "undecided".to_string(),
+    "xe/xem".to_string(),
+    "xey/xem".to_string(),
+    "ze/hir".to_string(),
+  ]);
+  let mut pronouns = vec!["none/use any".to_string()];
+
+  let matches = Regex::new(r"\[([^\]]+)\]").unwrap().captures(&display_name);
+  if let Some(found) = matches {
+    let found_pronouns: Vec<String> = found
+      .iter()
+      .last()
+      .unwrap()
+      .unwrap()
+      .as_str()
+      .split(",")
+      .map(|i| i.trim().to_string())
+      .collect();
+    let mut valid = true;
+    for pronoun in &found_pronouns {
+      if !valid_pronouns.contains(pronoun) {
+        valid = false;
+      }
+    }
+    if valid {
+      pronouns = found_pronouns.iter().map(|x| x.to_string()).collect();
+    }
+  }
+  return pronouns;
 }

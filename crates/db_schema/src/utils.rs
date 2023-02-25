@@ -15,6 +15,8 @@ use diesel::{
   result::{Error as DieselError, Error::QueryBuilderError},
   serialize::{Output, ToSql},
   sql_types::Text,
+  ConnectionError,
+  ConnectionResult,
   PgConnection,
 };
 use diesel_async::{
@@ -25,10 +27,11 @@ use diesel_async::{
   },
 };
 use diesel_migrations::EmbeddedMigrations;
+use futures_util::{future::BoxFuture, FutureExt};
 use lemmy_utils::{error::LemmyError, settings::structs::Settings};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::{env, env::VarError, time::Duration};
+use std::{env, env::VarError, sync::Arc, time::Duration};
 use tracing::info;
 use url::Url;
 
@@ -136,7 +139,10 @@ pub fn diesel_option_overwrite_to_url_create(
 async fn build_db_pool_settings_opt(settings: Option<&Settings>) -> Result<DbPool, LemmyError> {
   let db_url = get_database_url(settings);
   let pool_size = settings.map(|s| s.database.pool_size).unwrap_or(5);
-  let manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(&db_url);
+  let manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_setup(
+    &db_url,
+    establish_connection,
+  );
   let pool = Pool::builder(manager)
     .max_size(pool_size)
     .wait_timeout(POOL_TIMEOUT)
@@ -151,6 +157,38 @@ async fn build_db_pool_settings_opt(settings: Option<&Settings>) -> Result<DbPoo
   }
 
   Ok(pool)
+}
+
+fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+  let fut = async {
+    // We first set up the way we want rustls to work.
+    let mut rustls_config = rustls::ClientConfig::builder()
+      .with_safe_defaults()
+      .with_root_certificates(root_certs())
+      .with_no_client_auth();
+    rustls_config
+      .dangerous()
+      .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
+    let tls = tokio_postgres_rustls::MakeRustlsConnect::new(rustls_config);
+    let (client, conn) = tokio_postgres::connect(config, tls)
+      .await
+      .map_err(|e| ConnectionError::BadConnection(e.to_string()))?;
+    tokio::spawn(async move {
+      if let Err(e) = conn.await {
+        eprintln!("Database connection: {e}");
+      }
+    });
+    AsyncPgConnection::try_from(client).await
+  };
+  fut.boxed()
+}
+
+fn root_certs() -> rustls::RootCertStore {
+  let mut roots = rustls::RootCertStore::empty();
+  let certs = rustls_native_certs::load_native_certs().expect("Certs not loadable!");
+  let certs: Vec<_> = certs.into_iter().map(|cert| cert.0).collect();
+  roots.add_parsable_certificates(&certs);
+  roots
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
@@ -242,6 +280,24 @@ where
 {
   fn from(id: ObjectId<Kind>) -> Self {
     DbUrl(Box::new(id.into()))
+  }
+}
+
+mod danger {
+  pub struct NoCertificateVerification {}
+
+  impl rustls::client::ServerCertVerifier for NoCertificateVerification {
+    fn verify_server_cert(
+      &self,
+      _end_entity: &rustls::Certificate,
+      _intermediates: &[rustls::Certificate],
+      _server_name: &rustls::ServerName,
+      _scts: &mut dyn Iterator<Item = &[u8]>,
+      _ocsp: &[u8],
+      _now: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+      Ok(rustls::client::ServerCertVerified::assertion())
+    }
   }
 }
 
