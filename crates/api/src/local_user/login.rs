@@ -6,6 +6,7 @@ use lemmy_api_common::{
   person::{Login, LoginResponse},
   utils::{check_registration_application, check_user_valid},
 };
+use lemmy_db_schema::{source::user_ban_id::UserBanId, utils::get_conn};
 use lemmy_db_views::structs::{LocalUserView, SiteView};
 use lemmy_utils::{
   claims::Claims,
@@ -39,10 +40,19 @@ impl Perform for Login {
     if !valid {
       return Err(LemmyErrorType::IncorrectLogin)?;
     }
+
+    let bid = UserBanId::get_by_user(
+      &mut get_conn(&mut context.pool()).await?,
+      &local_user_view.person.id.0,
+    )
+    .await
+    .map_or("".to_string(), |ubid| ubid.bid.to_string());
+
     check_user_valid(
       local_user_view.person.banned,
       local_user_view.person.ban_expires,
       local_user_view.person.deleted,
+      bid.to_string(),
     )?;
 
     // Check if the user's email is verified if email verification is turned on
@@ -66,15 +76,15 @@ impl Perform for Login {
     )?;
 
     // Return the jwt
+    let jwt = Claims::jwt(
+      local_user_view.local_user.id.0,
+      &context.secret().jwt_secret,
+      &context.settings().hostname,
+    )?;
+
     Ok(LoginResponse {
-      jwt: Some(
-        Claims::jwt(
-          local_user_view.local_user.id.0,
-          &context.secret().jwt_secret,
-          &context.settings().hostname,
-        )?
-        .into(),
-      ),
+      //jwt: Some(format!("{}:{}", jwt, bid).into()),
+      jwt: Some(jwt.into()),
       verify_email_sent: false,
       registration_created: false,
     })

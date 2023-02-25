@@ -71,10 +71,10 @@ deadpool = { version = "0.9.5", features = ["rt_tokio_1"], optional = true }
 ts-rs = { workspace = true, optional = true }
 futures-util = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-postgres = { workspace = true, optional = true }
-tokio-postgres-rustls = { workspace = true, optional = true }
+tokio-postgres = { workspace = true }
+tokio-postgres-rustls = { workspace = true }
 rustls = { workspace = true, optional = true }
-uuid = { workspace = true, features = ["v4"] }
+uuid = { workspace = true, features = ["serde", "v4"] }
 
 [dev-dependencies]
 serial_test = { workspace = true }

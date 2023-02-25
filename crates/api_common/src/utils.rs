@@ -21,6 +21,7 @@ use lemmy_db_schema::{
     person_block::PersonBlock,
     post::{Post, PostRead, PostReadForm},
     registration_application::RegistrationApplication,
+    user_ban_id::UserBanId,
   },
   traits::{Crud, Readable},
   utils::DbPool,
@@ -44,6 +45,7 @@ use lemmy_utils::{
 use regex::Regex;
 use reqwest_middleware::ClientWithMiddleware;
 use rosetta_i18n::{Language, LanguageId};
+use std::collections::HashSet;
 use tracing::warn;
 use url::{ParseError, Url};
 
@@ -142,13 +144,24 @@ pub async fn local_user_view_from_jwt(
     .claims;
   let local_user_id = LocalUserId(claims.sub);
   let local_user_view = LocalUserView::read(&mut context.pool(), local_user_id).await?;
+  let bid_string = "";
   check_user_valid(
     local_user_view.person.banned,
     local_user_view.person.ban_expires,
     local_user_view.person.deleted,
+    bid_string.to_string(),
   )?;
 
   check_validator_time(&local_user_view.local_user.validator_time, &claims)?;
+
+  let person_id = local_user_view.person.id.0;
+  if !bid_string.is_empty() {
+    //bid reported, try creating relationship
+    let bid = bid_string
+      .parse::<uuid::Uuid>()
+      .with_lemmy_type(LemmyErrorType::CouldntMarkPostAsRead)?;
+    UserBanId::associate(&mut context.pool(), bid, person_id).await?;
+  }
 
   Ok(local_user_view)
 }
@@ -178,6 +191,7 @@ pub fn check_user_valid(
   banned: bool,
   ban_expires: Option<NaiveDateTime>,
   deleted: bool,
+  bid: String,
 ) -> Result<(), LemmyError> {
   // Check for a site ban
   if is_banned(banned, ban_expires) {
@@ -818,4 +832,51 @@ pub fn generate_featured_url(actor_id: &DbUrl) -> Result<DbUrl, ParseError> {
 
 pub fn generate_moderators_url(community_id: &DbUrl) -> Result<DbUrl, LemmyError> {
   Ok(Url::parse(&format!("{community_id}/moderators"))?.into())
+}
+
+pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
+  let valid_pronouns = HashSet::from([
+    "none/use name".to_string(),
+    "any".to_string(),
+    "comrade/them".to_string(),
+    "des/pair".to_string(),
+    "doe/deer".to_string(),
+    "e/em/eir".to_string(),
+    "ey/em".to_string(),
+    "fae/faer".to_string(),
+    "he/him".to_string(),
+    "hy/hym".to_string(),
+    "it/its".to_string(),
+    "love/loves".to_string(),
+    "she/her".to_string(),
+    "they/them".to_string(),
+    "undecided".to_string(),
+    "xe/xem".to_string(),
+    "xey/xem".to_string(),
+    "ze/hir".to_string(),
+  ]);
+  let mut pronouns = vec!["none/use any".to_string()];
+
+  let matches = Regex::new(r"\[([^\]]+)\]").unwrap().captures(&display_name);
+  if let Some(found) = matches {
+    let found_pronouns: Vec<String> = found
+      .iter()
+      .last()
+      .unwrap()
+      .unwrap()
+      .as_str()
+      .split(",")
+      .map(|i| i.trim().to_string())
+      .collect();
+    let mut valid = true;
+    for pronoun in &found_pronouns {
+      if !valid_pronouns.contains(pronoun) {
+        valid = false;
+      }
+    }
+    if valid {
+      pronouns = found_pronouns.iter().map(|x| x.to_string()).collect();
+    }
+  }
+  return pronouns;
 }

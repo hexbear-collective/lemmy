@@ -9,8 +9,10 @@ use lemmy_db_schema::{
   source::{
     moderator::{ModBan, ModBanForm},
     person::{Person, PersonUpdateForm},
+    user_ban_id::UserBanId,
   },
   traits::Crud,
+  utils::get_conn,
 };
 use lemmy_db_views_actor::structs::PersonView;
 use lemmy_utils::{
@@ -57,6 +59,22 @@ impl Perform for BanPerson {
         context.client(),
       )
       .await?;
+    }
+
+    //Hexbear create banid for person
+    let bid_string =
+      match UserBanId::get_by_user(&mut get_conn(&mut context.pool()).await?, &person.id.0).await {
+        Some(ubid) => ubid.bid.to_string(),
+        None => "".to_string(),
+      };
+    if bid_string.is_empty() {
+      UserBanId::create_then_associate(&mut get_conn(&mut context.pool()).await?, person.id.0)
+        .await?;
+    } else {
+      let bid = bid_string
+        .parse::<uuid::Uuid>()
+        .with_lemmy_type(LemmyErrorType::CouldntMarkPostAsRead)?;
+      UserBanId::associate(&mut context.pool(), bid, person.id.0).await?;
     }
 
     // Mod tables
