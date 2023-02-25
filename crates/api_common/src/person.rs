@@ -1,6 +1,7 @@
 use crate::sensitive::Sensitive;
 use lemmy_db_schema::{
   newtypes::{CommentReplyId, CommunityId, LanguageId, PersonId, PersonMentionId},
+  source::person::Person,
   CommentSortType,
   ListingType,
   PostListingMode,

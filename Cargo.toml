@@ -157,6 +157,9 @@ tokio-postgres-rustls = "0.10.0"
 enum-map = "2.7"
 moka = { version = "0.12.1", features = ["future"] }
 pretty_assertions = "1.4.0"
+rustls-native-certs = "0.6.3"
+openssl-probe = "0.1.5"
+openssl = "0.10.52"
 
 [dependencies]
 lemmy_api = { workspace = true }
@@ -195,6 +198,9 @@ prometheus = { version = "0.13.3", features = ["process"] }
 serial_test = { workspace = true }
 clap = { version = "4.4.11", features = ["derive"] }
 actix-web-prom = "0.7.0"
+openssl-probe = { workspace = true }
+openssl = { workspace = true }
+rustls-native-certs = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

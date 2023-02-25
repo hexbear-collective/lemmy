@@ -237,11 +237,14 @@ pub fn diesel_option_overwrite_to_url_create(
 
 fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
   let fut = async {
-    let rustls_config = rustls::ClientConfig::builder()
+    // We first set up the way we want rustls to work.
+    let mut rustls_config = rustls::ClientConfig::builder()
       .with_safe_defaults()
-      .with_custom_certificate_verifier(Arc::new(NoCertVerifier {}))
+      .with_root_certificates(root_certs())
       .with_no_client_auth();
-
+    rustls_config
+      .dangerous()
+      .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
     let tls = tokio_postgres_rustls::MakeRustlsConnect::new(rustls_config);
     let (client, conn) = tokio_postgres::connect(config, tls)
       .await
@@ -256,21 +259,12 @@ fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConne
   fut.boxed()
 }
 
-struct NoCertVerifier {}
-
-impl ServerCertVerifier for NoCertVerifier {
-  fn verify_server_cert(
-    &self,
-    _end_entity: &rustls::Certificate,
-    _intermediates: &[rustls::Certificate],
-    _server_name: &ServerName,
-    _scts: &mut dyn Iterator<Item = &[u8]>,
-    _ocsp_response: &[u8],
-    _now: SystemTime,
-  ) -> Result<ServerCertVerified, rustls::Error> {
-    // Will verify all (even invalid) certs without any checks (sslmode=require)
-    Ok(ServerCertVerified::assertion())
-  }
+fn root_certs() -> rustls::RootCertStore {
+  let mut roots = rustls::RootCertStore::empty();
+  let certs = rustls_native_certs::load_native_certs().expect("Certs not loadable!");
+  let certs: Vec<_> = certs.into_iter().map(|cert| cert.0).collect();
+  roots.add_parsable_certificates(&certs);
+  roots
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
@@ -454,6 +448,24 @@ impl<RF, LF> Queries<RF, LF> {
   {
     let conn = get_conn(pool).await?;
     (self.list_fn)(conn, args).await
+  }
+}
+
+mod danger {
+  pub struct NoCertificateVerification {}
+
+  impl rustls::client::ServerCertVerifier for NoCertificateVerification {
+    fn verify_server_cert(
+      &self,
+      _end_entity: &rustls::Certificate,
+      _intermediates: &[rustls::Certificate],
+      _server_name: &rustls::ServerName,
+      _scts: &mut dyn Iterator<Item = &[u8]>,
+      _ocsp: &[u8],
+      _now: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+      Ok(rustls::client::ServerCertVerified::assertion())
+    }
   }
 }
 

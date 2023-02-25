@@ -2,7 +2,7 @@ use actix_web::web::{Data, Json};
 use lemmy_api_common::{
   context::LemmyContext,
   person::SaveUserSettings,
-  utils::send_verification_email,
+  utils::{hexbear_find_pronouns, send_verification_email},
   SuccessResponse,
 };
 use lemmy_db_schema::{
@@ -130,4 +130,15 @@ pub async fn save_user_settings(
     .ok();
 
   Ok(Json(SuccessResponse::default()))
+}
+fn hexbear_validate_pronouns(
+  display_name: Option<Option<String>>,
+  user_name: String,
+) -> Option<Option<String>> {
+  let mut name_with_pronouns = Some(Some(user_name.to_string()));
+  if let Some(Some(display_name)) = &display_name {
+    let pronouns = hexbear_find_pronouns(display_name.to_string()).join(", ");
+    name_with_pronouns = Some(Some(format!("{} [{pronouns}]", user_name.to_string())))
+  }
+  return name_with_pronouns;
 }

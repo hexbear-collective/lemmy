@@ -76,7 +76,7 @@ fn adapt_request(
 
   let client_request = client
     .request(request.method().clone(), url)
-    .timeout(REQWEST_TIMEOUT);
+    .timeout(REQWEST_TIMEOUT * 2);
 
   request
     .headers()

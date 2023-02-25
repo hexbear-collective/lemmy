@@ -1,0 +1,72 @@
+version: "3.3"
+
+networks:
+  # communication to web and clients
+  lemmyexternalproxy:
+  # communication between lemmy services
+  lemmyinternal:
+    driver: bridge
+    internal: true
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    # this needs to match the database host in lemmy.hson
+    # Tune your settings via
+    # https://pgtune.leopard.in.ua/#/
+    # You can use this technique to add them here
+    # https://stackoverflow.com/a/30850095/1655478
+    hostname: postgres
+    command:
+      [
+        "postgres",
+        "-c",
+        "session_preload_libraries=auto_explain",
+        "-c",
+        "auto_explain.log_min_duration=5ms",
+        "-c",
+        "auto_explain.log_analyze=true",
+        "-c",
+        "track_activity_query_size=1048576",
+      ]
+    networks:
+      - lemmyinternal
+      # adding the external facing network to allow direct db access for devs
+      - lemmyexternalproxy
+    ports:
+      # use a different port so it doesnt conflict with potential postgres db running on the host
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=lemmy
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=lemmy
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data:Z
+    restart: always
+  pictrs:
+    image: asonix/pictrs:0.5.0-rc.3
+    # this needs to match the pictrs url in lemmy.hjson
+    hostname: pictrs
+    # we can set options to pictrs like this, here we set max. image size and forced format for conversion
+    # entrypoint: /sbin/tini -- /usr/local/bin/pict-rs -p /mnt -m 4 --image-format webp
+    networks:
+      - lemmyinternal
+      - lemmyexternalproxy
+    ports:
+      # use a different port so it doesnt conflict with potential postgres db running on the host
+      - "8080:8080"
+    environment:
+      - PICTRS_OPENTELEMETRY_URL=http://otel:4137
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=full
+      - PICTRS__MEDIA__VIDEO__VIDEO_CODEC=vp9
+      - PICTRS__MEDIA__ANIMATION__MAX_WIDTH=512
+      - PICTRS__MEDIA__ANIMATION__MAX_HEIGHT=512
+      - PICTRS__MEDIA__ANIMATION__MAX_AREA=262144
+      - PICTRS__MEDIA__ANIMATION__MAX_FRAME_COUNT=8000
+      - PICTRS__SERVER__API_KEY=abc123
+      - PICTRS__UPGRADE__CONCURRENCY=256
+    user: 991:991
+    volumes:
+      - ./volumes/pictrs:/mnt
+    restart: always
