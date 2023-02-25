@@ -6,8 +6,7 @@ use actix_web::{
   },
   web,
   web::Query,
-  HttpRequest,
-  HttpResponse,
+  HttpRequest, HttpResponse,
 };
 use futures::stream::{Stream, StreamExt};
 use lemmy_api_common::{context::LemmyContext, request::PictrsResponse};

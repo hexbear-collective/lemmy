@@ -15,6 +15,14 @@ use lemmy_db_schema::{
   utils::DbPool,
   RegistrationMode,
 };
+use lemmy_db_schema::{
+  source::{
+    local_site::LocalSite, registration_application::RegistrationApplication,
+    user_ban_id::UserBanId,
+  },
+  utils::{get_conn, DbPool},
+  RegistrationMode,
+};
 use lemmy_db_views::structs::{LocalUserView, SiteView};
 use lemmy_utils::error::{LemmyErrorType, LemmyResult};
 
