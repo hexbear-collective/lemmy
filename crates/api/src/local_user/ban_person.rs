@@ -9,6 +9,7 @@ use lemmy_api_common::{
 };
 use lemmy_db_schema::{
   source::{
+    hexbear_user_cookie_person::HexbearUserCookiePerson,
     local_user::LocalUser,
     login_token::LoginToken,
     moderator::{ModBan, ModBanForm},
@@ -57,6 +58,8 @@ pub async fn ban_from_site(
   )
   .await
   .with_lemmy_type(LemmyErrorType::CouldntUpdateUser)?;
+
+  HexbearUserCookiePerson::create(&mut context.pool(), data.person_id).await?;
 
   // if its a local user, invalidate logins
   let local_user = LocalUserView::read_person(&mut context.pool(), person.id).await;

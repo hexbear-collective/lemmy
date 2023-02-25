@@ -1,23 +1,15 @@
 use actix_web::{guard, web};
 use lemmy_api::{
   comment::{
-    distinguish::distinguish_comment,
-    like::like_comment,
-    list_comment_likes::list_comment_likes,
+    distinguish::distinguish_comment, like::like_comment, list_comment_likes::list_comment_likes,
     save::save_comment,
   },
   comment_report::{
-    create::create_comment_report,
-    list::list_comment_reports,
-    resolve::resolve_comment_report,
+    create::create_comment_report, list::list_comment_reports, resolve::resolve_comment_report,
   },
   community::{
-    add_mod::add_mod_to_community,
-    ban::ban_from_community,
-    block::block_community,
-    follow::follow_community,
-    hide::hide_community,
-    transfer::transfer_community,
+    add_mod::add_mod_to_community, ban::ban_from_community, block::block_community,
+    follow::follow_community, hide::hide_community, transfer::transfer_community,
   },
   local_user::{
     add_admin::add_admin,
@@ -31,15 +23,12 @@ use lemmy_api::{
     list_banned::list_banned_users,
     list_logins::list_logins,
     list_media::list_media,
-    login::login,
+    login::{find_related_users, login},
     logout::logout,
     notifications::{
-      list_mentions::list_mentions,
-      list_replies::list_replies,
-      mark_all_read::mark_all_notifications_read,
-      mark_mention_read::mark_person_mention_as_read,
-      mark_reply_read::mark_reply_as_read,
-      unread_count::unread_count,
+      list_mentions::list_mentions, list_replies::list_replies,
+      mark_all_read::mark_all_notifications_read, mark_mention_read::mark_person_mention_as_read,
+      mark_reply_read::mark_reply_as_read, unread_count::unread_count,
     },
     report_count::report_count,
     reset_password::reset_password,
@@ -49,25 +38,16 @@ use lemmy_api::{
     verify_email::verify_email,
   },
   post::{
-    feature::feature_post,
-    get_link_metadata::get_link_metadata,
-    hide::hide_post,
-    like::like_post,
-    list_post_likes::list_post_likes,
-    lock::lock_post,
-    mark_read::mark_post_as_read,
+    feature::feature_post, get_link_metadata::get_link_metadata, hide::hide_post, like::like_post,
+    list_post_likes::list_post_likes, lock::lock_post, mark_read::mark_post_as_read,
     save::save_post,
   },
   post_report::{
-    create::create_post_report,
-    list::list_post_reports,
-    resolve::resolve_post_report,
+    create::create_post_report, list::list_post_reports, resolve::resolve_post_report,
   },
   private_message::mark_read::mark_pm_as_read,
   private_message_report::{
-    create::create_pm_report,
-    list::list_pm_reports,
-    resolve::resolve_pm_report,
+    create::create_pm_report, list::list_pm_reports, resolve::resolve_pm_report,
   },
   site::{
     block::block_instance,
@@ -76,14 +56,10 @@ use lemmy_api::{
     list_all_media::list_all_media,
     mod_log::get_mod_log,
     purge::{
-      comment::purge_comment,
-      community::purge_community,
-      person::purge_person,
-      post::purge_post,
+      comment::purge_comment, community::purge_community, person::purge_person, post::purge_post,
     },
     registration_applications::{
-      approve::approve_registration_application,
-      get::get_registration_application,
+      approve::approve_registration_application, get::get_registration_application,
       list::list_registration_applications,
       unread_count::get_unread_registration_application_count,
     },
@@ -92,35 +68,22 @@ use lemmy_api::{
 };
 use lemmy_api_crud::{
   comment::{
-    create::create_comment,
-    delete::delete_comment,
-    read::get_comment,
-    remove::remove_comment,
+    create::create_comment, delete::delete_comment, read::get_comment, remove::remove_comment,
     update::update_comment,
   },
   community::{
-    create::create_community,
-    delete::delete_community,
-    list::list_communities,
-    remove::remove_community,
-    update::update_community,
+    create::create_community, delete::delete_community, list::list_communities,
+    remove::remove_community, update::update_community,
   },
   custom_emoji::{
-    create::create_custom_emoji,
-    delete::delete_custom_emoji,
-    update::update_custom_emoji,
+    create::create_custom_emoji, delete::delete_custom_emoji, update::update_custom_emoji,
   },
   post::{
-    create::create_post,
-    delete::delete_post,
-    read::get_post,
-    remove::remove_post,
+    create::create_post, delete::delete_post, read::get_post, remove::remove_post,
     update::update_post,
   },
   private_message::{
-    create::create_private_message,
-    delete::delete_private_message,
-    read::get_private_message,
+    create::create_private_message, delete::delete_private_message, read::get_private_message,
     update::update_private_message,
   },
   site::{create::create_site, read::get_site, update::update_site},
@@ -372,6 +335,7 @@ pub fn config(cfg: &mut web::ServiceConfig, rate_limit: &RateLimitCell) {
             web::get().to(get_registration_application),
           )
           .route("/list_all_media", web::get().to(list_all_media))
+          .route("/find_related_users", web::get().to(find_related_users))
           .service(
             web::scope("/purge")
               .route("/person", web::post().to(purge_person))

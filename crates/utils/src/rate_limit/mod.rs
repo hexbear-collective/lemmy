@@ -14,6 +14,7 @@ use std::{
   task::{Context, Poll},
   time::Duration,
 };
+use tracing::info;
 
 pub mod rate_limiter;
 
@@ -192,6 +193,7 @@ where
         service.call(req).await
       } else {
         let (http_req, _) = req.into_parts();
+
         Ok(ServiceResponse::from_err(
           LemmyError::from(LemmyErrorType::RateLimitError),
           http_req,

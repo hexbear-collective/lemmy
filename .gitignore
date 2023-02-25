@@ -34,3 +34,5 @@ dev_pgdata/
 
 # database dumps
 *.sqldump
+
+docker/hexbear/volumes

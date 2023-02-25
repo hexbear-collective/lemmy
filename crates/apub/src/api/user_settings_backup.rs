@@ -1,8 +1,5 @@
 use crate::objects::{
-  comment::ApubComment,
-  community::ApubCommunity,
-  person::ApubPerson,
-  post::ApubPost,
+  comment::ApubComment, community::ApubCommunity, person::ApubPerson, post::ApubPost,
 };
 use activitypub_federation::{config::Data, fetch::object_id::ObjectId, traits::Object};
 use actix_web::web::Json;
@@ -122,7 +119,7 @@ pub async fn import_settings(
   }
 
   let person_form = PersonUpdateForm {
-    display_name: Some(data.display_name.clone()),
+    //display_name: data.display_name.clone().map(Some), //hexbear, don't allow users to import display name
     bio: Some(data.bio.clone()),
     matrix_user_id: Some(data.matrix_id.clone()),
     bot_account: data.bot_account,
