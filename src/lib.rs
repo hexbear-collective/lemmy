@@ -18,9 +18,7 @@ use actix_web::{
   dev::{ServerHandle, ServiceResponse},
   middleware::{self, Condition, ErrorHandlerResponse, ErrorHandlers},
   web::Data,
-  App,
-  HttpResponse,
-  HttpServer,
+  App, HttpResponse, HttpServer,
 };
 use actix_web_prom::PrometheusMetricsBuilder;
 use clap::Parser;
@@ -30,15 +28,13 @@ use lemmy_api_common::{
   request::client_builder,
   send_activity::{ActivityChannel, MATCH_OUTGOING_ACTIVITIES},
   utils::{
-    check_private_instance_and_federation_enabled,
-    local_site_rate_limit_to_rate_limit_config,
+    check_private_instance_and_federation_enabled, local_site_rate_limit_to_rate_limit_config,
   },
 };
 use lemmy_apub::{
   activities::{handle_outgoing_activities, match_outgoing_activities},
   objects::instance::ApubSite,
-  VerifyUrlData,
-  FEDERATION_HTTP_FETCH_LIMIT,
+  VerifyUrlData, FEDERATION_HTTP_FETCH_LIMIT,
 };
 use lemmy_db_schema::{source::secret::Secret, utils::build_db_pool};
 use lemmy_federate::{Opts, SendManager};
@@ -240,9 +236,14 @@ pub async fn start_lemmy_server(args: CmdArgs) -> LemmyResult<()> {
       SETTINGS.federation.clone(),
     )
   });
+  #[cfg(unix)]
   let mut interrupt = tokio::signal::unix::signal(SignalKind::interrupt())?;
+  #[cfg(unix)]
   let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())?;
-
+  #[cfg(windows)]
+  let mut interrupt = tokio::signal::windows::ctrl_break()?;
+  #[cfg(windows)]
+  let mut terminate = tokio::signal::windows::ctrl_shutdown()?;
   if server.is_some() || federate.is_some() || scheduled_tasks.is_some() {
     tokio::select! {
       _ = tokio::signal::ctrl_c() => {

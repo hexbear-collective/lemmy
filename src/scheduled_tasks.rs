@@ -237,7 +237,8 @@ async fn process_post_aggregates_ranks_in_batches(conn: &mut AsyncPgConnection) 
                FOR UPDATE SKIP LOCKED)
          UPDATE post_aggregates pa
            SET hot_rank = r.hot_rank(pa.score, pa.published),
-           hot_rank_active = r.hot_rank(pa.score, pa.newest_comment_time_necro),
+           --hot_rank_active = r.hot_rank(pa.score, pa.newest_comment_time_necro), removed for hexbear hot rank
+           hot_rank_active = hot_rank_active(pa.score, pa.published, pa.newest_comment_time),
            scaled_rank = r.scaled_rank(pa.score, pa.published, ca.users_active_month)
          FROM batch, community_aggregates ca
          WHERE pa.post_id = batch.post_id and pa.community_id = ca.community_id RETURNING pa.published;
