@@ -5,9 +5,7 @@ use actix_web::{
     StatusCode,
   },
   web::*,
-  HttpRequest,
-  HttpResponse,
-  Responder,
+  HttpRequest, HttpResponse, Responder,
 };
 use futures::stream::{Stream, StreamExt};
 use lemmy_api_common::{

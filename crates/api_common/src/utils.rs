@@ -34,9 +34,7 @@ use lemmy_db_views::{
   structs::{LocalImageView, LocalUserView},
 };
 use lemmy_db_views_actor::structs::{
-  CommunityModeratorView,
-  CommunityPersonBanView,
-  CommunityView,
+  CommunityModeratorView, CommunityPersonBanView, CommunityView,
 };
 use lemmy_utils::{
   email::{send_email, translations::Lang},
@@ -49,8 +47,7 @@ use lemmy_utils::{
     slurs::{build_slur_regex, remove_slurs},
     validation::clean_urls_in_text,
   },
-  CACHE_DURATION_FEDERATION,
-  MAX_COMMENT_DEPTH_LIMIT,
+  CACHE_DURATION_FEDERATION, MAX_COMMENT_DEPTH_LIMIT,
 };
 use moka::future::Cache;
 use regex::{escape, Regex, RegexSet};
@@ -400,7 +397,7 @@ pub async fn build_federated_instances(
 
 /// Checks the password length
 pub fn password_length_check(pass: &str) -> LemmyResult<()> {
-  if !(10..=60).contains(&pass.chars().count()) {
+  if !(4..=60).contains(&pass.chars().count()) {
     Err(LemmyErrorType::InvalidPassword)?
   } else {
     Ok(())
@@ -1006,6 +1003,65 @@ pub fn check_comment_depth(comment: &Comment) -> LemmyResult<()> {
     Ok(())
   }
 }
+pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
+  let valid_pronouns = HashSet::from([
+    "none/use name".to_string(),
+    "any".to_string(),
+    "comrade/them".to_string(),
+    "ae/aer".to_string(),
+    "des/pair".to_string(),
+    "doe/deer".to_string(),
+    "e/em/eir".to_string(),
+    "ee/ees".to_string(),
+    "em/ems".to_string(),
+    "ey/em".to_string(),
+    "fae/faer".to_string(),
+    "he/him".to_string(),
+    "hy/hym".to_string(),
+    "it/its".to_string(),
+    "love/loves".to_string(),
+    "null/void".to_string(),
+    "pup/pup's".to_string(),
+    "sae/saer".to_string(),
+    "she/her".to_string(),
+    "sie/hir".to_string(),
+    "they/them".to_string(),
+    "thon/thons".to_string(),
+    "undecided".to_string(),
+    "xe/xem".to_string(),
+    "xey/xem".to_string(),
+    "ze/hir".to_string(),
+    "ze/zir".to_string(),
+  ]);
+  let mut pronouns = vec!["none/use any".to_string()];
+
+  let matches = Regex::new(r"\[([^\]]+)\]").unwrap().captures(&display_name);
+  if let Some(found) = matches {
+    let found_pronouns: Vec<String> = found
+      .iter()
+      .last()
+      .unwrap()
+      .unwrap()
+      .as_str()
+      .split(",")
+      .map(|i| i.trim().to_string())
+      .collect();
+    let mut valid = true;
+    for pronoun in &found_pronouns {
+      if !valid_pronouns.contains(pronoun) {
+        valid = false;
+      }
+    }
+    if valid {
+      pronouns = found_pronouns
+        .iter()
+        .take(2)
+        .map(|x| x.to_string())
+        .collect();
+    }
+  }
+  return pronouns;
+}
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -1126,4 +1182,4 @@ mod tests {
     assert!(check_comment_depth(&comment).is_err());
     Ok(())
   }
-}
+
