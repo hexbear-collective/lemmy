@@ -86,9 +86,9 @@ impl LocalUserLanguage {
     //       This hack can be removed once a majority of posts have language tags, or when it is
     //       clearer for new users that they need to enable undetermined language.
     //       See https://github.com/LemmyNet/lemmy-ui/issues/999
-    if !lang_ids.contains(&UNDETERMINED_ID) {
-      lang_ids.push(UNDETERMINED_ID);
-    }
+    // if !lang_ids.contains(&UNDETERMINED_ID) {
+    //   lang_ids.push(UNDETERMINED_ID);
+    // }
 
     conn
       .build_transaction()

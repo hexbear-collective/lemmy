@@ -3,7 +3,7 @@ use actix_web::web::Data;
 use lemmy_api_common::{
   context::LemmyContext,
   person::{LoginResponse, SaveUserSettings},
-  utils::{get_local_user_view_from_jwt, send_verification_email},
+  utils::{get_local_user_view_from_jwt, hexbear_find_pronouns, send_verification_email},
 };
 use lemmy_db_schema::{
   source::{
@@ -46,7 +46,7 @@ impl Perform for SaveUserSettings {
     let avatar = diesel_option_overwrite_to_url(&data.avatar)?;
     let banner = diesel_option_overwrite_to_url(&data.banner)?;
     let bio = diesel_option_overwrite(&data.bio);
-    let display_name = diesel_option_overwrite(&data.display_name);
+    let mut display_name = diesel_option_overwrite(&data.display_name);
     let matrix_user_id = diesel_option_overwrite(&data.matrix_user_id);
     let email_deref = data.email.as_deref().map(str::to_lowercase);
     let email = diesel_option_overwrite(&email_deref);
@@ -77,6 +77,8 @@ impl Perform for SaveUserSettings {
         site_view.local_site.actor_name_max_length as usize,
       )?;
     }
+
+    display_name = hexbear_validate_pronouns(display_name, local_user_view.person.name.to_string());
 
     if let Some(Some(matrix_user_id)) = &matrix_user_id {
       is_valid_matrix_id(matrix_user_id)?;
@@ -165,4 +167,15 @@ impl Perform for SaveUserSettings {
       registration_created: false,
     })
   }
+}
+fn hexbear_validate_pronouns(
+  display_name: Option<Option<String>>,
+  user_name: String,
+) -> Option<Option<String>> {
+  let mut name_with_pronouns = Some(Some(user_name.to_string()));
+  if let Some(Some(display_name)) = &display_name {
+    let pronouns = hexbear_find_pronouns(display_name.to_string()).join(", ");
+    name_with_pronouns = Some(Some(format!("{} [{pronouns}]", user_name.to_string())))
+  }
+  return name_with_pronouns;
 }
