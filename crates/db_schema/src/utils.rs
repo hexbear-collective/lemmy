@@ -502,6 +502,11 @@ pub mod functions {
     fn controversy_rank(upvotes: BigInt, downvotes: BigInt, score: BigInt) -> Double;
   }
 
+  sql_function! {
+    //Might need a sql_name here?
+    fn hot_rank_active(score: BigInt, time: Timestamptz, comment_time: Timestamptz) -> Double;
+  }
+
   sql_function!(fn reverse_timestamp_sort(time: Timestamptz) -> BigInt);
 
   sql_function!(fn lower(x: Text) -> Text);

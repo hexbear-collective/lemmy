@@ -1,7 +1,7 @@
 use lemmy_db_schema::{
   newtypes::{CommentReplyId, CommunityId, LanguageId, PersonId, PersonMentionId},
   sensitive::SensitiveString,
-  source::site::Site,
+  source::{person::Person, site::Site},
   CommentSortType,
   ListingType,
   PostListingMode,

@@ -6,6 +6,7 @@ use lemmy_api_common::{
   request::replace_image,
   utils::{
     get_url_blocklist,
+    hexbear_find_pronouns,
     local_site_to_slur_regex,
     process_markdown_opt,
     proxy_image_link_opt_api,
@@ -56,7 +57,7 @@ pub async fn save_user_settings(
   replace_image(&banner, &local_user_view.person.banner, &context).await?;
   let banner = proxy_image_link_opt_api(banner, &context).await?;
 
-  let display_name = diesel_string_update(data.display_name.as_deref());
+  let mut display_name = diesel_string_update(data.display_name.as_deref());
   let matrix_user_id = diesel_string_update(data.matrix_user_id.as_deref());
   let email_deref = data.email.as_deref().map(str::to_lowercase);
   let email = diesel_string_update(email_deref.as_deref());
@@ -96,6 +97,7 @@ pub async fn save_user_settings(
       site_view.local_site.actor_name_max_length as usize,
     )?;
   }
+  display_name = hexbear_validate_pronouns(display_name, local_user_view.person.name.to_string());
 
   if let Some(Some(matrix_user_id)) = &matrix_user_id {
     is_valid_matrix_id(matrix_user_id)?;
@@ -162,4 +164,15 @@ pub async fn save_user_settings(
     .await?;
 
   Ok(Json(SuccessResponse::default()))
+}
+fn hexbear_validate_pronouns(
+  display_name: Option<Option<String>>,
+  user_name: String,
+) -> Option<Option<String>> {
+  let mut name_with_pronouns = Some(Some(user_name.to_string()));
+  if let Some(Some(display_name)) = &display_name {
+    let pronouns = hexbear_find_pronouns(display_name.to_string()).join(", ");
+    name_with_pronouns = Some(Some(format!("{} [{pronouns}]", user_name.to_string())))
+  }
+  return name_with_pronouns;
 }

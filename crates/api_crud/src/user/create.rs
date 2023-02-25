@@ -116,6 +116,7 @@ pub async fn register(
     actor_id: Some(actor_id.clone()),
     inbox_url: Some(generate_inbox_url(&actor_id)?),
     shared_inbox_url: Some(generate_shared_inbox_url(context.settings())?),
+    display_name: Some(data.username.clone() + &" [none/use name]".to_string()),
     private_key: Some(actor_keypair.private_key),
     ..PersonInsertForm::new(
       data.username.clone(),

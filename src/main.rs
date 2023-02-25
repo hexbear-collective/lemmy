@@ -6,6 +6,11 @@ use lemmy_utils::{error::LemmyResult, settings::SETTINGS};
 pub async fn main() -> LemmyResult<()> {
   init_logging(&SETTINGS.opentelemetry_url)?;
   let args = CmdArgs::parse();
+  openssl_probe::init_ssl_cert_env_vars();
+
+  rustls::crypto::ring::default_provider()
+    .install_default()
+    .expect("Failed to install rustls crypto provider");
 
   #[cfg(not(feature = "embed-pictrs"))]
   start_lemmy_server(args).await?;

@@ -168,6 +168,9 @@ i-love-jesus = { version = "0.1.0" }
 clap = { version = "4.5.6", features = ["derive", "env"] }
 pretty_assertions = "1.4.0"
 derive-new = "0.6.0"
+rustls-native-certs = "0.6.3"
+openssl-probe = "0.1.5"
+openssl = "0.10.52"
 
 [dependencies]
 lemmy_api = { workspace = true }
@@ -206,6 +209,10 @@ prometheus = { version = "0.13.4", features = ["process"] }
 serial_test = { workspace = true }
 clap = { workspace = true }
 actix-web-prom = "0.8.0"
+openssl-probe = { workspace = true }
+openssl = { workspace = true }
+rustls = { workspace = true }
+rustls-native-certs = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

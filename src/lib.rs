@@ -56,7 +56,12 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use serde_json::json;
 use std::{env, ops::Deref};
+#[cfg(unix)]
+use tokio::signal::unix;
+#[cfg(unix)]
 use tokio::signal::unix::SignalKind;
+#[cfg(windows)]
+use tokio::signal::windows;
 use tracing::subscriber::set_global_default;
 use tracing_actix_web::TracingLogger;
 use tracing_error::ErrorLayer;
@@ -218,9 +223,14 @@ pub async fn start_lemmy_server(args: CmdArgs) -> LemmyResult<()> {
       federation_config,
     )
   });
+  #[cfg(unix)]
   let mut interrupt = tokio::signal::unix::signal(SignalKind::interrupt())?;
+  #[cfg(unix)]
   let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())?;
-
+  #[cfg(windows)]
+  let mut interrupt = tokio::signal::windows::ctrl_break()?;
+  #[cfg(windows)]
+  let mut terminate = tokio::signal::windows::ctrl_shutdown()?;
   if server.is_some() || federate.is_some() || scheduled_tasks.is_some() {
     tokio::select! {
       _ = tokio::signal::ctrl_c() => {

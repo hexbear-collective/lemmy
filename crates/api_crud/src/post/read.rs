@@ -55,7 +55,7 @@ pub async fn get_post(
   .await
   .is_ok();
 
-  let post_view = PostView::read(&mut context.pool(), post_id, person_id, is_mod_or_admin)
+  let post_view = PostView::read(&mut context.pool(), post_id, person_id, true) // hexbear always shows post with a link
     .await?
     .ok_or(LemmyErrorType::CouldntFindPost)?;
 

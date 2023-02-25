@@ -12,8 +12,10 @@ use lemmy_db_schema::{
     login_token::LoginToken,
     moderator::{ModBan, ModBanForm},
     person::{Person, PersonUpdateForm},
+    user_ban_id::UserBanId,
   },
   traits::Crud,
+  utils::get_conn,
 };
 use lemmy_db_views::structs::LocalUserView;
 use lemmy_db_views_actor::structs::PersonView;
