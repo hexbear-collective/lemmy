@@ -80,8 +80,8 @@ ALTER TABLE federation_queue_state
 
 ALTER TABLE image_upload
     DROP COLUMN id,
-    ADD PRIMARY KEY (pictrs_alias),
-    DROP CONSTRAINT image_upload_pictrs_alias_key;
+    ADD PRIMARY KEY (pictrs_alias);
+    --DROP CONSTRAINT image_upload_pictrs_alias_key;
 
 ALTER TABLE instance_block
     DROP COLUMN id,
