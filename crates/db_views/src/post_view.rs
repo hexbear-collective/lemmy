@@ -308,7 +308,9 @@ impl<'a> PostQuery<'a> {
     if !self.is_mod_or_admin.unwrap_or(true) {
       query = query
         .filter(community::removed.eq(false))
-        .filter(community::deleted.eq(false));
+        .filter(community::deleted.eq(false))
+        .filter(post::removed.eq(false))
+        .filter(post::deleted.eq(false));
     }
 
     if self.community_id.is_none() {
