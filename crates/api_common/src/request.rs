@@ -226,7 +226,8 @@ pub async fn fetch_site_data(
         .map(|p| {
           Url::parse(&format!(
             "{}/pictrs/image/{}",
-            settings.get_protocol_and_hostname(),
+            //settings.get_protocol_and_hostname(), // temp change, revert on deploy
+            "https://test.hexbear.net",
             p
           ))
           .ok()
