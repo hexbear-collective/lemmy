@@ -432,7 +432,7 @@ impl<'a> PostQuery<'a> {
 
     query = query.limit(limit).offset(offset);
 
-    debug!("Post View Query: {:?}", debug_query::<Pg, _>(&query));
+    //debug!("Post View Query: {:?}", debug_query::<Pg, _>(&query));
 
     let res = query.load::<PostViewTuple>(conn).await?;
 
