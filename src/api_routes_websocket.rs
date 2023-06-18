@@ -497,7 +497,7 @@ where
   let res = parsed_data
     .perform(&web::Data::new(context.deref().clone()), Some(id))
     .await?;
-  SendActivity::send_activity(&parsed_data, &res, &context).await?;
+  //SendActivity::send_activity(&parsed_data, &res, &context).await?;
   serialize_websocket_message(&op, &res)
 }
 
@@ -539,7 +539,7 @@ where
 {
   let parsed_data: Data = serde_json::from_value(data)?;
   let res = parsed_data.perform(&context, Some(id)).await?;
-  SendActivity::send_activity(&parsed_data, &res, &context).await?;
+  //SendActivity::send_activity(&parsed_data, &res, &context).await?;
   serialize_websocket_message(&op, &res)
 }
 
@@ -720,6 +720,6 @@ where
   let res = parsed_data
     .perform(&web::Data::new(context.deref().clone()), Some(id))
     .await?;
-  SendActivity::send_activity(&parsed_data, &res, &context).await?;
+  //SendActivity::send_activity(&parsed_data, &res, &context).await?;
   serialize_websocket_message(&op, &res)
 }

@@ -392,7 +392,7 @@ where
     + 'static,
 {
   let res = data.perform(&context, None).await?;
-  SendActivity::send_activity(&data, &res, &apub_data).await?;
+  //SendActivity::send_activity(&data, &res, &apub_data).await?;
   Ok(HttpResponse::Ok().json(res))
 }
 
@@ -425,7 +425,7 @@ where
     + 'static,
 {
   let res = data.perform(&context, None).await?;
-  SendActivity::send_activity(&data.0, &res, &context).await?;
+  //SendActivity::send_activity(&data.0, &res, &context).await?;
   Ok(HttpResponse::Ok().json(res))
 }
 
@@ -459,7 +459,7 @@ where
     + 'static,
 {
   let res = data.perform(&context, None).await?;
-  SendActivity::send_activity(&data, &res, &apub_data).await?;
+  //SendActivity::send_activity(&data, &res, &apub_data).await?;
   Ok(HttpResponse::Ok().json(res))
 }
 
