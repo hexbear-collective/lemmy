@@ -15,7 +15,7 @@ services:
       - lemmyinternal
       - lemmyexternalproxy
     ports:
-    # actual and only port facing any connection from outside 
+    # actual and only port facing any connection from outside
       - "80:1236"
       - "443:443"
       - "8536:8536"
@@ -23,7 +23,10 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx.conf.d/:/etc/nginx/conf.d/:ro
       - /opt/app/certbot/www/:/var/www/certbot/:ro
+      - /opt/app/matrix/:/var/www/matrix:ro
       - /opt/app/certbot/conf/:/etc/nginx/ssl/:ro
+      - /opt/app/static/:/opt/app/static/:ro
+      - /opt/app/nginx-error.log:/log/nginx-error.log:rw
     restart: always
     depends_on:
       - pictrs
@@ -39,22 +42,27 @@ services:
     # image: dessalines/lemmy:dev
     # use this to build your local lemmy server image for development
     # run docker compose up --build
-    build: 
+    build:
       context: ../../
       dockerfile: docker/Dockerfile
-      args: 
+      args:
         RUST_RELEASE_MODE: release
     # this hostname is used in nginx reverse proxy and also for lemmy ui to connect to the backend, do not change
     hostname: lemmy
     networks:
-      - lemmyinternal
-      - lemmyexternalproxy # hexbear needs open access to db-1 server
+       - lemmyinternal
+       - lemmyexternalproxy # hexbear needs open access to db-1 server
     restart: always
     environment:
-      - RUST_LOG="warn,lemmy_server=debug,lemmy_api=debug,lemmy_api_common=debug,lemmy_api_crud=debug,lemmy_apub=debug,lemmy_db_schema=debug,lemmy_db_views=debug,lemmy_db_views_actor=debug,lemmy_db_views_moderator=debug,lemmy_routes=debug,lemmy_utils=debug,lemmy_websocket=debug"
+      - RUST_LOG="info,lemmy_server=info,lemmy_api=info,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info,lemmy_websocket=info"
       - RUST_BACKTRACE=full
+      - ACTIX_THREADPOOL=256
     volumes:
       - ./lemmy.hjson:/config/config.hjson
+    deploy:
+      resources:
+        limits:
+          memory: 6G
     depends_on:
       - pictrs
 
@@ -63,16 +71,17 @@ services:
     # use this to build your local lemmy ui image for development
     # run docker compose up --build
     # assuming lemmy-ui is cloned besides lemmy directory
-    build: 
+    build:
      context: ../../../lemmy-ui
      dockerfile: Dockerfile
+    scale: 3
     networks:
       - lemmyinternal
     environment:
       # this needs to match the hostname defined in the lemmy service
       - LEMMY_UI_LEMMY_INTERNAL_HOST=lemmy:8536
       # set the outside hostname here
-      - LEMMY_UI_LEMMY_EXTERNAL_HOST=test.hexbear.net:443
+      - LEMMY_UI_LEMMY_EXTERNAL_HOST=www.hexbear.net:443
       - LEMMY_UI_HTTPS=true
       - LEMMY_UI_DEBUG=false
       - NODE_ENV=production
@@ -88,10 +97,8 @@ services:
     # entrypoint: /sbin/tini -- /usr/local/bin/pict-rs -p /mnt -m 4 --image-format webp
     networks:
       - lemmyinternal
-      - lemmyexternalproxy
     environment:
       - PICTRS_OPENTELEMETRY_URL=http://otel:4137
-      - PICTRS__API_KEY=API_KEY
       - RUST_LOG=debug
       - RUST_BACKTRACE=full
       - PICTRS__MEDIA__VIDEO_CODEC=vp9
@@ -100,8 +107,6 @@ services:
       - PICTRS__MEDIA__GIF__MAX_AREA=65536
       - PICTRS__MEDIA__GIF__MAX_FRAME_COUNT=400
     user: 991:991
-    ports:
-      - "8080:8080"
     volumes:
       - ../../../pictrs:/mnt
     restart: always
