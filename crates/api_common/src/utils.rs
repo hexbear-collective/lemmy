@@ -305,7 +305,7 @@ pub async fn build_federated_instances(
 
 /// Checks the password length
 pub fn password_length_check(pass: &str) -> Result<(), LemmyError> {
-  if !(10..=60).contains(&pass.chars().count()) {
+  if !(6..=60).contains(&pass.chars().count()) {
     Err(LemmyErrorType::InvalidPassword)?
   } else {
     Ok(())
