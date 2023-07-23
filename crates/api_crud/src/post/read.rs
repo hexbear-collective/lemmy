@@ -59,7 +59,7 @@ impl PerformCrud for GetPost {
       &mut context.pool(),
       post_id,
       person_id,
-      Some(is_mod_or_admin),
+      Some(true), // hexbear always shows post with a link
     )
     .await
     .with_lemmy_type(LemmyErrorType::CouldntFindPost)?;
