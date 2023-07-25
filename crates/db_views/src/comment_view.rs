@@ -301,13 +301,13 @@ impl<'a> CommentQuery<'a> {
     let is_creator = self.creator_id == self.local_user.map(|l| l.person.id);
     // only show deleted comments to creator
     if !is_creator {
-      query = query.filter(comment::deleted.eq(false));
+      //query = query.filter(comment::deleted.eq(false)); // hexbear comment out so that comments show up in tree even if deleted/removed
     }
 
     let is_admin = self.local_user.map(|l| l.person.admin).unwrap_or(false);
     // only show removed comments to admin when viewing user profile
     if !(is_profile_view && is_admin) {
-      query = query.filter(comment::removed.eq(false));
+      //query = query.filter(comment::removed.eq(false)); // hexbear comment out so that comments show up in tree even if deleted/removed
     }
 
     if !self
