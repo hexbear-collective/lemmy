@@ -199,13 +199,13 @@ fn queries<'a>() -> Queries<
     let is_creator = options.creator_id == options.local_user.map(|l| l.person.id);
     // only show deleted comments to creator
     if !is_creator {
-      query = query.filter(comment::deleted.eq(false));
+      //query = query.filter(comment::deleted.eq(false)); //hexbear shows deleted comments
     }
 
     let is_admin = options.local_user.map(|l| l.person.admin).unwrap_or(false);
     // only show removed comments to admin when viewing user profile
     if !(is_profile_view && is_admin) {
-      query = query.filter(comment::removed.eq(false));
+      //query = query.filter(comment::removed.eq(false));  //hexbear shows deleted comments
     }
 
     if !options
