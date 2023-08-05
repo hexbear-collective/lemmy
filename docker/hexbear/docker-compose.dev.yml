@@ -44,7 +44,7 @@ services:
       - ./volumes/postgres:/var/lib/postgresql/data:Z
     restart: always
   pictrs:
-    image: asonix/pictrs:0.4.1
+    image: asonix/pictrs:0.4.2
     # this needs to match the pictrs url in lemmy.hjson
     hostname: pictrs
     # we can set options to pictrs like this, here we set max. image size and forced format for conversion
@@ -64,7 +64,7 @@ services:
       - PICTRS__MEDIA__GIF__MAX_HEIGHT=512
       - PICTRS__MEDIA__GIF__MAX_AREA=262144
       - PICTRS__MEDIA__GIF__MAX_FRAME_COUNT=800
-      - PICTRS__API_KEY=abc123
+      - PICTRS__SERVER__API_KEY=abc123
     user: 991:991
     volumes:
       - ./volumes/pictrs:/mnt
