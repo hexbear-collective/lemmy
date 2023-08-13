@@ -10,34 +10,34 @@ services:
   proxy:
     image: nginx:1-alpine
     ports:
-      - "80:1236"
-      - "443:443"
       - "1236:1236"
       - "8536:8536"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx.conf.d/:/etc/nginx/conf.d/:ro
-      - /opt/app/certbot/www/:/var/www/certbot/:ro
-      - /opt/app/matrix/:/var/www/matrix:ro
-      - /opt/app/certbot/conf/:/etc/nginx/ssl/:ro
-      - /opt/app/static/:/opt/app/static/:ro
+      - ./nginx.internal.conf:/etc/nginx/nginx.conf:ro
+        #      - ./nginx.conf.d/:/etc/nginx/conf.d/:ro
+        #      - /opt/app/certbot/www/:/var/www/certbot/:ro
+        #      - /opt/app/matrix/:/var/www/matrix:ro
+        #      - /opt/app/certbot/conf/:/etc/nginx/ssl/:ro
+        #      - /opt/app/static/:/opt/app/static#/:ro
+        #
       - /opt/app/nginx-error.log:/log/nginx-error.log:rw
     restart: always
+    hostname: proxy
     depends_on:
       - pictrs
       - lemmy-ui
+      - mod-dashboard-api
+      - mod-dashboard-frontend
     logging: *default-logging
 
   certbot:
     image: certbot/certbot:latest
+    hostname: certbot
     volumes:
       - /opt/app/certbot/www/:/var/www/certbot/:rw
       - /opt/app/certbot/conf/:/etc/letsencrypt/:rw
 
   lemmy:
-    # image: dessalines/lemmy:dev
-    # use this to build your local lemmy server image for development
-    # run docker compose up --build
     build:
       context: ../../
       dockerfile: docker/Dockerfile
@@ -59,11 +59,8 @@ services:
       - pictrs
     logging: *default-logging
 
+
   lemmy-ui:
-    # image: dessalines/lemmy-ui:0.17.1
-    # use this to build your local lemmy ui image for development
-    # run docker compose up --build
-    # assuming lemmy-ui is cloned besides lemmy directory
     build:
      context: ../../../lemmy-ui
      dockerfile: Dockerfile
@@ -77,17 +74,19 @@ services:
       - NODE_ENV=production
     depends_on:
       - lemmy
+    hostname: lemmy-ui
     restart: always
     logging: *default-logging
     init: true
-
+    deploy:
+      replicas: 3
   pictrs:
     image: asonix/pictrs:0.4.2
     # this needs to match the pictrs url in lemmy.hjson
     hostname: pictrs
     environment:
       - PICTRS_OPENTELEMETRY_URL=http://otel:4137
-      - PICTRS__TRACING__LOGGING__TARGETS=warn
+      - PICTRS__TRACING__LOGGING__TARGETS=info
       - RUST_BACKTRACE=full
       - PICTRS__MEDIA__VIDEO_CODEC=vp9
       - PICTRS__MEDIA__GIF__MAX_WIDTH=512
@@ -98,4 +97,27 @@ services:
     volumes:
       - ../../../pictrs:/mnt
     restart: always
+    logging: *default-logging
+  
+  mod-dashboard-api:
+    build:
+      context: ../../../hexbear-mod-dashboard
+      dockerfile: Dockerfile.API
+    hostname: dashboard-api
+    environment:
+      - ConnectionString=Host=localhost;Port=5433;Database=lemmy;Username=lemmy;Password=password
+    ports:
+      - "7082:7082"
+    logging: *default-logging
+    volumes:
+      - /var/lib/docker/containers:/app/Logs/
+  mod-dashboard-frontend:
+    build:
+      context: ../../../hexbear-mod-dashboard
+      dockerfile: Dockerfile.Frontend
+      args:
+        AppSettings: '{"APIUrl":"https://test-dashapi.hexbear.net"}'
+    hostname: dashboard-frontend
+    ports:
+      - "7081:7081"
     logging: *default-logging
