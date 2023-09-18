@@ -15,6 +15,7 @@ use std::{
   time::Duration,
 };
 use tokio::sync::{mpsc, mpsc::Sender, OnceCell};
+use tracing::info;
 use typed_builder::TypedBuilder;
 
 pub mod rate_limiter;
@@ -236,7 +237,13 @@ where
 
   fn call(&self, req: ServiceRequest) -> Self::Future {
     let ip_addr = get_ip(&req.connection_info());
-
+    let path = req.path().to_string();
+    let headers = req.headers();
+    let res = headers
+      .iter()
+      .map(|(k, v)| format!("{}:{}", k, v.to_str().unwrap_or("")))
+      .collect::<Vec<String>>()
+      .join(",");
     let rate_limited = self.rate_limited.clone();
     let service = self.service.clone();
 
@@ -244,7 +251,12 @@ where
       if rate_limited.check(ip_addr) {
         service.call(req).await
       } else {
+        info!(
+          "Rate Limit error hit, logging: IP: {}, Path: {}, Headers: {} ",
+          &ip_addr, &path, &res
+        );
         let (http_req, _) = req.into_parts();
+
         Ok(ServiceResponse::from_err(
           LemmyError::from(LemmyErrorType::RateLimitError),
           http_req,
