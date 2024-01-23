@@ -27,7 +27,7 @@ COPY . ./
 # Debug build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     if [ "${RUST_RELEASE_MODE}" = "debug" ]; then \
-        echo "pub const VERSION: &str = \"0.19.2\";" > crates/utils/src/version.rs; \
+        echo "pub const VERSION: &str = \"0.19.3\";" > crates/utils/src/version.rs; \
         cargo build --features "${CARGO_BUILD_FEATURES}"; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/lemmy/target set -ex; \
 # Release build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     if [ "${RUST_RELEASE_MODE}" = "release" ]; then \
-        echo "pub const VERSION: &str = \"0.19.2\";" > crates/utils/src/version.rs; \
+        echo "pub const VERSION: &str = \"0.19.3\";" > crates/utils/src/version.rs; \
         [ -z "$USE_RELEASE_CACHE" ] && cargo clean --release; \
         cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
