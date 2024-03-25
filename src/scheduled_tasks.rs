@@ -238,19 +238,21 @@ async fn process_post_aggregates_ranks_in_batches(conn: &mut AsyncPgConnection) 
                FOR UPDATE SKIP LOCKED)
          UPDATE post_aggregates pa
            SET hot_rank = hot_rank(pa.score, pa.published),
-           hot_rank_active = hot_rank_active(pa.score,
+           hot_rank_active = hot_rank(pa.score,
               (pa.published
-                + ('24:00:00'::interval *
+                +
+                ('24:00:00'::interval
+                    *
                     ( (1)::double precision
                       -
                       exp( (- 0.000012146493725346809)::double precision
                             *
                             date_part('epoch'::text,
-                                (GREATEST(pa.newest_comment_time_necro, pa.published) - pa.published)
+                                (GREATEST(pa.newest_comment_time, pa.published) - pa.published)
                             )
                       )
                     )
-                  )
+                )
               )
             ),
            scaled_rank = scaled_rank(pa.score, pa.published, ca.users_active_month)
