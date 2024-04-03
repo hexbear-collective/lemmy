@@ -344,6 +344,10 @@ pub mod functions {
   }
 
   sql_function! {
+    fn hot_rank_active(score: BigInt, time: Timestamptz, comment_time: Timestamptz) -> Double;
+  }
+
+  sql_function! {
     fn scaled_rank(score: BigInt, time: Timestamptz, users_active_month: BigInt) -> Double;
   }
 
