@@ -3,7 +3,7 @@ use crate::{
   newtypes::PostId,
   schema::{community_aggregates, post, post_aggregates},
   utils::{
-    functions::{hot_rank, scaled_rank},
+    functions::{hot_rank, hot_rank_active, scaled_rank},
     get_conn,
     DbPool,
   },
@@ -36,9 +36,10 @@ impl PostAggregates {
     diesel::update(post_aggregates::table.find(post_id))
       .set((
         post_aggregates::hot_rank.eq(hot_rank(post_aggregates::score, post_aggregates::published)),
-        post_aggregates::hot_rank_active.eq(hot_rank(
+        post_aggregates::hot_rank_active.eq(hot_rank_active(
           post_aggregates::score,
-          post_aggregates::newest_comment_time_necro,
+          post_aggregates::published,
+          post_aggregates::newest_comment_time,
         )),
         post_aggregates::scaled_rank.eq(scaled_rank(
           post_aggregates::score,
