@@ -1,4 +1,7 @@
 -- Fixing hot_rank_active to not break on ancient posts
+
+DROP FUNCTION hot_rank_active (score numeric, published timestamp with time zone, newest_comment_time timestamp with time zone);
+
 CREATE OR REPLACE FUNCTION hot_rank_active (score numeric, published timestamp with time zone, newest_comment_time timestamp with time zone)
     RETURNS float
     AS $$
