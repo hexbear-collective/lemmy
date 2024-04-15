@@ -1,4 +1,7 @@
 -- Return the hot_rank_active function to its broken-for-old-posts version
+
+DROP FUNCTION hot_rank_active (score numeric, published timestamp with time zone, newest_comment_time timestamp with time zone);
+
 CREATE OR REPLACE FUNCTION hot_rank_active (score numeric, published timestamp with time zone, newest_comment_time timestamp with time zone)
     RETURNS float
     AS $$
