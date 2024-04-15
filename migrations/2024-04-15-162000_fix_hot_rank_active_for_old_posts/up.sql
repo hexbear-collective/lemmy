@@ -12,9 +12,12 @@ DECLARE
                       -
                       exp( (- 0.000012146493725346809)::double precision
                             *
-                            date_part('epoch'::text,
+                            LEAST(
                                 -- max value allowed here is 60 * 60 * 24 * 7 = 604800 (1 week in seconds)
-                                LEAST( (GREATEST(newest_comment_time, published) - published), 604800)
+                                date_part('epoch'::text,
+                                    (GREATEST(newest_comment_time, published) - published)
+                                ),
+                                604800
                             )
                       )
                     )
