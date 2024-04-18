@@ -28,13 +28,29 @@ pub async fn save_user_settings(
 ) -> Result<Json<SuccessResponse>, LemmyError> {
   let site_view = SiteView::read_local(&mut context.pool()).await?;
 
-  let avatar = diesel_option_overwrite_to_url(&data.avatar)?;
-  let banner = diesel_option_overwrite_to_url(&data.banner)?;
+  let mut avatar = diesel_option_overwrite_to_url(&data.avatar)?;
+  let mut banner = diesel_option_overwrite_to_url(&data.banner)?;
   let bio = diesel_option_overwrite(data.bio.clone());
-  let display_name = diesel_option_overwrite(data.display_name.clone());
+  let mut display_name = diesel_option_overwrite(data.display_name.clone());
   let matrix_user_id = diesel_option_overwrite(data.matrix_user_id.clone());
   let email_deref = data.email.as_deref().map(str::to_lowercase);
   let email = diesel_option_overwrite(email_deref.clone());
+
+  if let Some(Some(a)) = &avatar {
+    //validate avatar is in host domain
+    let avatar_host = a.host_str().unwrap_or("");
+    if (avatar_host != context.settings().get_hostname_without_port()?) {
+      avatar = Some(None);
+    }
+  }
+
+  if let Some(Some(a)) = &banner {
+    //validate banner is in host domain
+    let banner_host = a.host_str().unwrap_or("");
+    if (banner_host != context.settings().get_hostname_without_port()?) {
+      banner = Some(None);
+    }
+  }
 
   if let Some(Some(email)) = &email {
     let previous_email = local_user_view.local_user.email.clone().unwrap_or_default();
@@ -70,6 +86,7 @@ pub async fn save_user_settings(
       site_view.local_site.actor_name_max_length as usize,
     )?;
   }
+  display_name = hexbear_validate_pronouns(display_name, local_user_view.person.name.to_string());
 
   if let Some(Some(matrix_user_id)) = &matrix_user_id {
     is_valid_matrix_id(matrix_user_id)?;

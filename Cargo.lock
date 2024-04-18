@@ -2674,6 +2674,7 @@ dependencies = [
  "pretty_assertions",
  "regex",
  "rustls 0.21.10",
+ "rustls-native-certs",
  "serde",
  "serde_json",
  "serde_with",
@@ -2810,6 +2811,8 @@ dependencies = [
  "lemmy_federate",
  "lemmy_routes",
  "lemmy_utils",
+ "openssl",
+ "openssl-probe",
  "opentelemetry 0.19.0",
  "opentelemetry-otlp 0.12.0",
  "pict-rs",
@@ -2818,6 +2821,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-tracing",
+ "rustls-native-certs",
  "serde_json",
  "serial_test",
  "tokio",
@@ -4547,6 +4551,18 @@ dependencies = [
  "ring 0.17.7",
  "rustls-webpki",
  "sct",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile",
+ "schannel",
+ "security-framework",
 ]
 
 [[package]]
