@@ -8,10 +8,6 @@ pub async fn main() -> LemmyResult<()> {
   let args = CmdArgs::parse();
   openssl_probe::init_ssl_cert_env_vars();
 
-  rustls::crypto::ring::default_provider()
-    .install_default()
-    .expect("Failed to install rustls crypto provider");
-
   #[cfg(not(feature = "embed-pictrs"))]
   start_lemmy_server(args).await?;
   #[cfg(feature = "embed-pictrs")]
