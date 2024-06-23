@@ -1113,7 +1113,11 @@ pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
       }
     }
     if valid {
-      pronouns = found_pronouns.iter().map(|x| x.to_string()).collect();
+      pronouns = found_pronouns
+        .iter()
+        .take(2)
+        .map(|x| x.to_string())
+        .collect();
     }
   }
   return pronouns;
