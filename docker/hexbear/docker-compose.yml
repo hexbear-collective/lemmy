@@ -80,7 +80,7 @@ services:
     deploy:
       replicas: 3
   pictrs:
-    image: asonix/pictrs:0.4.2
+    image: asonix/pictrs:0.5.16
     # this needs to match the pictrs url in lemmy.hjson
     hostname: pictrs
     environment:
