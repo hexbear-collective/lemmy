@@ -102,7 +102,7 @@ services:
       - ../../../pictrs:/mnt
     restart: always
     logging: *default-logging
-lemmy-ui-next:
+  lemmy-ui-next:
     build:
      context: ../../../lemmy-ui-next
      dockerfile: Dockerfile
