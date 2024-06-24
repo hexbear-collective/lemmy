@@ -103,7 +103,7 @@ pub async fn import_settings(
   context: Data<LemmyContext>,
 ) -> LemmyResult<Json<SuccessResponse>> {
   let person_form = PersonUpdateForm {
-    display_name: Some(data.display_name.clone()),
+    //display_name: Some(data.display_name.clone()),
     bio: Some(data.bio.clone()),
     matrix_user_id: Some(data.matrix_id.clone()),
     bot_account: data.bot_account,
