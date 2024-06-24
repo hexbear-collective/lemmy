@@ -12,6 +12,7 @@ services:
     ports:
       - "1236:1236"
       - "8536:8536"
+      - "3000:3000"
     volumes:
       - ./nginx.internal.conf:/etc/nginx/nginx.conf:ro
         #      - ./nginx.conf.d/:/etc/nginx/conf.d/:ro
@@ -26,7 +27,6 @@ services:
     depends_on:
       - pictrs
       - lemmy-ui
-      - mod-dashboard-frontend
     logging: *default-logging
 
   certbot:
@@ -92,21 +92,26 @@ services:
       - PICTRS__MEDIA__GIF__MAX_HEIGHT=512
       - PICTRS__MEDIA__GIF__MAX_AREA=262144
       - PICTRS__MEDIA__GIF__MAX_FRAME_COUNT=8000
+      - PICTRS__MEDIA__ANIMATION__MAX_WIDTH=512
+      - PICTRS__MEDIA__ANIMATION__MAX_HEIGHT=512
+      - PICTRS__MEDIA__ANIMATION__MAX_AREA=262144
+      - PICTRS__MEDIA__ANIMATION__MAX_FRAME_COUNT=8000
+      - PICTRS__UPGRADE__CONCURRENCY=512
     user: 991:991
     volumes:
       - ../../../pictrs:/mnt
     restart: always
     logging: *default-logging
-  
-  mod-dashboard-frontend:
+lemmy-ui-next:
     build:
-      context: ../../../hexbear-mod-dashboard
-      dockerfile: Dockerfile
-      args:
-        AppSettings: '{"APIUrl":"https://test-dash.hexbear.net"}'
-    hostname: dashboard-frontend
+     context: ../../../lemmy-ui-next
+     dockerfile: Dockerfile
     environment:
-      - ConnectionString=Host=localhost;Port=5433;Database=lemmy;Username=lemmy;Password=password
-    ports:
-      - "7081:7081"
+      - LEMMY_BACKEND=https://localhost:8536
+      - LEMMY_UI_NEXT_PUBLIC_URL=https://testnext.hexbear.net
+    depends_on:
+      - lemmy
+    hostname: lemmy-ui-next
+    restart: always
     logging: *default-logging
+    init: true
