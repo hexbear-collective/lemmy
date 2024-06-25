@@ -107,7 +107,7 @@ services:
      context: ../../../lemmy-ui-next
      dockerfile: Dockerfile
     environment:
-      - LEMMY_BACKEND=https://localhost:8536
+      - LEMMY_BACKEND=http://lemmy:8536
       - LEMMY_UI_NEXT_PUBLIC_URL=https://testnext.hexbear.net
     depends_on:
       - lemmy
