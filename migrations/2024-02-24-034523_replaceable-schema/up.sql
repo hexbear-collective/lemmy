@@ -11,11 +11,11 @@ DROP FUNCTION controversy_rank, scaled_rank, hot_rank;
 --Hexbear: delete orphaned aggregates before adding FK
 Delete from comment_aggregates where comment_id in (select comment_id from comment_aggregates ca left join comment c on c.id = ca.comment_id where c.Id is NULL);
 --hexbear add FK that was missing--	
-ALTER TABLE comment_aggregates
-ADD CONSTRAINT comment_aggregates_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES comment (id) INITIALLY DEFERRED;
---hexbear no need to alter FK.
 --ALTER TABLE comment_aggregates
---    ALTER CONSTRAINT comment_aggregates_comment_id_fkey INITIALLY DEFERRED;
+--ADD CONSTRAINT comment_aggregates_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES comment (id) INITIALLY DEFERRED;
+--hexbear no need to alter FK.
+ALTER TABLE comment_aggregates
+    ALTER CONSTRAINT comment_aggregates_comment_id_fkey INITIALLY DEFERRED;
 
 ALTER TABLE community_aggregates
     ALTER CONSTRAINT community_aggregates_community_id_fkey INITIALLY DEFERRED;
