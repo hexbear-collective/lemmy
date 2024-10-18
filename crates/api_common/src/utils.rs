@@ -1076,24 +1076,31 @@ pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
     "none/use name".to_string(),
     "any".to_string(),
     "comrade/them".to_string(),
+    "ae/aer".to_string(),
     "des/pair".to_string(),
     "doe/deer".to_string(),
     "e/em/eir".to_string(),
+    "ee/ees".to_string(),
+    "em/ems".to_string(),
     "ey/em".to_string(),
     "fae/faer".to_string(),
     "he/him".to_string(),
     "hy/hym".to_string(),
     "it/its".to_string(),
     "love/loves".to_string(),
+    "null/void".to_string(),
+    "pup/pups".to_string(),
     "she/her".to_string(),
+    "sie/hir".to_string(),
     "they/them".to_string(),
+    "thon/thons".to_string(),
     "undecided".to_string(),
     "xe/xem".to_string(),
     "xey/xem".to_string(),
     "ze/hir".to_string(),
     "ze/zir".to_string(),
-    "null/void".to_string(),
-    "sie/hir".to_string(),
+ 
+
   ]);
   let mut pronouns = vec!["none/use any".to_string()];
 
