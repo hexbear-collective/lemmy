@@ -1090,6 +1090,7 @@ pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
     "love/loves".to_string(),
     "null/void".to_string(),
     "pup/pup's".to_string(),
+    "sae/saer".to_string(),
     "she/her".to_string(),
     "sie/hir".to_string(),
     "they/them".to_string(),
