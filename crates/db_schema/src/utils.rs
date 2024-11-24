@@ -1,7 +1,7 @@
 pub mod uplete;
 
 use crate::{newtypes::DbUrl, CommentSortType, PostSortType};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::TimeDelta;
 use deadpool::Runtime;
 use diesel::{
   dsl,
@@ -68,7 +68,7 @@ use url::Url;
 const FETCH_LIMIT_DEFAULT: i64 = 10;
 pub const FETCH_LIMIT_MAX: i64 = 50;
 pub const SITEMAP_LIMIT: i64 = 50000;
-pub const SITEMAP_DAYS: Option<TimeDelta> = TimeDelta::try_days(31);
+pub const SITEMAP_DAYS: TimeDelta = TimeDelta::days(31);
 pub const RANK_DEFAULT: f64 = 0.0001;
 
 /// Some connection options to speed up queries
@@ -181,8 +181,8 @@ where
   K: CursorKey<C, SqlType = Timestamptz>,
 {
   type SqlType = sql_types::BigInt;
-  type CursorValue = functions::reverse_timestamp_sort::HelperType<K::CursorValue>;
-  type SqlValue = functions::reverse_timestamp_sort::HelperType<K::SqlValue>;
+  type CursorValue = functions::reverse_timestamp_sort<K::CursorValue>;
+  type SqlValue = functions::reverse_timestamp_sort<K::SqlValue>;
 
   fn get_cursor_value(cursor: &C) -> Self::CursorValue {
     functions::reverse_timestamp_sort(K::get_cursor_value(cursor))
@@ -360,8 +360,8 @@ pub fn diesel_url_create(opt: Option<&str>) -> LemmyResult<Option<DbUrl>> {
 }
 
 /// Sets a few additional config options necessary for starting lemmy
-fn build_config_options_uri_segment(config: &str) -> String {
-  let mut url = Url::parse(config).expect("Couldn't parse postgres connection URI");
+fn build_config_options_uri_segment(config: &str) -> LemmyResult<String> {
+  let mut url = Url::parse(config)?;
 
   // Set `lemmy.protocol_and_hostname` so triggers can use it
   let lemmy_protocol_and_hostname_option =
@@ -377,7 +377,7 @@ fn build_config_options_uri_segment(config: &str) -> String {
     .join(" ");
 
   url.set_query(Some(&format!("options={options_segments}")));
-  url.into()
+  Ok(url.into())
 }
 
 fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
@@ -385,8 +385,11 @@ fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConne
     /// Use a once_lock to create the postgres connection config, since this config never changes
     static POSTGRES_CONFIG_WITH_OPTIONS: OnceLock<String> = OnceLock::new();
 
-    let config =
-      POSTGRES_CONFIG_WITH_OPTIONS.get_or_init(|| build_config_options_uri_segment(config));
+    let config = POSTGRES_CONFIG_WITH_OPTIONS.get_or_init(|| {
+      build_config_options_uri_segment(config)
+        .inspect_err(|e| error!("Couldn't parse postgres connection URI: {e}"))
+        .unwrap_or_default()
+    });
 
     // We only support TLS with sslmode=require currently
     let conn = if config.contains("sslmode=require") {
@@ -483,7 +486,7 @@ pub fn build_db_pool() -> LemmyResult<ActualDbPool> {
       // from the pool
       let conn_was_used = metrics.recycled.is_some();
       if metrics.age() > Duration::from_secs(3 * 24 * 60 * 60) && conn_was_used {
-        Err(HookError::Continue(None))
+        Err(HookError::Message("Connection is too old".into()))
       } else {
         Ok(())
       }
@@ -495,12 +498,9 @@ pub fn build_db_pool() -> LemmyResult<ActualDbPool> {
   Ok(pool)
 }
 
+#[allow(clippy::expect_used)]
 pub fn build_db_pool_for_tests() -> ActualDbPool {
   build_db_pool().expect("db pool missing")
-}
-
-pub fn naive_now() -> DateTime<Utc> {
-  Utc::now()
 }
 
 pub fn post_to_comment_sort_type(sort: PostSortType) -> CommentSortType {
@@ -515,6 +515,7 @@ pub fn post_to_comment_sort_type(sort: PostSortType) -> CommentSortType {
   }
 }
 
+#[allow(clippy::expect_used)]
 static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
   Regex::new(r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$")
     .expect("compile email regex")
@@ -523,27 +524,29 @@ static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 pub mod functions {
   use diesel::sql_types::{BigInt, Text, Timestamptz};
 
-  sql_function! {
+  define_sql_function! {
     #[sql_name = "r.hot_rank"]
     fn hot_rank(score: BigInt, time: Timestamptz) -> Double;
   }
 
-  sql_function! {
+  define_sql_function! {
     #[sql_name = "r.scaled_rank"]
     fn scaled_rank(score: BigInt, time: Timestamptz, users_active_month: BigInt) -> Double;
   }
 
-  sql_function! {
+  define_sql_function! {
     #[sql_name = "r.controversy_rank"]
     fn controversy_rank(upvotes: BigInt, downvotes: BigInt, score: BigInt) -> Double;
   }
 
-  sql_function!(fn reverse_timestamp_sort(time: Timestamptz) -> BigInt);
+  define_sql_function!(fn reverse_timestamp_sort(time: Timestamptz) -> BigInt);
 
-  sql_function!(fn lower(x: Text) -> Text);
+  define_sql_function!(fn lower(x: Text) -> Text);
+
+  define_sql_function!(fn random() -> Text);
 
   // really this function is variadic, this just adds the two-argument version
-  sql_function!(fn coalesce<T: diesel::sql_types::SqlType + diesel::sql_types::SingleValue>(x: diesel::sql_types::Nullable<T>, y: T) -> T);
+  define_sql_function!(fn coalesce<T: diesel::sql_types::SqlType + diesel::sql_types::SingleValue>(x: diesel::sql_types::Nullable<T>, y: T) -> T);
 }
 
 pub const DELETED_REPLACEMENT_TEXT: &str = "*Permanently Deleted*";
