@@ -1,6 +1,8 @@
 use crate::{
   context::LemmyContext,
-  request::{delete_image_from_pictrs, fetch_pictrs_proxied_image_details},
+  request::{
+    delete_image_from_pictrs, fetch_pictrs_proxied_image_details, purge_image_from_pictrs,
+  },
   site::{FederatedInstances, InstanceWithFederationState},
 };
 use chrono::{DateTime, Days, Local, TimeZone, Utc};
@@ -1020,6 +1022,7 @@ pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
     "hy/hym".to_string(),
     "it/its".to_string(),
     "love/loves".to_string(),
+    "mirror/your pronouns".to_string(),
     "null/void".to_string(),
     "pup/pup's".to_string(),
     "sae/saer".to_string(),
