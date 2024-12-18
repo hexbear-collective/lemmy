@@ -1,17 +1,23 @@
 use crate::{check_totp_2fa_valid, local_user::check_email_verified};
 use actix_web::{
-  web::{Data, Json},
-  HttpRequest,
+  cookie::Cookie,
+  http::StatusCode,
+  web::{Data, Json, Query},
+  HttpRequest, HttpResponse,
 };
 use bcrypt::verify;
 use lemmy_api_common::{
   claims::Claims,
   context::LemmyContext,
-  person::{Login, LoginResponse},
-  utils::check_user_valid,
+  person::{Login, LoginResponse, RelatedUsersReq},
+  utils::{check_user_valid, is_admin},
 };
 use lemmy_db_schema::{
-  source::{local_site::LocalSite, registration_application::RegistrationApplication},
+  newtypes::{LocalUserId, PersonId},
+  source::{
+    hexbear_user_cookie_person::HexbearUserCookiePerson, local_site::LocalSite,
+    local_user::LocalUser, person::Person, registration_application::RegistrationApplication,
+  },
   utils::DbPool,
   RegistrationMode,
 };
@@ -23,7 +29,7 @@ pub async fn login(
   data: Json<Login>,
   req: HttpRequest,
   context: Data<LemmyContext>,
-) -> LemmyResult<Json<LoginResponse>> {
+) -> LemmyResult<HttpResponse> {
   let site_view = SiteView::read_local(&mut context.pool())
     .await?
     .ok_or(LemmyErrorType::LocalSiteNotSetup)?;
@@ -44,6 +50,27 @@ pub async fn login(
   if !valid {
     Err(LemmyErrorType::IncorrectLogin)?
   }
+
+  let bid_cookie = &req.cookie("bid");
+  let mut bid_cookie_value = "".to_string();
+  if bid_cookie.is_some() {
+    bid_cookie_value = bid_cookie.clone().unwrap().value().to_string();
+  }
+  let hexbear_cookie = HexbearUserCookiePerson::process_cookie(
+    &mut context.pool(),
+    local_user_view.person.id,
+    bid_cookie_value.to_string(),
+  )
+  .await;
+
+  if local_user_view.person.banned {
+    let mut response = HttpResponse::build(StatusCode::UNAUTHORIZED).json(LemmyErrorType::SiteBan);
+    if hexbear_cookie.len() > 0 {
+      let cookie = Cookie::new("bid", hexbear_cookie);
+      response.add_cookie(&cookie)?;
+    }
+    return Ok(response);
+  }
   check_user_valid(&local_user_view.person)?;
   check_email_verified(&local_user_view, &site_view)?;
 
@@ -61,11 +88,16 @@ pub async fn login(
 
   let jwt = Claims::generate(local_user_view.local_user.id, req, &context).await?;
 
-  Ok(Json(LoginResponse {
+  let mut res = HttpResponse::Ok().json(Json(LoginResponse {
     jwt: Some(jwt.clone()),
     verify_email_sent: false,
     registration_created: false,
-  }))
+  }));
+  if hexbear_cookie.len() > 0 {
+    let cookie = Cookie::new("bid", hexbear_cookie);
+    res.add_cookie(&cookie)?;
+  }
+  Ok(res)
 }
 
 async fn check_registration_application(
@@ -91,4 +123,18 @@ async fn check_registration_application(
     }
   }
   Ok(())
+}
+
+pub async fn find_related_users(
+  data: Query<RelatedUsersReq>,
+  local_user_view: LocalUserView,
+  context: Data<LemmyContext>,
+) -> LemmyResult<Json<Vec<Person>>> {
+  // Make sure user is an admin
+  is_admin(&local_user_view)?;
+
+  let related_users =
+    HexbearUserCookiePerson::find_related_users(&mut context.pool(), data.person_id).await?;
+
+  Ok(Json(related_users))
 }

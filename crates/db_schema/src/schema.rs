@@ -945,17 +945,9 @@ diesel::table! {
 }
 
 diesel::table! {
-    hexbear.ban_id (id) {
-        id -> Uuid,
-        created -> Timestamp,
-        aliased_to -> Nullable<Uuid>,
-    }
-}
-
-diesel::table! {
-    hexbear.user_ban_id (bid, uid) {
-        bid -> Uuid,
-        uid -> Int4,
+    hexbear.user_cookie_person (cookie_uuid, person_id) {
+        cookie_uuid -> Uuid,
+        person_id -> Int4,
     }
 }
 

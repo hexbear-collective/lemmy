@@ -16,6 +16,7 @@ pub mod email_verification;
 pub mod federation_allowlist;
 pub mod federation_blocklist;
 pub mod federation_queue_state;
+pub mod hexbear_user_cookie_person;
 pub mod images;
 pub mod instance;
 pub mod instance_block;
@@ -39,7 +40,6 @@ pub mod registration_application;
 pub mod secret;
 pub mod site;
 pub mod tagline;
-pub mod user_ban_id;
 
 /// Default value for columns like [community::Community.inbox_url] which are marked as serde(skip).
 ///
