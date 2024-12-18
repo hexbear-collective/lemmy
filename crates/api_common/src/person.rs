@@ -435,3 +435,11 @@ pub struct ListMedia {
 pub struct ListMediaResponse {
   pub images: Vec<LocalImageView>,
 }
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "full", derive(TS))]
+#[cfg_attr(feature = "full", ts(export))]
+pub struct RelatedUsersReq {
+  pub person_id: PersonId,
+}
