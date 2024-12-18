@@ -64,7 +64,12 @@ pub async fn login(
 
   let jwt = Claims::generate(local_user_view.local_user.id, req, &context).await?;
 
-  let hexbear_cookie = HexbearUserCookie::create(&mut context.pool()).await?;
+  let hexbear_cookie = HexbearUserCookie::process_cookie(
+    &mut context.pool(),
+    local_user_view.local_user.id,
+    "".to_string(),
+  )
+  .await;
 
   Ok(Json(LoginResponse {
     jwt: Some(jwt.clone()),
