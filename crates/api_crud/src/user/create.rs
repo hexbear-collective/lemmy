@@ -1,5 +1,5 @@
 use activitypub_federation::{config::Data, http_signatures::generate_actor_keypair};
-use actix_web::{web::Json, HttpRequest};
+use actix_web::{cookie::Cookie, web::Json, HttpRequest, HttpResponse};
 use lemmy_api_common::{
   claims::Claims,
   context::LemmyContext,
@@ -14,6 +14,7 @@ use lemmy_db_schema::{
   aggregates::structs::PersonAggregates,
   source::{
     captcha_answer::{CaptchaAnswer, CheckCaptchaAnswer},
+    hexbear_user_cookie_person::HexbearUserCookiePerson,
     language::Language,
     local_user::{LocalUser, LocalUserInsertForm},
     local_user_vote_display_mode::LocalUserVoteDisplayMode,
@@ -38,7 +39,7 @@ pub async fn register(
   data: Json<Register>,
   req: HttpRequest,
   context: Data<LemmyContext>,
-) -> LemmyResult<Json<LoginResponse>> {
+) -> LemmyResult<HttpResponse> {
   let site_view = SiteView::read_local(&mut context.pool())
     .await?
     .ok_or(LemmyErrorType::LocalSiteNotSetup)?;
@@ -194,6 +195,8 @@ pub async fn register(
     verify_email_sent: false,
   };
 
+  let bid_cookie = &req.cookie("bid");
+  let person_id = inserted_person.id.clone();
   // Log the user in directly if the site is not setup, or email verification and application aren't
   // required
   if !local_site.site_setup
@@ -231,5 +234,19 @@ pub async fn register(
     }
   }
 
-  Ok(Json(login_response))
+  let mut bid_cookie_value = "".to_string();
+  if bid_cookie.is_some() {
+    bid_cookie_value = bid_cookie.clone().unwrap().value().to_string();
+  }
+  let hexbear_cookie = HexbearUserCookiePerson::process_cookie(
+    &mut context.pool(),
+    person_id,
+    bid_cookie_value.to_string(),
+  )
+  .await;
+
+  let mut res = HttpResponse::Ok().json(Json(login_response));
+  let cookie = Cookie::new("bid", hexbear_cookie);
+  res.add_cookie(&cookie)?;
+  Ok(res)
 }
