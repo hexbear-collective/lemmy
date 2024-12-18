@@ -11,7 +11,10 @@ use lemmy_api_common::{
   utils::check_user_valid,
 };
 use lemmy_db_schema::{
-  source::{local_site::LocalSite, registration_application::RegistrationApplication},
+  source::{
+    hexbear_user_cookie::HexbearUserCookie, local_site::LocalSite,
+    registration_application::RegistrationApplication,
+  },
   utils::DbPool,
   RegistrationMode,
 };
@@ -60,6 +63,8 @@ pub async fn login(
   }
 
   let jwt = Claims::generate(local_user_view.local_user.id, req, &context).await?;
+
+  let hexbear_cookie = HexbearUserCookie::create(&mut context.pool()).await?;
 
   Ok(Json(LoginResponse {
     jwt: Some(jwt.clone()),
