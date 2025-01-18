@@ -5,12 +5,8 @@ use lemmy_api_common::{
   person::SaveUserSettings,
   request::replace_image,
   utils::{
-    get_url_blocklist,
-    hexbear_find_pronouns,
-    local_site_to_slur_regex,
-    process_markdown_opt,
-    proxy_image_link_opt_api,
-    send_verification_email,
+    get_url_blocklist, hexbear_find_pronouns, local_site_to_slur_regex, process_markdown_opt,
+    proxy_image_link_opt_api, send_verification_email,
   },
   SuccessResponse,
 };
@@ -173,6 +169,8 @@ fn hexbear_validate_pronouns(
   if let Some(Some(display_name)) = &display_name {
     let pronouns = hexbear_find_pronouns(display_name.to_string()).join(", ");
     name_with_pronouns = Some(Some(format!("{} [{pronouns}]", user_name.to_string())))
+  } else {
+    name_with_pronouns = Some(Some(format!("{} [none/use name]", user_name.to_string())))
   }
   return name_with_pronouns;
 }
