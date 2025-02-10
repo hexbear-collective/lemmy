@@ -1087,6 +1087,7 @@ pub fn hexbear_find_pronouns(display_name: String) -> Vec<String> {
     "he/him".to_string(),
     "hy/hym".to_string(),
     "it/its".to_string(),
+    "kit/kit's".to_string(),
     "love/loves".to_string(),
     "mirror/your pronouns".to_string(),
     "null/void".to_string(),
