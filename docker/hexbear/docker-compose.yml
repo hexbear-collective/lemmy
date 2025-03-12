@@ -102,16 +102,4 @@ services:
       - ../../../pictrs:/mnt
     restart: always
     logging: *default-logging
-  lemmy-ui-next:
-    build:
-     context: ../../../lemmy-ui-next
-     dockerfile: Dockerfile
-    environment:
-      - LEMMY_BACKEND=http://lemmy:8536
-      - LEMMY_UI_NEXT_PUBLIC_URL=https://testnext.hexbear.net
-    depends_on:
-      - lemmy
-    hostname: lemmy-ui-next
-    restart: always
-    logging: *default-logging
-    init: true
+
