@@ -1,4 +1,3 @@
-version: "3.7"
 
 x-logging: &default-logging
   driver: "json-file"
@@ -80,7 +79,7 @@ services:
     logging: *default-logging
     init: true
     deploy:
-      replicas: 3
+      replicas: 4
   pictrs:
     image: asonix/pictrs:0.5.16
     # this needs to match the pictrs url in lemmy.hjson
@@ -90,14 +89,10 @@ services:
       - PICTRS__TRACING__LOGGING__TARGETS=info
       - RUST_BACKTRACE=full
       - PICTRS__MEDIA__VIDEO_CODEC=vp9
-      - PICTRS__MEDIA__GIF__MAX_WIDTH=512
-      - PICTRS__MEDIA__GIF__MAX_HEIGHT=512
-      - PICTRS__MEDIA__GIF__MAX_AREA=262144
-      - PICTRS__MEDIA__GIF__MAX_FRAME_COUNT=8000
-      - PICTRS__MEDIA__ANIMATION__MAX_WIDTH=512
-      - PICTRS__MEDIA__ANIMATION__MAX_HEIGHT=512
+      - PICTRS__MEDIA__ANIMATION__MAX_WIDTH=1280
+      - PICTRS__MEDIA__ANIMATION__MAX_HEIGHT=720
       - PICTRS__MEDIA__ANIMATION__MAX_AREA=262144
-      - PICTRS__MEDIA__ANIMATION__MAX_FRAME_COUNT=8000
+      - PICTRS__MEDIA__ANIMATION__MAX_FRAME_COUNT=10000
       - PICTRS__UPGRADE__CONCURRENCY=512
     user: 991:991
     volumes:
