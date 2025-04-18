@@ -71,6 +71,8 @@ services:
       - LEMMY_UI_HTTPS=true
       - LEMMY_UI_DEBUG=false
       - NODE_ENV=production
+    volumes:
+      - ./extra_themes:/app/extra_themes
     depends_on:
       - lemmy
     hostname: lemmy-ui
