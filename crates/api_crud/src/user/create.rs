@@ -220,7 +220,7 @@ pub async fn register(
   };
 
   let bid_cookie = &req.cookie("bid");
-  let person_id = inserted_person.id.clone();
+  let person_id = person.id.clone();
   // Log the user in directly if the site is not setup, or email verification and application aren't
   // required
   if !local_site.site_setup
