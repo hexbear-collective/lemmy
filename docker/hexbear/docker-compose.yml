@@ -74,6 +74,8 @@ services:
     init: true
     deploy:
       replicas: 3
+    labels:
+      autoheal-app: true
 
   pictrs:
     image: asonix/pictrs:0.5.16
