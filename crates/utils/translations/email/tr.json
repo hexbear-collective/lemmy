@@ -1,0 +1,17 @@
+{
+  "registration_approved_subject": "{username} için kayıt onaylandı",
+  "registration_approved_body": "Kayıt isteğiniz onaylanmıştır. {hostname}'e hoşgeldiniz!",
+  "notification_mentioned_by_subject": "{username} bir yorumda sizden bahsetti",
+  "verify_email_subject": "{hostname} için emailinizi doğrulayın",
+  "email_verified_body": "Emailiniz doğrulandı.",
+  "email_verified_subject": "{username} için email doğrulandı",
+  "password_reset_subject": "{username} İçin parola sıfırlama",
+  "verify_email_body": "Lütfen @{username}@{hostname} kullanıcısı adına kayıtlı emailinizi doğrulamak için aşağıdaki linke tıklayın. Eğer kullanıcı hesabı size ait değilse görmezden gelin.<br><br><a href=\"{verify_link}\">Emailinizi doğrulayın</a>",
+  "notification_comment_reply_subject": "{username}'den yeni bir yorum",
+  "notification_post_reply_subject": "{username}'den yeni bir yorum",
+  "notification_private_message_subject": "{username}'den özel mesaj",
+  "new_application_subject": "{username} {hostname}'e katılmak için başvurdu",
+  "new_application_body": "Başvuruyu görüntülemek için lütfen aşağıdaki linke tıklayın.<br><br><a href=\"{applications_link}\">View Applications</a>",
+  "new_report_subject": "{hostname}'de {reporter_username} kullanıcısı tarafından {reported_username} kullanıcısı için yeni bir şikayet oluşturuldu",
+  "new_report_body": "Tüm şikayetleri görüntülemek için lütfen aşağıdaki linke tıklayın.<br><br><a href=\"{reports_link}\">View Reports</a>"
+}
