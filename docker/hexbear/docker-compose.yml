@@ -14,12 +14,6 @@ services:
       - "3000:3000"
     volumes:
       - ./nginx.internal.conf:/etc/nginx/nginx.conf:ro
-        #      - ./nginx.conf.d/:/etc/nginx/conf.d/:ro
-        #      - /opt/app/certbot/www/:/var/www/certbot/:ro
-        #      - /opt/app/matrix/:/var/www/matrix:ro
-        #      - /opt/app/certbot/conf/:/etc/nginx/ssl/:ro
-        #      - /opt/app/static/:/opt/app/static#/:ro
-        #
       - /opt/app/nginx-error.log:/log/nginx-error.log:rw
     restart: always
     hostname: proxy
@@ -66,7 +60,7 @@ services:
       # this needs to match the hostname defined in the lemmy service
       - LEMMY_UI_LEMMY_INTERNAL_HOST=lemmy:8536
       # set the outside hostname here
-      - LEMMY_UI_LEMMY_EXTERNAL_HOST=hexbear.net:443
+      - LEMMY_UI_LEMMY_EXTERNAL_HOST=hexbear.net
       - LEMMY_UI_HTTPS=true
       - LEMMY_UI_DEBUG=false
       - NODE_ENV=production
@@ -75,11 +69,12 @@ services:
     depends_on:
       - lemmy
     hostname: lemmy-ui
-    restart: always
+    restart: unless-stopped
     logging: *default-logging
     init: true
     deploy:
-      replicas: 4
+      replicas: 3
+
   pictrs:
     image: asonix/pictrs:0.5.16
     # this needs to match the pictrs url in lemmy.hjson
@@ -91,7 +86,7 @@ services:
       - PICTRS__MEDIA__VIDEO_CODEC=vp9
       - PICTRS__MEDIA__ANIMATION__MAX_WIDTH=1280
       - PICTRS__MEDIA__ANIMATION__MAX_HEIGHT=720
-      - PICTRS__MEDIA__ANIMATION__MAX_AREA=262144
+      - PICTRS__MEDIA__ANIMATION__MAX_AREA=922000
       - PICTRS__MEDIA__ANIMATION__MAX_FRAME_COUNT=10000
       - PICTRS__UPGRADE__CONCURRENCY=512
     user: 991:991
@@ -99,4 +94,18 @@ services:
       - ../../../pictrs:/mnt
     restart: always
     logging: *default-logging
+
+  autoheal:
+    deploy:
+      replicas: 1
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal-app
+      AUTOHEAL_START_PERIOD: 15
+      AUTOHEAL_ONLY_MONITOR_RUNNING: true
+    image: willfarrell/autoheal:latest
+    network_mode: none
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
 
