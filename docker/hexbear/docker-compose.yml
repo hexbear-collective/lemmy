@@ -131,5 +131,5 @@ services:
     ports:
       - 8924:8924
     volumes:
-      - "./anubia/botPolicy.yaml:/data/cfg/botPolicy.yaml:ro"
+      - "./anubis/botPolicy.yaml:/data/cfg/botPolicy.yaml:ro"
       - "./anubis/anubis.bdb:/data/anubis.bdb:rw"
