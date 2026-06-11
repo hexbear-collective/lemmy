@@ -119,17 +119,15 @@ services:
       METRICS_BIND: ":9090"
       SERVE_ROBOTS_TXT: "true"
       TARGET: "http://lemmy-ui:1234"
-      POLICY_FNAME: "/data/cfg/botPolicy.yaml"
-      OG_PASSTHROUGH: "true"
+      POLICY_FNAME: "/data/botPolicy.yaml"
+      OG_PASSTHROUGH: false
       OG_EXPIRY_TIME: "24h"
+      CUSTOM_REAL_IP_HEADER: "X-Forwarded-For"
     healthcheck:
       test: ["CMD", "anubis", "--healthcheck"]
       interval: 5s
       timeout: 30s
       retries: 5
       start_period: 500ms
-    ports:
-      - 8924:8924
     volumes:
-      - "./anubis/botPolicy.yaml:/data/cfg/botPolicy.yaml:ro"
-      - "./anubis/anubis.bdb:/data/anubis.bdb:rw"
+      - "./anubis/:/data/:rw"
