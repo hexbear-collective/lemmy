@@ -1,23 +1,30 @@
 # You can find the default botPolicy here:
 # https://github.com/TecharoHQ/anubis/blob/main/data/botPolicies.yaml
 bots:
-  - import: (data)/meta/default-config.yaml
+
   - name: logged-in-users
     headers_regex:
-      Cookie: .*jwt=.+
+      Cookie: .*(jwt|bypass)=.+
     action: ALLOW
+  - name: meta-webindexer
+    user_agent_regex: facebook
+    action: DENY
+  - import: (data)/meta/default-config.yaml
+
 dnsbl: false
+
 openGraph:
   enabled: false
   considerHost: false
   ttl: 24h
+
 status_codes:
   CHALLENGE: 200
   DENY: 200
+
 store:
-  backend: bbolt
-  parameters:
-    path: /data/anubis.bdb
+  backend: memory
+  parameters: {}    
 thresholds:
   - name: minimal-suspicion
     expression: weight <= 0
@@ -55,3 +62,4 @@ thresholds:
     challenge:
       algorithm: fast
       difficulty: 6
+
