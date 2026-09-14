@@ -34,6 +34,6 @@
 
   pictrs: {
     url: "http://pictrs:8080/"
-    # api_key: "API_KEY"
+    image_mode: "ProxyAllImages"
   }
 }
