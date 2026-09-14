@@ -131,3 +131,4 @@ services:
       start_period: 500ms
     volumes:
       - "./anubis/:/data/:rw"
+    restart: always
